@@ -8,15 +8,10 @@
 
 html,
 body {
-  background: #070908;
+  background: #0B1220;
   color: #f2f5f3;
-  font-family: Inter, system-ui, "Segoe UI", sans-serif;
+  font-family: 'Outfit', 'Plus Jakarta Sans', Inter, system-ui, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
-}
-
-body {
-  background-image: radial-gradient(1200px 500px at 70% -10%, rgba(61, 255, 143, 0.05), transparent 60%);
-  background-attachment: fixed;
 }
 
 *:focus-visible {
