@@ -7,9 +7,8 @@ import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app import __version__
-from app.auth.deps import require
-from app.auth.service import User
 from app.schemas.api import (
+    AcknowledgeRequest,
     AdvanceRequest,
     Alert,
     ControlRequest,
@@ -63,7 +62,7 @@ def health(monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------- zones
-@router.get("/zones", response_model=list[ZoneSummary], tags=["zones"], dependencies=[Depends(require("view"))])
+@router.get("/zones", response_model=list[ZoneSummary], tags=["zones"])
 def list_zones(monitor: MonitoringService = Depends(get_monitor)) -> list[dict[str, Any]]:
     return [_with_alert(monitor.zone_summary(zid)) for zid in ZONES]
 
@@ -74,12 +73,12 @@ def _with_alert(summary: dict[str, Any]) -> dict[str, Any]:
     return summary
 
 
-@router.get("/zones/{zone_id}", response_model=ZoneSummary, tags=["zones"], dependencies=[Depends(require("view"))])
+@router.get("/zones/{zone_id}", response_model=ZoneSummary, tags=["zones"])
 def get_zone(zone_id: str, monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
     return _with_alert(monitor.zone_summary(_zone_or_404(zone_id)))
 
 
-@router.get("/zones/{zone_id}/readings", response_model=ReadingsResponse, tags=["zones"], dependencies=[Depends(require("view"))])
+@router.get("/zones/{zone_id}/readings", response_model=ReadingsResponse, tags=["zones"])
 def zone_readings(
     zone_id: str,
     minutes: int = Query(180, ge=1, le=1440, description="How many minutes of history to return"),
@@ -91,7 +90,7 @@ def zone_readings(
     return {"zone_id": zone_id, "minutes": minutes, "count": len(records), "readings": records}
 
 
-@router.get("/zones/{zone_id}/forecast", response_model=ForecastResponse, tags=["prediction"], dependencies=[Depends(require("view"))])
+@router.get("/zones/{zone_id}/forecast", response_model=ForecastResponse, tags=["prediction"])
 def zone_forecast(
     zone_id: str,
     horizon: int = Query(30, description="Forecast horizon in minutes (15, 30 or 60)"),
@@ -105,7 +104,7 @@ def zone_forecast(
     return {**fc, "zone_id": zone_id, "lower_limit": cfg.lower_limit, "upper_limit": cfg.upper_limit}
 
 
-@router.get("/zones/{zone_id}/risk", response_model=RiskResponse, tags=["prediction"], dependencies=[Depends(require("view"))])
+@router.get("/zones/{zone_id}/risk", response_model=RiskResponse, tags=["prediction"])
 def zone_risk(
     zone_id: str,
     horizon: int = Query(30, description="Forecast horizon in minutes used for the forecast component (15, 30 or 60)"),
@@ -117,14 +116,14 @@ def zone_risk(
     return {**monitor.risk(zone_id, horizon), "zone_id": zone_id}
 
 
-@router.get("/zones/{zone_id}/sensor-health", tags=["prediction"], dependencies=[Depends(require("view"))])
+@router.get("/zones/{zone_id}/sensor-health", tags=["prediction"])
 def zone_sensor_health(zone_id: str, monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
     _zone_or_404(zone_id)
     return {"zone_id": zone_id, **monitor.get_assessment(zone_id).sensor}
 
 
 # ---------------------------------------------------------------------- alerts
-@router.get("/alerts", response_model=list[Alert], tags=["alerts"], dependencies=[Depends(require("view"))])
+@router.get("/alerts", response_model=list[Alert], tags=["alerts"])
 def list_alerts(
     severity: Optional[Severity] = None,
     zone_id: Optional[str] = None,
@@ -139,7 +138,7 @@ def list_alerts(
     return [_alert_out(a) for a in rows]
 
 
-@router.get("/alerts/{alert_id}", response_model=Alert, tags=["alerts"], dependencies=[Depends(require("view"))])
+@router.get("/alerts/{alert_id}", response_model=Alert, tags=["alerts"])
 def get_alert(alert_id: str, monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
     alert = monitor.db.get_alert(alert_id)
     if alert is None:
@@ -149,25 +148,22 @@ def get_alert(alert_id: str, monitor: MonitoringService = Depends(get_monitor)) 
 
 @router.post("/alerts/{alert_id}/acknowledge", response_model=Alert, tags=["alerts"])
 def acknowledge_alert(
-    alert_id: str,
-    user: User = Depends(require("acknowledge")),
-    monitor: MonitoringService = Depends(get_monitor),
+    alert_id: str, body: Optional[AcknowledgeRequest] = None, monitor: MonitoringService = Depends(get_monitor)
 ) -> dict[str, Any]:
-    # The acknowledging user comes from the session, not the request body.
-    label = f"{user.full_name} ({user.role})"
-    alert = monitor.alerts.acknowledge(alert_id, label, monitor.sim_time or pd.Timestamp.now().to_pydatetime())
+    user = body.user if body else "operator"
+    alert = monitor.alerts.acknowledge(alert_id, user, monitor.sim_time or pd.Timestamp.now().to_pydatetime())
     if alert is None:
         raise HTTPException(status_code=404, detail=f"Alert '{alert_id}' not found")
     return _alert_out(alert)
 
 
 # ---------------------------------------------------------------------- simulator
-@router.get("/simulator/status", tags=["simulator"], dependencies=[Depends(require("view"))])
+@router.get("/simulator/status", tags=["simulator"])
 def simulator_status(monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
     return monitor.status()
 
 
-@router.post("/simulator/scenario", response_model=MessageResponse, tags=["simulator"], dependencies=[Depends(require("simulate"))])
+@router.post("/simulator/scenario", response_model=MessageResponse, tags=["simulator"])
 def activate_scenario(body: ScenarioRequest, monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
     _zone_or_404(body.zone_id)
     monitor.set_scenario(body.zone_id, body.scenario, body.ambient_delta)
@@ -175,7 +171,7 @@ def activate_scenario(body: ScenarioRequest, monitor: MonitoringService = Depend
             "data": monitor.status()}
 
 
-@router.post("/simulator/reset", response_model=MessageResponse, tags=["simulator"], dependencies=[Depends(require("simulate"))])
+@router.post("/simulator/reset", response_model=MessageResponse, tags=["simulator"])
 def reset_simulator(body: Optional[ResetRequest] = None, monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
     body = body or ResetRequest()
     if body.zone_id:
@@ -186,7 +182,7 @@ def reset_simulator(body: Optional[ResetRequest] = None, monitor: MonitoringServ
     return {"message": msg, "data": monitor.status()}
 
 
-@router.post("/simulator/control", response_model=MessageResponse, tags=["simulator"], dependencies=[Depends(require("simulate"))])
+@router.post("/simulator/control", response_model=MessageResponse, tags=["simulator"])
 def control_simulator(body: ControlRequest, monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
     if body.tick_seconds is not None:
         monitor.tick_seconds = body.tick_seconds
@@ -195,13 +191,13 @@ def control_simulator(body: ControlRequest, monitor: MonitoringService = Depends
     return {"message": "Simulator updated.", "data": monitor.status()}
 
 
-@router.post("/simulator/advance", response_model=MessageResponse, tags=["simulator"], dependencies=[Depends(require("simulate"))])
+@router.post("/simulator/advance", response_model=MessageResponse, tags=["simulator"])
 def advance_simulator(body: AdvanceRequest, monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
     created = monitor.advance(body.minutes)
     return {"message": f"Advanced {body.minutes} simulated minutes; {created} new alert(s).", "data": monitor.status()}
 
 
-@router.post("/simulator/what-if", tags=["simulator"], dependencies=[Depends(require("what_if"))])
+@router.post("/simulator/what-if", tags=["simulator"])
 def what_if(body: WhatIfRequest, monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
     _zone_or_404(body.zone_id)
     try:
@@ -211,7 +207,7 @@ def what_if(body: WhatIfRequest, monitor: MonitoringService = Depends(get_monito
 
 
 # ---------------------------------------------------------------------- model
-@router.get("/model/metrics", tags=["model"], dependencies=[Depends(require("model"))])
+@router.get("/model/metrics", tags=["model"])
 def model_metrics(monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
     fc = monitor.models.forecaster
     if fc is None:
@@ -220,7 +216,7 @@ def model_metrics(monitor: MonitoringService = Depends(get_monitor)) -> dict[str
 
 
 # ---------------------------------------------------------------------- manager
-@router.get("/manager/overview", tags=["manager"], dependencies=[Depends(require("manager_overview"))])
+@router.get("/manager/overview", tags=["manager"])
 def manager_overview(
     window_minutes: int = Query(240, ge=30, le=1440, description="Compliance window in minutes"),
     monitor: MonitoringService = Depends(get_monitor),

@@ -9,8 +9,6 @@ from app.main import create_app
 def client(test_settings, models):
     app = create_app(test_settings, models=models, autostart=False)
     with TestClient(app) as c:
-        token = c.post("/api/auth/login", json={"username": "admin", "password": "admin123"}).json()["access_token"]
-        c.headers["Authorization"] = f"Bearer {token}"
         yield c
 
 
@@ -92,8 +90,8 @@ def test_demo_flow_compressor_failure(client):
     alerts = client.get("/api/alerts", params={"zone_id": "zone-a"}).json()
     comp = next(a for a in alerts if a["category"] == "compressor_failure")
     assert "Inspect the compressor" in comp["recommended_action"]
-    acked = client.post(f"/api/alerts/{comp['id']}/acknowledge").json()
-    assert acked["acknowledged"] is True and "admin" in acked["acknowledged_by"]
+    acked = client.post(f"/api/alerts/{comp['id']}/acknowledge", json={"user": "demo"}).json()
+    assert acked["acknowledged"] is True and acked["acknowledged_by"] == "demo"
     # De-duplication: still exactly one compressor alert after many ticks.
     assert sum(a["category"] == "compressor_failure" for a in alerts) == 1
     assert client.get("/api/alerts", params={"severity": "critical"}).status_code == 200
@@ -142,3 +140,11 @@ def test_sensor_anomaly_scenario_raises_sensor_alerts(client):
     cats = {a["category"] for a in client.get("/api/alerts", params={"zone_id": "zone-b"}).json()}
     assert {"sensor_anomaly", "missing_data"} <= cats
     assert "high_temperature" not in cats and "predicted_excursion" not in cats
+
+
+def test_manager_overview(client):
+    ov = client.get("/api/manager/overview").json()
+    assert ov["totals"]["zones"] == 3 and ov["totals"]["zones_ok"] == 3
+    z = ov["zones"][0]
+    assert z["time_in_range_pct"] == 100.0 and len(z["sparkline"]) == 60
+    assert client.get("/api/manager/overview", params={"window_minutes": 5}).status_code == 422

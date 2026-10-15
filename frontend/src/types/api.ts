@@ -246,29 +246,6 @@ export interface ModelMetricsResponse {
   metrics: ModelMetrics | null;
 }
 
-// ---------------------------------------------------------------- auth / RBAC
-export type Role = "admin" | "manager" | "operator";
-export type Permission = "view" | "acknowledge" | "manager_overview" | "what_if" | "model" | "simulate" | "manage_users";
-
-export interface AuthUser {
-  username: string;
-  full_name: string;
-  role: Role;
-  role_label: string;
-  permissions: Permission[];
-}
-
-export interface LoginResponse {
-  access_token: string;
-  token_type: string;
-  user: AuthUser;
-}
-
-export interface RoleMatrix {
-  roles: { id: Role; label: string }[];
-  permissions: { id: Permission; label: string; roles: Role[] }[];
-}
-
 // ---------------------------------------------------------------- manager overview
 export interface ManagerZone extends ZoneSummary {
   window_minutes: number;

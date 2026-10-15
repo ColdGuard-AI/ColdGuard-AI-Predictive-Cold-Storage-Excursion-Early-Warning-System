@@ -2,8 +2,6 @@ import {
   Activity,
   BellRing,
   Building2,
-  KeyRound,
-  LogOut,
   Boxes,
   BrainCircuit,
   CheckCircle2,
@@ -18,20 +16,17 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useApp } from "../hooks/AppContext";
-import { useAuth } from "../hooks/AuthContext";
-import type { Permission } from "../types/api";
 import { fmtTime } from "../lib/format";
 import { SimulatedBadge, StatusDot } from "./ui";
 
-const NAV: { to: string; label: string; icon: typeof LayoutDashboard; permission: Permission }[] = [
-  { to: "/manager", label: "Facility Overview", icon: Building2, permission: "manager_overview" },
-  { to: "/", label: "Live Monitor", icon: LayoutDashboard, permission: "view" },
-  { to: "/zones", label: "Storage Zones", icon: Boxes, permission: "view" },
-  { to: "/history", label: "Sensor History", icon: LineChart, permission: "view" },
-  { to: "/alerts", label: "Alerts", icon: BellRing, permission: "view" },
-  { to: "/what-if", label: "What-If Simulator", icon: SlidersHorizontal, permission: "what_if" },
-  { to: "/model", label: "Model & Method", icon: BrainCircuit, permission: "model" },
-  { to: "/access", label: "Access Control", icon: KeyRound, permission: "manage_users" },
+const NAV: { to: string; label: string; icon: typeof LayoutDashboard }[] = [
+  { to: "/manager", label: "Facility Overview", icon: Building2 },
+  { to: "/", label: "Live Monitor", icon: LayoutDashboard },
+  { to: "/zones", label: "Storage Zones", icon: Boxes },
+  { to: "/history", label: "Sensor History", icon: LineChart },
+  { to: "/alerts", label: "Alerts", icon: BellRing },
+  { to: "/what-if", label: "What-If Simulator", icon: SlidersHorizontal },
+  { to: "/model", label: "Model & Method", icon: BrainCircuit },
 ];
 
 function Brand() {
@@ -52,11 +47,10 @@ function Brand() {
 
 function NavItems({ onNavigate }: { onNavigate?: () => void }) {
   const { zones } = useApp();
-  const { can } = useAuth();
   const activeAlerts = zones?.reduce((n, z) => n + z.active_alert_count, 0) ?? 0;
   return (
     <nav aria-label="Main" className="flex flex-col gap-1">
-      {NAV.filter((n) => can(n.permission)).map(({ to, label, icon: Icon }) => (
+      {NAV.map(({ to, label, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}
@@ -107,24 +101,6 @@ function SystemStatus() {
       <span className="flex items-center gap-1.5 font-mono text-fg-muted" title="Simulated clock: one simulated minute per tick">
         <Activity size={13} className="text-neon/70" /> Sim clock {fmtTime(health.sim_time)}
       </span>
-    </div>
-  );
-}
-
-function UserMenu() {
-  const { user, logout } = useAuth();
-  if (!user) return null;
-  const initials = user.full_name.split(" ").map((p) => p[0]).join("").slice(0, 2);
-  return (
-    <div className="flex items-center gap-2.5">
-      <span className="grid h-8 w-8 place-items-center rounded-full border border-neon/30 bg-neon/10 text-xs font-semibold text-neon" aria-hidden>{initials}</span>
-      <span className="hidden leading-tight sm:block">
-        <span className="block text-xs font-medium text-fg">{user.full_name}</span>
-        <span className="block text-[11px] text-fg-muted">{user.role_label}</span>
-      </span>
-      <button onClick={() => void logout()} className="rounded-md p-1.5 text-fg-muted hover:bg-white/5 hover:text-fg" aria-label="Sign out" title="Sign out">
-        <LogOut size={16} />
-      </button>
     </div>
   );
 }
@@ -200,7 +176,6 @@ export function Layout({ children }: { children: ReactNode }) {
             <SimulatedBadge text="Prototype · Simulated data" />
             <div className="ml-auto flex flex-wrap items-center gap-x-5 gap-y-2">
               <SystemStatus />
-              <UserMenu />
             </div>
           </div>
         </header>

@@ -13,17 +13,13 @@ import type {
   WhatIfRequest,
   WhatIfResponse,
   ZoneSummary,
-  AuthUser,
-  LoginResponse,
   ManagerOverview,
-  RoleMatrix,
-  Role,
 } from "../types/api";
 
 let authToken: string | null = null;
 let onUnauthorized: (() => void) | null = null;
 
-/** Called by the auth context so every request carries the session token. */
+/** Integration point for the team login module: set a bearer token to send with every request. */
 export function setAuthToken(token: string | null) {
   authToken = token;
 }
@@ -93,7 +89,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       body = null;
     }
   }
-  if (res.status === 401 && authToken && !path.startsWith("/api/auth/login")) onUnauthorized?.();
+  if (res.status === 401 && authToken) onUnauthorized?.();
   if (!res.ok) throw new ApiError(describeErrorBody(body, res.status), res.status);
   return body as T;
 }
@@ -129,11 +125,4 @@ export const api = {
   modelMetrics: () => request<ModelMetricsResponse>("/api/model/metrics"),
   managerOverview: (windowMinutes = 240) =>
     request<ManagerOverview>(`/api/manager/overview${qs({ window_minutes: windowMinutes })}`),
-  login: (username: string, password: string) => post<LoginResponse>("/api/auth/login", { username, password }),
-  logout: () => post<{ ok: boolean }>("/api/auth/logout"),
-  me: () => request<AuthUser>("/api/auth/me"),
-  roles: () => request<RoleMatrix>("/api/auth/roles"),
-  users: () => request<AuthUser[]>("/api/auth/users"),
-  setRole: (username: string, role: Role) =>
-    request<AuthUser>(`/api/auth/users/${username}`, { method: "PATCH", body: JSON.stringify({ role }) }),
 };

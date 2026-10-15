@@ -3,11 +3,9 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertDetail, AlertRow, useAcknowledge } from "../components/alerts";
 import { ChartLegend, ForecastChart } from "../components/charts";
-import { ScenarioPanel } from "../components/ScenarioPanel";
 import { Badge, Card, EmptyState, ErrorState, InfoTip, LoadingState, Segmented, StaleBanner } from "../components/ui";
 import { RiskFactors, RiskGauge, RiskLabel, TempStatusLabel, TIPS, ZoneTabs } from "../components/zone";
 import { useApp } from "../hooks/AppContext";
-import { useAuth } from "../hooks/AuthContext";
 import { usePolling } from "../hooks/usePolling";
 import { CHART, fmtMinutes, fmtNum, fmtTemp, POLL_MS } from "../lib/format";
 import { api } from "../services/api";
@@ -15,8 +13,6 @@ import type { Alert, Forecast, Horizon, ZoneSummary } from "../types/api";
 
 export default function Dashboard() {
   const { zones, zonesError, zonesLoading, refreshZones, selectedZone, selectedZoneId } = useApp();
-  const { can } = useAuth();
-  const canSimulate = can("simulate");
   const [horizon, setHorizon] = useState<Horizon>(30);
   const [openAlert, setOpenAlert] = useState<Alert | null>(null);
 
@@ -114,8 +110,7 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          <div className={`grid grid-cols-1 gap-4 ${canSimulate ? "xl:grid-cols-2" : ""}`}>
-            {canSimulate && <ScenarioPanel />}
+          <div className="grid grid-cols-1 gap-4">
             <Card
               title="Recent Alerts"
               icon={<BellRing size={15} />}

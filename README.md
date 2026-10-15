@@ -22,7 +22,7 @@ ColdGuard AI watches each storage zone continuously and acts on the **forecast**
 * **Actionable alerts.** Every alert carries a recommendation tied to the observed condition. Alerts are de-duplicated, have a cooldown and can be acknowledged.
 * **What-If simulator.** A plain-language "What happens if…?" tool. Pick a room, a situation ("the cooling stops", "someone leaves the door open", "it gets very hot outside") and a duration. You get a direct answer: whether products stay safe, how long until they're at risk, and how much warning you'd get. Technical numbers are tucked under "Technical details".
 * **Storage Manager dashboard.** A live floor plan of the facility. Each room shows its thermometer against the safe band, a cooling unit that spins while running, a door that swings open on the wall, a last-hour sparkline and a plain-language status ("All good", "Door left open", "Out of safe range"). Alongside it are facility KPIs, time-in-range compliance per room and a "Needs your review" list.
-* **Role-based access.** Administrator, Storage Manager and Operator roles. The backend API enforces each role's permissions; it doesn't just hide buttons.
+* **Authentication is out of scope for this branch.** Login and roles come from the team's login module. The API client exposes `setAuthToken()` in `frontend/src/services/api.ts` so that module can attach its token to every request.
 
 In the demo scenario (compressor failure in Zone A), the early-warning alert fires about **25–30 simulated minutes before** the actual excursion.
 
@@ -30,7 +30,7 @@ In the demo scenario (compressor failure in Zone A), the early-warning alert fir
 
 ```
 ┌──────────────────────── React + Vite (TypeScript, Tailwind, Recharts) ───────────────────────┐
-│ Login · Facility Overview · Live Monitor · Zones · History · Alerts · What-If · Model · Access│
+│ Facility Overview · Live Monitor · Zones · Sensor History · Alerts · What-If · Model & Method │
 │ polls REST API every 2 s                                                                      │
 └───────────────────────────────────────────────┬──────────────────────────────────────────────┘
                                                 │ /api (Vite proxy in dev, CORS configured)
@@ -65,22 +65,20 @@ ColdGuardAI/
 │   │   ├── main.py              # FastAPI app factory, CORS, lifespan, error handlers
 │   │   ├── config.py            # env-var settings
 │   │   ├── train.py             # `python -m app.train` CLI
-│   │   ├── api/routes.py        # REST endpoints (each declares the permission it needs)
-│   │   ├── api/auth_routes.py   # login / logout / me / roles / user management
-│   │   ├── auth/                # users, password hashing, sessions, role → permission map
+│   │   ├── api/routes.py        # REST endpoints
 │   │   ├── schemas/api.py       # Pydantic request/response models
 │   │   ├── database/db.py       # SQLite repository
 │   │   ├── simulator/           # zones, physics engine, history generator
 │   │   ├── models/              # features, forecaster, anomaly detector, model registry
 │   │   └── services/            # monitor (orchestrator), forecasting, risk, alerts, what-if
-│   ├── tests/                   # 63 pytest tests (incl. role-based access)
+│   ├── tests/                   # 53 pytest tests
 │   ├── artifacts/               # trained model + metrics + training CSV (auto-generated)
 │   ├── data/                    # SQLite DB (auto-generated)
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
-│   │   ├── components/          # Layout, ui primitives, charts, alerts, ScenarioPanel, zone widgets
-│   │   ├── pages/               # Login, Manager, Dashboard (Live Monitor), Zones, History, Alerts, WhatIf, Model, Access
+│   │   ├── components/          # Layout, ui primitives, charts, alerts, FacilityMap, zone widgets
+│   │   ├── pages/               # Manager (Facility Overview), Dashboard (Live Monitor), Zones, History, Alerts, WhatIf, Model
 │   │   ├── hooks/               # usePolling, AppContext
 │   │   ├── services/api.ts      # typed REST client
 │   │   ├── types/api.ts
@@ -131,21 +129,9 @@ npm run dev
 
 Open **http://localhost:5173**. The dev server proxies `/api` to `http://127.0.0.1:8000`.
 
-### Signing in: roles and demo accounts
-
-| Role | Username / password | Lands on | Can do |
-|---|---|---|---|
-| Storage Manager | `manager` / `manager123` | Facility Overview | Floor plan and compliance, live monitoring, alerts and acknowledgement, What-If, model page |
-| Operator | `operator` / `operator123` | Live Monitor | Live monitoring, zones, sensor history, alerts and acknowledgement |
-| Administrator | `admin` / `admin123` | Facility Overview | Everything, plus simulator controls (scenarios, speed, reset) and changing user roles |
-
-Click a demo account on the login page to sign in. Each browser tab keeps its own session, so you can have the admin in one window driving the scenarios and the manager in another watching the floor plan. Admins can change roles under **Access Control**, and the change applies immediately.
-
-Passwords are stored as PBKDF2 hashes in SQLite. Sessions are bearer tokens held in memory, so restarting the backend signs everyone out. This is **demo-grade** authentication: there is no HTTPS enforcement, password reset or rate limiting.
-
 ### API documentation
 
-* Swagger UI: **http://localhost:8000/docs**. Call `POST /api/auth/login`, copy the `access_token`, then click **Authorize**. Only `/api/health` and `/api/auth/login` are public; other endpoints return 401 without a token and 403 if your role lacks the permission.
+* Swagger UI: **http://localhost:8000/docs**
 * ReDoc: http://localhost:8000/redoc
 
 ### Configuration (optional environment variables)
@@ -165,7 +151,14 @@ To retrain manually: `python -m app.train --days 12 --seed 42` (from `backend/`)
 
 ## 8. Simulation scenarios
 
-Signed in as **admin**, open the Live Monitor's **Scenario Simulator** panel, pick a zone and click a scenario. You can also call `POST /api/simulator/scenario` with an admin token. Managers and operators don't see these controls, because in a real deployment the "scenario" would be a real event.
+Scenarios are triggered through the API (the dashboard is the manager's view, so it has no simulator buttons). The easiest way is Swagger at http://localhost:8000/docs → `POST /api/simulator/scenario`, or from a terminal:
+
+```bash
+curl -X POST http://localhost:8000/api/simulator/scenario -H "Content-Type: application/json" -d "{\"zone_id\":\"zone-a\",\"scenario\":\"compressor_failure\"}"
+curl -X POST http://localhost:8000/api/simulator/reset -H "Content-Type: application/json" -d "{\"mode\":\"scenario\"}"
+```
+
+`POST /api/simulator/control` sets speed and pause, and `POST /api/simulator/advance` fast-forwards.
 
 | Scenario | What changes in the simulator |
 |---|---|
@@ -175,7 +168,7 @@ Signed in as **admin**, open the Live Monitor's **Scenario Simulator** panel, pi
 | Ambient Temperature Increase | Ambient +18 °C over 15 min, and cooling capacity derates |
 | Sensor Anomaly | The *reported* value spikes, then drops out, then freezes; the physical temperature is unaffected |
 
-Scenarios change simulator **inputs**. Readings, charts, forecasts, risk and alerts all respond through the normal pipeline. The panel also has Pause/Resume, speed (0.5×/1×/2×), **+10 min** fast-forward, **Return to Normal** and **Full reset**.
+Scenarios change simulator **inputs**. Readings, charts, forecasts, risk and alerts all respond through the normal pipeline. 
 
 Zones (illustrative limits): **Vaccine Store A** 2–8 °C, **Dairy Chiller B** 0–6 °C, **Frozen Store C** −25 to −15 °C.
 
@@ -205,13 +198,13 @@ Zones (illustrative limits): **Vaccine Store A** 2–8 °C, **Dairy Chiller B** 
 * The forecast assumes current conditions persist. It cannot anticipate a door that will be opened later.
 * The tree-spread band is an uncertainty indicator, not a calibrated confidence interval.
 * The risk score is a hand-designed heuristic, not a probability.
-* Single-process prototype: state lives in one FastAPI process with SQLite. Authentication is demo-grade: in-memory sessions, fixed demo accounts, no HTTPS enforcement.
+* Single-process prototype: state lives in one FastAPI process with SQLite. Authentication is provided separately by the team login module.
 * Timestamps come from a fast simulated clock (1 tick = 1 simulated minute).
 
 ## 11. Tests
 
 ```bash
-# backend (from backend/, venv active), 63 tests incl. the full demo flow and the role permission matrix
+# backend (from backend/, venv active), 53 tests incl. the full demo flow through the API
 python -m pytest -q
 
 # frontend (from frontend/)
@@ -220,19 +213,15 @@ npm run typecheck   # tsc
 npm run build       # production build
 ```
 
-Backend tests cover: simulator (reproducibility, every scenario, reset, duration), features with missing or unsorted data, training and baseline comparison, insufficient training data, save/load, forecast availability, risk scoring, sensor checks, alert rules, de-duplication, cooldown, escalation, acknowledgement, request validation (422/404), What-If, role-based access (401/403 per role, role changes, logout, manager overview), and an end-to-end demo flow that asserts **the early warning precedes the actual excursion**.
+Backend tests cover: simulator (reproducibility, every scenario, reset, duration), features with missing or unsorted data, training and baseline comparison, insufficient training data, save/load, forecast availability, risk scoring, sensor checks, alert rules, de-duplication, cooldown, escalation, acknowledgement, request validation (422/404), What-If, manager overview, and an end-to-end demo flow that asserts **the early warning precedes the actual excursion**.
 
 ## 12. 2-minute demo script
 
-1. Run `uvicorn app.main:app --port 8000` and `npm run dev`, then open http://localhost:5173. On the login page, click **Administrator**. Optionally open a second browser window and sign in as **Storage Manager**.
-2. **Facility Overview** shows all three rooms green ("All good"), 100% time in range and nothing to review.
-3. Go to **Live Monitor**, select **Vaccine Store A**, and in the **Scenario Simulator** panel click **Compressor Failure**.
-4. Back on **Facility Overview**, the room's cooling unit shows *Stopped* and the room turns red with "Cooling has stopped". The thermometer rises toward the red line, and a *Compressor Failure* alert appears under "Needs your review".
-5. In **Live Monitor**, the dashed forecast bends up toward the 8 °C limit and the risk score climbs. "Why this risk score?" lists the forecast, trend and compressor factors.
-6. After about 10 s (≈10 simulated min), the amber **Early warning: excursion predicted in ~N min** banner appears while the room is still below 8 °C. The actual *High Temperature* alert follows about 25–30 s later.
-7. Open an alert to see its explanation and recommended action, then **Acknowledge** it. The alert records who acknowledged it.
-8. Open **What-If Simulator**, choose *The cooling stops* and *1 hour*, then click **Show me what happens**. The answer reads like "Products at risk in about 39 min… ColdGuard would warn you after 9 min".
-9. In the Live Monitor, click **Return to Normal Operation**; the room recovers in about 30 simulated minutes. **Full reset** restarts everything.
-10. Optional: sign in as **Operator** to show the restricted view (no What-If, no simulator controls), or as admin open **Access Control** to show the permission matrix.
-
-Tip: use **2×** speed or **+10 min** to move faster, or **Pause** to talk over a frame.
+1. Run `uvicorn app.main:app --port 8000` and `npm run dev`, then open http://localhost:5173/manager. **Facility Overview** shows all three rooms green, 100% time in range and nothing to review.
+2. Open http://localhost:8000/docs in a second window and run `POST /api/simulator/scenario` with `{"zone_id": "zone-a", "scenario": "compressor_failure"}`.
+3. On **Facility Overview**, Vaccine Store A's cooling unit shows *Stopped* and the room turns red with "Cooling has stopped". The thermometer rises, and a *Compressor Failure* alert appears under "Needs your review".
+4. In **Live Monitor**, the dashed forecast bends up toward the 8 °C limit and the risk score climbs. "Why this risk score?" lists the forecast, trend and compressor factors.
+5. After about 10 s (≈10 simulated min), the amber **Early warning: excursion predicted in ~N min** banner appears while the room is still below 8 °C. The actual *High Temperature* alert follows about 25–30 s later.
+6. Open an alert to see its explanation and recommended action, then **Acknowledge** it.
+7. Open **What-If Simulator**, choose *The cooling stops* and *1 hour*, then click **Show me what happens**. You get a plain answer: products at risk in N min, and how early ColdGuard would warn.
+8. Reset with `POST /api/simulator/reset` and `{"mode": "scenario"}`; the room recovers in about 30 simulated minutes. `{"mode": "full"}` restarts everything.

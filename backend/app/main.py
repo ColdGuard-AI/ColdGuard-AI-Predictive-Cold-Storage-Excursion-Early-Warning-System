@@ -13,9 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app import __version__
-from app.api.auth_routes import router as auth_router
 from app.api.routes import router
-from app.auth.service import AuthService
 from app.config import Settings, settings
 from app.database.db import Database
 from app.models.registry import ModelBundle, load_or_train
@@ -32,7 +30,6 @@ def create_app(cfg: Settings = settings, models: ModelBundle | None = None, auto
         monitor = MonitoringService(cfg, bundle, db)
         monitor.initialize()
         app.state.monitor = monitor
-        app.state.auth = AuthService(db._conn, db._lock)
         if cfg.autostart_simulator if autostart is None else autostart:
             monitor.start_background()
         yield
@@ -45,8 +42,7 @@ def create_app(cfg: Settings = settings, models: ModelBundle | None = None, auto
         description=(
             "Predictive cold-storage excursion & early-warning system (hackathon prototype). "
             "**All sensor data is simulated.** Forecasts come from a Random Forest trained on simulated data; "
-            "risk scores are a documented heuristic. Most endpoints need a bearer token from `POST /api/auth/login` "
-            "(demo users: admin/admin123, manager/manager123, operator/operator123) - use the Authorize button."
+            "risk scores are a documented heuristic."
         ),
         lifespan=lifespan,
     )
@@ -71,7 +67,6 @@ def create_app(cfg: Settings = settings, models: ModelBundle | None = None, auto
     def root() -> dict[str, str]:
         return {"name": "ColdGuard AI", "tagline": "Predict Before It Spoils.", "docs": "/docs", "data": "simulated"}
 
-    app.include_router(auth_router)
     app.include_router(router)
     return app
 

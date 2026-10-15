@@ -6,7 +6,6 @@ import { FacilityMap } from "../components/FacilityMap";
 import { Card, EmptyState, ErrorState, InfoTip, LoadingState, Segmented, SimulatedBadge, StaleBanner } from "../components/ui";
 import { RiskFactors, RiskGauge, RiskLabel, TIPS } from "../components/zone";
 import { useApp } from "../hooks/AppContext";
-import { useAuth } from "../hooks/AuthContext";
 import { usePolling } from "../hooks/usePolling";
 import { fmtMinutes, fmtTemp, fmtTime } from "../lib/format";
 import { TONE_COLORS, zoneHeadline } from "../lib/status";
@@ -40,7 +39,6 @@ function pctTone(p: number | null): "ok" | "warn" | "crit" {
 
 export default function Manager() {
   const { selectedZoneId, setSelectedZoneId, zones: liveZones } = useApp();
-  const { user, can } = useAuth();
   const navigate = useNavigate();
   const [windowMin, setWindowMin] = useState(240);
   const [openAlert, setOpenAlert] = useState<Alert | null>(null);
@@ -65,7 +63,7 @@ export default function Manager() {
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold text-fg"><Building2 size={20} className="text-neon" /> Facility Overview</h1>
           <p className="text-sm text-fg-muted">
-            Good {greeting()}, {user?.full_name.split(" ")[0]}. Here is every storage room at a glance. <SimulatedBadge />
+            Good {greeting()}. Here is every storage room at a glance. <SimulatedBadge />
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -94,7 +92,7 @@ export default function Manager() {
           <FacilityMap zones={zones} selectedId={selected?.zone_id ?? ""} onSelect={setSelectedZoneId} />
           <Legend />
         </Card>
-        {selected && <RoomDetail z={selected} risk={risk.data} canWhatIf={can("what_if")} onOpen={(path) => { setSelectedZoneId(selected.zone_id); navigate(path); }} />}
+        {selected && <RoomDetail z={selected} risk={risk.data} canWhatIf onOpen={(path) => { setSelectedZoneId(selected.zone_id); navigate(path); }} />}
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
