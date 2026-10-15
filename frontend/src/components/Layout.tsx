@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
   X,
   XCircle,
+  LogOut,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -128,7 +129,15 @@ function Toaster() {
   );
 }
 
-export function Layout({ children }: { children: ReactNode }) {
+export function Layout({ 
+  children, 
+  user, 
+  onSignOut 
+}: { 
+  children: ReactNode; 
+  user?: any; 
+  onSignOut?: () => void; 
+}) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
   useEffect(() => setDrawerOpen(false), [location.pathname]);
@@ -141,9 +150,29 @@ export function Layout({ children }: { children: ReactNode }) {
           <Brand />
         </div>
         <NavItems />
-        <div className="mt-auto space-y-2 rounded-lg border border-white/5 bg-white/[0.02] p-3 text-[11px] leading-relaxed text-fg-faint">
-          <SimulatedBadge text="Prototype" />
-          <p>All readings come from a sensor simulator. Forecasts are not validated for real-world, medical or food-safety decisions.</p>
+        <div className="mt-auto space-y-3">
+          {user && (
+            <div className="rounded-lg border border-neon/20 bg-neon/5 p-3 text-xs">
+              <div className="font-semibold text-fg flex items-center justify-between">
+                <span className="truncate">{user.name || user.email}</span>
+                <span className="h-2 w-2 rounded-full bg-emerald-400 shrink-0"></span>
+              </div>
+              <div className="text-[10px] text-fg-muted font-mono truncate mt-0.5">
+                {user.role_display || user.actual_role}
+              </div>
+              <button
+                onClick={onSignOut}
+                className="mt-2 w-full py-1 px-2 rounded bg-rose-950/40 hover:bg-rose-900/40 border border-rose-500/30 text-rose-300 text-[11px] font-medium flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                <LogOut size={12} />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          )}
+          <div className="space-y-2 rounded-lg border border-white/5 bg-white/[0.02] p-3 text-[11px] leading-relaxed text-fg-faint">
+            <SimulatedBadge text="Prototype" />
+            <p>All readings come from a sensor simulator. Forecasts are not validated for real-world, medical or food-safety decisions.</p>
+          </div>
         </div>
       </aside>
 
@@ -159,6 +188,19 @@ export function Layout({ children }: { children: ReactNode }) {
               </button>
             </div>
             <NavItems onNavigate={() => setDrawerOpen(false)} />
+            {user && (
+              <div className="mt-auto pt-4 border-t border-neon/15">
+                <div className="text-xs font-semibold text-fg">{user.name}</div>
+                <div className="text-[10px] text-fg-muted">{user.role_display}</div>
+                <button
+                  onClick={onSignOut}
+                  className="mt-2 w-full py-1.5 px-3 rounded bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-center gap-1.5"
+                >
+                  <LogOut size={13} />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -176,6 +218,25 @@ export function Layout({ children }: { children: ReactNode }) {
             <SimulatedBadge text="Prototype · Simulated data" />
             <div className="ml-auto flex flex-wrap items-center gap-x-5 gap-y-2">
               <SystemStatus />
+              {user && (
+                <div className="hidden sm:flex items-center gap-3 pl-3 border-l border-white/10">
+                  <div className="text-right">
+                    <div className="text-xs font-semibold text-fg flex items-center gap-1.5 justify-end">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
+                      {user.name || user.email}
+                    </div>
+                    <div className="text-[10px] text-fg-muted font-mono">{user.role_display || user.actual_role}</div>
+                  </div>
+                  <button
+                    onClick={onSignOut}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-rose-300 bg-rose-950/40 border border-rose-500/30 hover:bg-rose-900/40 hover:text-rose-200 transition cursor-pointer"
+                    title="Sign out of ColdGuard session"
+                  >
+                    <LogOut size={13} />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
