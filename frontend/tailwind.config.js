@@ -4,20 +4,42 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: { DEFAULT: "#070908", 900: "#0b0e0d", 800: "#101413", 700: "#161b1a", 600: "#1d2422", 500: "#2a3330" },
-        neon: { DEFAULT: "#3dff8f", soft: "#8affbf", dim: "#1fae5c" },
-        fg: { DEFAULT: "#f2f5f3", muted: "#9aa6a0", faint: "#6b7671" },
-        warn: "#fbbf24",
-        crit: "#ff5c70",
-        sky: "#7cc7ff",
+        ink: { 
+          DEFAULT: "#0B1220", 
+          950: "#070D18", 
+          900: "#0D1626", 
+          800: "#131F35", 
+          700: "#1E2D4A", 
+          600: "#253B61", 
+          500: "#334B75" 
+        },
+        neon: { 
+          DEFAULT: "#22D3EE", 
+          soft: "#67E8F9", 
+          dim: "#0891B2" 
+        },
+        fg: { 
+          DEFAULT: "#F8FAFC", 
+          muted: "#94A3B8", 
+          faint: "#64748B" 
+        },
+        warn: "#F59E0B",
+        crit: "#F43F5E",
+        sky: "#38BDF8",
+        cyan: {
+          400: "#22D3EE",
+          500: "#06B6D4",
+          600: "#0891B2",
+        },
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "Segoe UI", "sans-serif"],
+        sans: ["'Outfit'", "'Plus Jakarta Sans'", "Inter", "system-ui", "sans-serif"],
         mono: ["'JetBrains Mono'", "ui-monospace", "Consolas", "monospace"],
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(61,255,143,0.18), 0 0 18px -6px rgba(61,255,143,0.35)",
-        "glow-crit": "0 0 0 1px rgba(255,92,112,0.35), 0 0 18px -6px rgba(255,92,112,0.5)",
+        glow: "0 0 0 1px rgba(34,211,238,0.25), 0 0 20px -4px rgba(34,211,238,0.35)",
+        "glow-cyan": "0 0 25px rgba(34, 211, 238, 0.22), inset 0 0 15px rgba(34, 211, 238, 0.08)",
+        "glow-crit": "0 0 0 1px rgba(244,63,94,0.35), 0 0 20px -4px rgba(244,63,94,0.5)",
       },
     },
   },

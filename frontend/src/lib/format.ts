@@ -87,23 +87,23 @@ export function capitalize(s: string): string {
 }
 
 export const RISK_COLOR: Record<RiskCategory, string> = {
-  low: "#3dff8f",
-  medium: "#fbbf24",
-  high: "#ff8a5c",
-  critical: "#ff5c70",
-  unknown: "#6b7671",
+  low: "#10B981", // Emerald safe
+  medium: "#F59E0B", // Amber warning
+  high: "#F97316", // Orange elevated
+  critical: "#F43F5E", // Rose critical
+  unknown: "#64748B",
 };
 
-// Chart palette (kept in one place so every chart reads the same way).
+// Chart palette (aligned with cold-chain cryo cyan and deep navy aesthetic)
 export const CHART = {
-  observed: "#3dff8f",
-  forecast: "#7cc7ff",
-  band: "#7cc7ff",
-  limit: "#ff5c70",
-  setpoint: "#9aa6a0",
-  humidity: "#c4a6ff",
-  scenario: "#ff8a5c",
-  baseline: "#3dff8f",
-  grid: "rgba(255,255,255,0.06)",
-  axis: "#6b7671",
+  observed: "#22D3EE",
+  forecast: "#38BDF8",
+  band: "#38BDF8",
+  limit: "#F43F5E",
+  setpoint: "#94A3B8",
+  humidity: "#A78BFA",
+  scenario: "#F97316",
+  baseline: "#22D3EE",
+  grid: "rgba(34, 211, 238, 0.08)",
+  axis: "#64748B",
 };

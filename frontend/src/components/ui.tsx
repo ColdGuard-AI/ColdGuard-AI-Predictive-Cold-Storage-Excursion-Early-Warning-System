@@ -23,20 +23,20 @@ export function Card({
   bodyClassName?: string;
   tone?: "crit" | "warn";
 }) {
-  const ring = tone === "crit" ? "border-crit/40 shadow-glow-crit" : tone === "warn" ? "border-warn/30" : "border-neon/10";
+  const ring = tone === "crit" ? "border-crit/50 shadow-glow-crit" : tone === "warn" ? "border-warn/40" : "border-cyan-500/20 hover:border-cyan-500/35";
   return (
-    <section className={`rounded-xl border bg-ink-800/90 ${ring} flex flex-col min-w-0 ${className}`}>
+    <section className={`rounded-xl border bg-slate-900/80 backdrop-blur-md shadow-xl ${ring} flex flex-col min-w-0 transition-all ${className}`}>
       {(title || actions) && (
-        <header className="flex items-center justify-between gap-3 px-4 pt-3.5 pb-2 flex-wrap">
-          <h2 className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-fg-muted">
-            {icon && <span className="text-neon/80">{icon}</span>}
+        <header className="flex items-center justify-between gap-3 px-4 pt-3.5 pb-2 flex-wrap border-b border-cyan-500/10">
+          <h2 className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-cyan-300">
+            {icon && <span className="text-cyan-400">{icon}</span>}
             {title}
             {tip && <InfoTip text={tip} />}
           </h2>
           {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
         </header>
       )}
-      <div className={`px-4 pb-4 flex-1 min-w-0 ${title || actions ? "" : "pt-4"} ${bodyClassName}`}>{children}</div>
+      <div className={`px-4 pb-4 flex-1 min-w-0 ${title || actions ? "pt-3.5" : "pt-4"} ${bodyClassName}`}>{children}</div>
     </section>
   );
 }
@@ -60,7 +60,7 @@ export function InfoTip({ text, label = "More information" }: { text: string; la
         type="button"
         aria-label={label}
         aria-describedby={open ? id : undefined}
-        className="text-fg-faint hover:text-neon focus-visible:text-neon rounded-full"
+        className="text-fg-faint hover:text-cyan-400 focus-visible:text-cyan-400 rounded-full transition-colors"
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
@@ -73,7 +73,7 @@ export function InfoTip({ text, label = "More information" }: { text: string; la
         <span
           role="tooltip"
           id={id}
-          className="absolute left-1/2 top-full z-50 mt-2 w-64 -translate-x-1/2 rounded-lg border border-neon/20 bg-ink-900 px-3 py-2 text-xs font-normal leading-relaxed text-fg shadow-xl"
+          className="absolute left-1/2 top-full z-50 mt-2 w-64 -translate-x-1/2 rounded-lg border border-cyan-500/30 bg-slate-950/95 px-3 py-2 text-xs font-normal leading-relaxed text-fg shadow-2xl backdrop-blur-md"
         >
           {text}
         </span>
@@ -91,17 +91,17 @@ export function Button({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" | "danger"; size?: "sm" | "md"; loading?: boolean }) {
   const styles = {
-    primary: "bg-neon text-ink font-semibold hover:bg-neon-soft border-neon",
-    secondary: "bg-ink-700 text-fg border-white/10 hover:border-neon/40 hover:text-neon",
-    ghost: "bg-transparent text-fg-muted border-transparent hover:text-fg hover:bg-white/5",
-    danger: "bg-crit/10 text-crit border-crit/40 hover:bg-crit/20",
+    primary: "bg-cyan-400 text-slate-950 font-bold hover:bg-cyan-300 border-cyan-400 shadow-glow",
+    secondary: "bg-slate-900/80 text-slate-200 border-cyan-500/30 hover:border-cyan-400 hover:text-white shadow-sm",
+    ghost: "bg-transparent text-slate-400 border-transparent hover:text-white hover:bg-white/5",
+    danger: "bg-rose-950/50 text-rose-300 border-rose-500/40 hover:bg-rose-900/50",
   }[variant];
   const sizes = size === "sm" ? "px-2.5 py-1 text-xs" : "px-3.5 py-2 text-sm";
   return (
     <button
       {...props}
       disabled={props.disabled || loading}
-      className={`inline-flex items-center justify-center gap-2 rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${styles} ${sizes} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${styles} ${sizes} ${className}`}
     >
       {loading && <Loader2 size={14} className="animate-spin" />}
       {children}
@@ -121,15 +121,15 @@ export function Segmented<T extends string | number>({
   label: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-lg border border-white/10 bg-ink-900 p-0.5">
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-xl border border-cyan-500/25 bg-slate-950/90 p-1">
       {options.map((o) => (
         <button
           key={String(o.value)}
           role="radio"
           aria-checked={o.value === value}
           onClick={() => onChange(o.value)}
-          className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-            o.value === value ? "bg-neon/15 text-neon" : "text-fg-muted hover:text-fg"
+          className={`rounded-lg px-3 py-1.5 text-xs font-mono font-bold transition-all cursor-pointer ${
+            o.value === value ? "bg-cyan-400 text-slate-950 shadow-sm" : "text-slate-400 hover:text-white"
           }`}
         >
           {o.label}

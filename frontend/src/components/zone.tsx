@@ -21,14 +21,16 @@ export function ZoneTabs({ className = "" }: { className?: string }) {
             role="tab"
             aria-selected={selected}
             onClick={() => setSelectedZoneId(z.zone_id)}
-            className={`flex shrink-0 items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors ${
-              selected ? "border-neon/40 bg-neon/[0.07]" : "border-white/[0.07] bg-ink-800 hover:border-neon/25"
+            className={`flex shrink-0 items-center gap-2.5 rounded-xl border px-3.5 py-2 text-left transition-all cursor-pointer backdrop-blur-md ${
+              selected
+                ? "border-cyan-400 bg-cyan-500/15 shadow-glow"
+                : "border-cyan-500/20 bg-slate-900/80 hover:border-cyan-400/40 hover:bg-slate-850"
             }`}
           >
             <StatusDot tone={tone} pulse={tone === "crit"} />
             <span>
-              <span className={`block text-sm font-medium ${selected ? "text-fg" : "text-fg-muted"}`}>{z.name}</span>
-              <span className="block font-mono text-[11px] text-fg-faint">
+              <span className={`block text-sm font-semibold tracking-tight ${selected ? "text-white" : "text-slate-300"}`}>{z.name}</span>
+              <span className="block font-mono text-[11px] text-cyan-400/80">
                 {z.temperature != null ? `${z.temperature.toFixed(1)}°C` : "no data"} · risk {z.risk_score ?? "—"}
               </span>
             </span>
