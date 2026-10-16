@@ -13,6 +13,7 @@ import {
   X,
   XCircle,
   LogOut,
+  Layers,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -23,6 +24,7 @@ import { SimulatedBadge, StatusDot } from "./ui";
 const NAV: { to: string; label: string; icon: typeof LayoutDashboard }[] = [
   { to: "/manager", label: "Facility Overview", icon: Building2 },
   { to: "/", label: "Live Monitor", icon: LayoutDashboard },
+  { to: "/twin", label: "Digital Twin", icon: Layers },
   { to: "/zones", label: "Storage Zones", icon: Boxes },
   { to: "/history", label: "Sensor History", icon: LineChart },
   { to: "/alerts", label: "Alerts", icon: BellRing },

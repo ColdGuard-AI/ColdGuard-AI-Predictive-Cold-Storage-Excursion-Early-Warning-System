@@ -9,6 +9,7 @@ import { setAuthToken } from "./services/api";
 // Dashboard Pages from feature/dashboard
 import Alerts from "./pages/Alerts";
 import Dashboard from "./pages/Dashboard";
+import DigitalTwin from "./pages/DigitalTwin";
 import History from "./pages/History";
 import Manager from "./pages/Manager";
 import Model from "./pages/Model";
@@ -97,6 +98,7 @@ export default function App() {
           <ErrorBoundary>
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/twin" element={<DigitalTwin />} />
               <Route path="/manager" element={<Manager />} />
               <Route path="/zones" element={<Zones />} />
               <Route path="/history" element={<History />} />

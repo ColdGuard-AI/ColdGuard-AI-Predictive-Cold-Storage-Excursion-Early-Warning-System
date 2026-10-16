@@ -78,6 +78,7 @@ export interface Reading {
   zone_id: string;
   sensor_id: string;
   temperature: number | null;
+  true_temperature?: number | null;
   humidity: number | null;
   compressor_status: string;
   door_status: string;
