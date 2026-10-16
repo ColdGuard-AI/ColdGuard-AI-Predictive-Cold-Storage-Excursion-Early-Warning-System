@@ -54,42 +54,42 @@ export default function Manager() {
 
   const { totals, zones, action_items } = overview.data;
   const selected = zones.find((z) => z.zone_id === selectedZoneId) ?? zones[0];
-  const highest = zones.find((z) => z.zone_id === totals.highest_risk_zone);
+  const singleStoreZones = [selected];
   const zoneName = (id: string) => zones.find((z) => z.zone_id === id)?.name ?? liveZones?.find((z) => z.zone_id === id)?.name;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold text-fg"><Building2 size={20} className="text-neon" /> Facility Overview</h1>
-          <p className="text-sm text-fg-muted">
-            Good {greeting()}. Here is every storage room at a glance. <SimulatedBadge />
+          <h1 className="flex items-center gap-2 text-xl font-bold text-white tracking-tight"><Building2 size={20} className="text-cyan-400" /> Store Overview & Governance</h1>
+          <p className="text-sm text-slate-400">
+            Good {greeting()}. Here is your active cold storage facility profile. <SimulatedBadge />
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-fg-faint">Compliance window</span>
+          <span className="text-xs text-slate-400 font-mono">Compliance window:</span>
           <Segmented label="Compliance window" value={windowMin} onChange={setWindowMin} options={WINDOWS} />
         </div>
       </div>
       <StaleBanner error={overview.error} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Kpi icon={<CheckCircle2 size={13} />} label="Rooms OK" value={`${totals.zones_ok} / ${totals.zones}`} tone={totals.zones_attention ? "warn" : "ok"}
-          sub={totals.zones_attention ? `${totals.zones_attention} need attention` : "everything normal"} />
-        <Kpi icon={<BellRing size={13} />} label="Active alerts" value={String(totals.active_alerts)} tone={totals.active_alerts ? "crit" : "ok"}
-          sub={`${totals.unacknowledged_alerts} not yet reviewed`} />
-        <Kpi icon={<ClipboardCheck size={13} />} label="Time in range" value={totals.facility_time_in_range_pct != null ? `${totals.facility_time_in_range_pct}%` : "—"}
-          tone={pctTone(totals.facility_time_in_range_pct)} sub={`average, last ${fmtMinutes(windowMin)}`}
-          tip="Share of readings inside each room's safe range during the selected window, averaged across rooms." />
-        <Kpi icon={<Gauge size={13} />} label="Highest risk" value={highest ? `${highest.risk_score ?? "—"}` : "—"}
-          tone={highest?.risk_category === "low" ? "ok" : highest?.risk_category === "medium" ? "warn" : "crit"} sub={highest?.name} tip={TIPS.risk} />
+        <Kpi icon={<CheckCircle2 size={13} />} label="Store Status" value={selected.temperature_status === "normal" ? "1 / 1 OK" : "0 / 1 Excursion"} tone={selected.temperature_status === "normal" ? "ok" : "crit"}
+          sub={selected.temperature_status === "normal" ? "temperature within range" : "attention required"} />
+        <Kpi icon={<BellRing size={13} />} label="Active alerts" value={String(selected.active_alert_count)} tone={selected.active_alert_count ? "crit" : "ok"}
+          sub={`${selected.active_alert_count} active excursion flags`} />
+        <Kpi icon={<ClipboardCheck size={13} />} label="Time in range" value={selected.time_in_range_pct != null ? `${selected.time_in_range_pct}%` : "—"}
+          tone={pctTone(selected.time_in_range_pct)} sub={`last ${fmtMinutes(windowMin)}`}
+          tip="Share of readings inside the safe temperature range during the selected compliance window." />
+        <Kpi icon={<Gauge size={13} />} label="Store Risk Score" value={`${selected.risk_score ?? "—"}`}
+          tone={selected.risk_category === "low" ? "ok" : selected.risk_category === "medium" ? "warn" : "crit"} sub={selected.name} tip={TIPS.risk} />
         <Kpi icon={<Activity size={13} />} label="Sim clock" value={fmtTime(overview.data.sim_time)} sub="1 s = 1 simulated min" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <Card className="xl:col-span-2" title="Storage rooms — live floor plan" icon={<Building2 size={15} />}
-          tip="Each room shows its live temperature on a thermometer (green band = safe range), the cooling unit on the wall, the door on the bottom wall, and the last hour of readings. Click a room for details.">
-          <FacilityMap zones={zones} selectedId={selected?.zone_id ?? ""} onSelect={setSelectedZoneId} />
+        <Card className="xl:col-span-2" title="Storage room — live floor plan" icon={<Building2 size={15} />}
+          tip="Shows live temperature, cooling unit on the wall, door seal status, and telemetry.">
+          <FacilityMap zones={singleStoreZones} selectedId={selected?.zone_id ?? ""} onSelect={setSelectedZoneId} />
           <Legend />
         </Card>
         {selected && <RoomDetail z={selected} risk={risk.data} canWhatIf onOpen={(path) => { setSelectedZoneId(selected.zone_id); navigate(path); }} />}
@@ -97,20 +97,20 @@ export default function Manager() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card title="Needs your review" icon={<AlertTriangle size={15} />}
-          actions={<button onClick={() => navigate("/alerts")} className="text-xs text-neon hover:underline">All alerts</button>}>
-          {!action_items.length ? (
-            <EmptyState title="Nothing to review" hint="All alerts have been acknowledged." />
+          actions={<button onClick={() => navigate("/alerts")} className="text-xs text-cyan-400 hover:underline">All alerts</button>}>
+          {!action_items.filter((a) => a.zone_id === selected.zone_id).length ? (
+            <EmptyState title="Nothing to review" hint="All alerts for this store have been acknowledged." />
           ) : (
             <ul className="space-y-2">
-              {action_items.map((a) => (
+              {action_items.filter((a) => a.zone_id === selected.zone_id).map((a) => (
                 <AlertRow key={a.id} alert={a} zoneName={zoneName(a.zone_id)} onOpen={setOpenAlert} onAck={acknowledge} ackPending={pending === a.id} />
               ))}
             </ul>
           )}
         </Card>
-        <Card title="Room compliance" icon={<ClipboardCheck size={15} />} tip="How long each room stayed inside its safe range during the selected window.">
+        <Card title="Store compliance" icon={<ClipboardCheck size={15} />} tip="How long this store stayed inside its safe range during the selected window.">
           <ul className="space-y-4">
-            {zones.map((z) => <ComplianceRow key={z.zone_id} z={z} />)}
+            {singleStoreZones.map((z) => <ComplianceRow key={z.zone_id} z={z} />)}
           </ul>
         </Card>
       </div>

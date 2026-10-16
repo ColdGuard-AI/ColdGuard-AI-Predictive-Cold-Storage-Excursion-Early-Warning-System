@@ -68,23 +68,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [dismiss],
   );
 
+  // Single store mode: restrict active zones to the primary store (zone-a)
+  const singleStoreList = useMemo(() => {
+    if (!zonesPoll.data?.length) return null;
+    return [zonesPoll.data[0]];
+  }, [zonesPoll.data]);
+
   const value = useMemo<AppState>(
     () => ({
-      zones: zonesPoll.data,
+      zones: singleStoreList,
       zonesError: zonesPoll.error,
       zonesLoading: zonesPoll.loading,
       refreshZones: zonesPoll.refresh,
       health: healthPoll.data,
       healthError: healthPoll.error,
-      selectedZoneId,
+      selectedZoneId: "zone-a",
       setSelectedZoneId,
-      selectedZone: zonesPoll.data?.find((z) => z.zone_id === selectedZoneId) ?? null,
+      selectedZone: zonesPoll.data?.[0] ?? null,
       toasts,
       notify,
       dismiss,
     }),
-    [zonesPoll.data, zonesPoll.error, zonesPoll.loading, zonesPoll.refresh, healthPoll.data, healthPoll.error,
-      selectedZoneId, setSelectedZoneId, toasts, notify, dismiss],
+    [singleStoreList, zonesPoll.data, zonesPoll.error, zonesPoll.loading, zonesPoll.refresh, healthPoll.data, healthPoll.error,
+      setSelectedZoneId, toasts, notify, dismiss],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -25,7 +25,7 @@ const NAV: { to: string; label: string; icon: typeof LayoutDashboard }[] = [
   { to: "/manager", label: "Facility Overview", icon: Building2 },
   { to: "/", label: "Live Monitor", icon: LayoutDashboard },
   { to: "/twin", label: "Digital Twin", icon: Layers },
-  { to: "/zones", label: "Storage Zones", icon: Boxes },
+  { to: "/zones", label: "Store Details", icon: Boxes },
   { to: "/history", label: "Sensor History", icon: LineChart },
   { to: "/alerts", label: "Alerts", icon: BellRing },
   { to: "/what-if", label: "What-If Simulator", icon: SlidersHorizontal },

@@ -4,39 +4,29 @@ import { useApp } from "../hooks/AppContext";
 import { InfoTip, StatusDot } from "./ui";
 
 export function ZoneTabs({ className = "" }: { className?: string }) {
-  const { zones, selectedZoneId, setSelectedZoneId } = useApp();
-  if (!zones?.length) return null;
+  const { selectedZone } = useApp();
+  const z = selectedZone;
+  if (!z) return null;
+  const tone = z.temperature_status === "critical" || z.risk_category === "critical" || z.risk_category === "high"
+    ? "crit"
+    : z.temperature_status === "warning" || z.risk_category === "medium" || z.sensor_status === "suspicious"
+      ? "warn"
+      : "ok";
+
   return (
-    <div role="tablist" aria-label="Storage zone" className={`flex gap-2 overflow-x-auto pb-1 ${className}`}>
-      {zones.map((z) => {
-        const tone = z.temperature_status === "critical" || z.risk_category === "critical" || z.risk_category === "high"
-          ? "crit"
-          : z.temperature_status === "warning" || z.risk_category === "medium" || z.sensor_status === "suspicious"
-            ? "warn"
-            : "ok";
-        const selected = z.zone_id === selectedZoneId;
-        return (
-          <button
-            key={z.zone_id}
-            role="tab"
-            aria-selected={selected}
-            onClick={() => setSelectedZoneId(z.zone_id)}
-            className={`flex shrink-0 items-center gap-2.5 rounded-xl border px-3.5 py-2 text-left transition-all cursor-pointer backdrop-blur-md ${
-              selected
-                ? "border-cyan-400 bg-cyan-500/15 shadow-glow"
-                : "border-cyan-500/20 bg-slate-900/80 hover:border-cyan-400/40 hover:bg-slate-850"
-            }`}
-          >
-            <StatusDot tone={tone} pulse={tone === "crit"} />
-            <span>
-              <span className={`block text-sm font-semibold tracking-tight ${selected ? "text-white" : "text-slate-300"}`}>{z.name}</span>
-              <span className="block font-mono text-[11px] text-cyan-400/80">
-                {z.temperature != null ? `${z.temperature.toFixed(1)}°C` : "no data"} · risk {z.risk_score ?? "—"}
-              </span>
-            </span>
-          </button>
-        );
-      })}
+    <div className={`flex items-center gap-3 rounded-xl border border-cyan-500/30 bg-slate-900/80 px-4 py-2 backdrop-blur-md shadow-glow ${className}`}>
+      <StatusDot tone={tone} pulse={tone === "crit"} />
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] uppercase font-mono font-bold text-cyan-400">Store:</span>
+        <span className="text-sm font-bold text-white tracking-tight">{z.name}</span>
+        <span className="text-white/20">·</span>
+        <span className="font-mono text-xs text-slate-400">{z.sensor_id}</span>
+        <span className="text-white/20 hidden sm:inline">·</span>
+        <span className="text-xs text-slate-300 hidden sm:inline">{z.product}</span>
+      </div>
+      <span className="font-mono text-xs text-cyan-300 font-bold pl-2 border-l border-cyan-500/20">
+        {z.temperature != null ? `${z.temperature.toFixed(1)}°C` : "no data"}
+      </span>
     </div>
   );
 }
