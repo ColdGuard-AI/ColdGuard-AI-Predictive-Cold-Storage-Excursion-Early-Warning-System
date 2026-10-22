@@ -122,7 +122,7 @@ export default function App() {
                     <EmptyState title="Page not found" />
                     <p className="text-center">
                       <Link to="/" className="text-neon hover:underline">
-                        Back to Live Monitor
+                        Back to Live Monitoring
                       </Link>
                     </p>
                   </div>

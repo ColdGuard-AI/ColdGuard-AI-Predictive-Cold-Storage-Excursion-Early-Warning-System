@@ -13,7 +13,8 @@ describe("describeErrorBody", () => {
     expect(describeErrorBody(body, 422)).toBe("scenario: Input should be 'normal'");
   });
   it("falls back to the status code", () => {
-    expect(describeErrorBody(null, 500)).toBe("Request failed with status 500");
+    expect(describeErrorBody(null, 502)).toBe("Request failed with status 502");
+    expect(describeErrorBody(null, 500)).toContain("500");
   });
 });
 

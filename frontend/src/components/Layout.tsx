@@ -11,6 +11,7 @@ import {
   Menu,
   Radio,
   Settings as SettingsIcon,
+  ShieldAlert,
   ShieldCheck,
   SlidersHorizontal,
   Snowflake,
@@ -27,8 +28,8 @@ import { fmtTime } from "../lib/format";
 import { SimulatedBadge, StatusDot } from "./ui";
 
 const NAV = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/excursion", label: "Live Monitoring", icon: Activity },
+  { to: "/", label: "Live Monitoring", icon: LayoutDashboard },
+  { to: "/excursion", label: "Excursion Monitor", icon: ShieldAlert },
   { to: "/predictions", label: "Predictions", icon: TrendingUp },
   { to: "/ai-explanation", label: "AI Explanation", icon: Sparkles },
   { to: "/alerts", label: "Alerts & Events", icon: BellRing },
