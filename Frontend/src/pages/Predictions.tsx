@@ -2,9 +2,11 @@ import {
   AlertTriangle,
   Atom,
   Clock,
+  DoorOpen,
   Layers,
   LineChart as LineChartIcon,
   ShieldAlert,
+  ShieldCheck,
   Snowflake,
   TrendingDown,
   TrendingUp,
@@ -28,6 +30,9 @@ export default function Predictions() {
 
   const data = predictionQuery.data;
   const currentZone = zones?.find((z) => z.zone_id === selectedZone);
+  const isRecovering =
+    (currentZone?.recovery_phase && currentZone.recovery_phase !== "none" && currentZone.recovery_phase !== "recovered") ||
+    (currentZone?.residual_rise_predicted ?? 0) > 0.05;
 
   return (
     <div className="space-y-6 pb-12 font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
@@ -39,7 +44,7 @@ export default function Predictions() {
             Predictive Intelligence & Multi-Horizon Forecasts
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Machine learning forecast horizons across all cold storage chambers with time-to-breach probability.
+            Machine learning forecast horizons across all cold storage chambers with thermodynamic residual inertia and time-to-breach probability.
           </p>
         </div>
 
@@ -49,7 +54,7 @@ export default function Predictions() {
             <button
               key={z.zone_id}
               onClick={() => setSelectedZone(z.zone_id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 selectedZone === z.zone_id
                   ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
                   : "text-slate-400 hover:text-white"
@@ -61,6 +66,61 @@ export default function Predictions() {
         </div>
       </div>
 
+      {/* Stateful Door & Post-Closure Recovery Banner */}
+      {(currentZone?.door_status === "open" || isRecovering) && (
+        <div
+          className={`p-4 rounded-2xl border flex flex-wrap items-center justify-between gap-3 backdrop-blur-xl ${
+            currentZone?.door_status === "open"
+              ? "bg-rose-950/40 border-rose-500/50 text-rose-200"
+              : "bg-amber-950/40 border-amber-500/50 text-amber-200"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className={`p-2 rounded-xl ${
+                currentZone?.door_status === "open" ? "bg-rose-500/20 text-rose-400" : "bg-amber-500/20 text-amber-400"
+              }`}
+            >
+              <DoorOpen size={20} className={currentZone?.door_status === "open" ? "animate-pulse" : ""} />
+            </div>
+            <div>
+              <div className="font-bold text-sm text-white flex items-center gap-2">
+                <span>
+                  {currentZone?.door_status === "open"
+                    ? `Chamber Door Open (${currentZone.door_open_minutes.toFixed(0)} min)`
+                    : "Door Sealed — Cooling Recovery Active (Risk Retained)"}
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-black/40 border border-white/10">
+                  {currentZone?.name}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                {currentZone?.door_status === "open"
+                  ? "Ambient warm air ingress active. ML model forecasting residual rise upon closure."
+                  : `Trapped warm air dissipating. Predicted residual rise ΔT +${(currentZone?.residual_rise_predicted ?? 0).toFixed(1)}°C · Peak ${
+                      currentZone?.peak_temp_predicted != null ? fmtTemp(currentZone.peak_temp_predicted) : "evaluating"
+                    } · Recovery ~${Math.round(currentZone?.recovery_time_minutes ?? 0)} min.`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 text-xs font-mono">
+            <div className="text-right">
+              <div className="text-[10px] text-slate-400 uppercase">Recovery Progress</div>
+              <div className="font-bold text-cyan-300 text-sm">
+                {Math.round(currentZone?.recovery_progress_pct ?? 100)}%
+              </div>
+            </div>
+            <div className="w-24 h-2 bg-slate-900 rounded-full overflow-hidden border border-white/10">
+              <div
+                className="h-full bg-gradient-to-r from-amber-500 to-cyan-400 transition-all duration-500"
+                style={{ width: `${Math.min(100, Math.max(5, currentZone?.recovery_progress_pct ?? 100))}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Multi-Horizon Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
@@ -70,7 +130,7 @@ export default function Predictions() {
           { key: "1440", title: "Next 24 Hours", icon: Clock },
         ].map((h) => {
           const item = data?.horizons?.[h.key];
-          const riskScore = item?.risk_score ?? (h.key === "60" ? 78 : 35);
+          const riskScore = item?.risk_score ?? (currentZone?.risk_score ?? 15);
           const isHighRisk = riskScore >= 60;
           return (
             <div
@@ -123,6 +183,14 @@ export default function Predictions() {
                     {item?.excursion_expected ? "YES" : "NO"}
                   </span>
                 </div>
+                {item?.time_to_breach_minutes != null && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Time to Breach:</span>
+                    <span className="font-bold font-mono text-amber-400">
+                      ~{Math.round(item.time_to_breach_minutes)} min
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -145,22 +213,34 @@ export default function Predictions() {
                 <th className="pb-3">Current Temp</th>
                 <th className="pb-3">Safe Range</th>
                 <th className="pb-3">Trend</th>
-                <th className="pb-3">30m Risk</th>
-                <th className="pb-3">1h Risk</th>
+                <th className="pb-3">Door / Thermal Status</th>
+                <th className="pb-3">Live Risk Score</th>
                 <th className="pb-3">Est. Time to Breach</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/70">
               {zones?.map((z) => {
-                const isZoneB = z.zone_id === "zone-b";
+                const zIsRecovering =
+                  (z.recovery_phase && z.recovery_phase !== "none" && z.recovery_phase !== "recovered") ||
+                  (z.residual_rise_predicted ?? 0) > 0.05;
+                const score = z.risk_score ?? 0;
+                const isCritical = score >= 60;
+                const isWarning = score >= 30;
+
                 return (
                   <tr
                     key={z.zone_id}
                     onClick={() => setSelectedZone(z.zone_id)}
-                    className="hover:bg-slate-800/40 cursor-pointer transition"
+                    className={`hover:bg-slate-800/40 cursor-pointer transition ${
+                      selectedZone === z.zone_id ? "bg-slate-800/30" : ""
+                    }`}
                   >
                     <td className="py-3 font-semibold text-white flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-cyan-400" />
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          isCritical ? "bg-rose-400 animate-pulse" : isWarning ? "bg-amber-400" : "bg-cyan-400"
+                        }`}
+                      />
                       {z.name}
                     </td>
                     <td className="py-3 text-slate-300">{z.product}</td>
@@ -176,18 +256,38 @@ export default function Predictions() {
                         {z.trend_per_hour.toFixed(1)}°C/h
                       </span>
                     </td>
-                    <td className="py-3 font-mono font-bold">
-                      <span className={isZoneB ? "text-rose-400" : "text-emerald-400"}>
-                        {isZoneB ? "65% (High)" : "12% (Low)"}
-                      </span>
+                    <td className="py-3 font-mono text-xs">
+                      {z.door_status === "open" ? (
+                        <span className="text-rose-400 font-bold flex items-center gap-1">
+                          <DoorOpen size={12} className="animate-pulse" /> OPEN ({z.door_open_minutes.toFixed(0)}m)
+                        </span>
+                      ) : zIsRecovering ? (
+                        <span className="text-amber-400 font-semibold flex items-center gap-1">
+                          <Snowflake size={12} /> RECOVERING (+{(z.residual_rise_predicted ?? 0).toFixed(1)}°C)
+                        </span>
+                      ) : (
+                        <span className="text-emerald-400 flex items-center gap-1">
+                          <ShieldCheck size={12} /> Sealed (Nominal)
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 font-mono font-bold">
-                      <span className={isZoneB ? "text-rose-400" : "text-emerald-400"}>
-                        {isZoneB ? "78% (High)" : "14% (Low)"}
+                      <span
+                        className={
+                          isCritical
+                            ? "text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/30"
+                            : isWarning
+                            ? "text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30"
+                            : "text-emerald-400"
+                        }
+                      >
+                        {z.risk_score != null ? `${z.risk_score}% (${z.risk_category.toUpperCase()})` : "—"}
                       </span>
                     </td>
                     <td className="py-3 font-mono text-amber-400 font-semibold">
-                      {isZoneB ? "~40 minutes" : "No breach expected"}
+                      {z.time_to_breach_minutes != null
+                        ? `~${Math.round(z.time_to_breach_minutes)} min`
+                        : "No breach expected"}
                     </td>
                   </tr>
                 );

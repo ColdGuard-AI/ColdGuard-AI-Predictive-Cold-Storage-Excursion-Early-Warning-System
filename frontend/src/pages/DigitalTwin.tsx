@@ -1088,7 +1088,7 @@ function ElectricalSparks({ position }: { position: [number, number, number] }) 
   );
 }
 
-function WarmAirIngress({ isOpen }: { isOpen: boolean }) {
+function WarmAirIngress({ isOpen, isRecovering }: { isOpen: boolean; isRecovering?: boolean }) {
   const pointsRef = useRef<THREE.Points>(null);
   const count = 140;
 
@@ -1110,12 +1110,13 @@ function WarmAirIngress({ isOpen }: { isOpen: boolean }) {
   }, []);
 
   useFrame(() => {
-    if (pointsRef.current && isOpen) {
+    if (pointsRef.current && (isOpen || isRecovering)) {
       const pos = pointsRef.current.geometry.attributes.position.array as Float32Array;
+      const speed = isOpen ? 0.045 : 0.012;
       for (let i = 0; i < count; i++) {
-        pos[i * 3] -= 0.045;
-        pos[i * 3 + 1] += 0.006;
-        pos[i * 3 + 2] += (Math.random() - 0.5) * 0.02;
+        pos[i * 3] -= speed;
+        pos[i * 3 + 1] += 0.004;
+        pos[i * 3 + 2] += (Math.random() - 0.5) * 0.015;
 
         if (pos[i * 3] < 5.0) {
           pos[i * 3] = 10.1;
@@ -1127,11 +1128,18 @@ function WarmAirIngress({ isOpen }: { isOpen: boolean }) {
     }
   });
 
-  if (!isOpen) return null;
+  if (!isOpen && !isRecovering) return null;
 
   return (
     <points ref={pointsRef} geometry={geo}>
-      <pointsMaterial size={0.08} vertexColors transparent opacity={0.8} blending={THREE.AdditiveBlending} depthWrite={false} />
+      <pointsMaterial
+        size={isOpen ? 0.08 : 0.045}
+        vertexColors
+        transparent
+        opacity={isOpen ? 0.8 : 0.35}
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+      />
     </points>
   );
 }
@@ -1511,10 +1519,16 @@ function EvaporatorUnit({
 function ColdRoomDoor({
   position,
   isOpen,
+  isRecovering,
+  recoveryProgressPct,
+  residualRise,
   onClick,
 }: {
   position: [number, number, number];
   isOpen: boolean;
+  isRecovering?: boolean;
+  recoveryProgressPct?: number;
+  residualRise?: number;
   onClick: () => void;
 }) {
   const doorPanelRef = useRef<THREE.Mesh>(null);
@@ -1553,11 +1567,19 @@ function ColdRoomDoor({
           className={`pointer-events-auto cursor-pointer font-mono text-[9px] px-2.5 py-1 rounded-lg border shadow-xl flex items-center gap-1.5 transition-all ${
             isOpen
               ? "bg-rose-950/95 border-rose-500 text-rose-300 animate-pulse shadow-rose-500/30"
+              : isRecovering
+              ? "bg-amber-950/95 border-amber-500/70 text-amber-200 shadow-amber-500/20"
               : "bg-slate-900/90 border-cyan-500/40 text-cyan-300 hover:border-cyan-400"
           }`}
         >
-          <DoorOpen size={11} />
-          <span className="font-bold">{isOpen ? "DOOR OPEN (Click to Seal)" : "Door Sealed (Click to Open)"}</span>
+          <DoorOpen size={11} className={isOpen ? "text-rose-400" : isRecovering ? "text-amber-400" : "text-cyan-400"} />
+          <span className="font-bold">
+            {isOpen
+              ? "DOOR OPEN (Click to Seal)"
+              : isRecovering
+              ? `SEALED • RECOVERING (${Math.round(recoveryProgressPct ?? 0)}%${(residualRise ?? 0) > 0 ? ` +${residualRise?.toFixed(1)}°C rise` : ""})`
+              : "Door Sealed (Click to Open)"}
+          </span>
         </div>
       </Html>
     </group>
@@ -1680,6 +1702,9 @@ function ColdStorageScene({
     fansActive: boolean;
     compressorRunning: boolean;
     doorOpen: boolean;
+    isRecovering?: boolean;
+    recoveryProgressPct?: number;
+    residualRise?: number;
     zoneTemps: Record<string, number>;
   };
   cameraPreset: CameraPreset;
@@ -1827,10 +1852,16 @@ function ColdStorageScene({
       <ColdRoomDoor
         position={[10.1, 1.35, -1.8]}
         isOpen={simulationState.doorOpen}
+        isRecovering={simulationState.isRecovering}
+        recoveryProgressPct={simulationState.recoveryProgressPct}
+        residualRise={simulationState.residualRise}
         onClick={onToggleDoor}
       />
 
-      <WarmAirIngress isOpen={simulationState.doorOpen} />
+      <WarmAirIngress
+        isOpen={simulationState.doorOpen}
+        isRecovering={simulationState.isRecovering}
+      />
       <DeliveryDockBay />
 
       <AirflowStreamlines isActive={simulationState.fansActive && simulationState.compressorRunning} />
@@ -2256,6 +2287,11 @@ export default function DigitalTwin() {
     fansActive: true,
     compressorRunning: true,
     doorOpen: false,
+    isRecovering: false,
+    recoveryProgressPct: 100,
+    residualRise: 0,
+    peakTemp: null as number | null,
+    recoveryMinutes: 0,
     zoneTemps: {
       "zone-a": 5.0,
       "zone-b": 3.0,
@@ -2285,11 +2321,14 @@ export default function DigitalTwin() {
       const zA = allZones.find((z) => z.zone_id === "zone-a");
       const zB = allZones.find((z) => z.zone_id === "zone-b");
       const zC = allZones.find((z) => z.zone_id === "zone-c");
+      const curr = allZones.find((z) => z.zone_id === selectedZoneId) || zC || allZones[0];
 
-      const isDoorOpen = zC?.door_status === "open";
+      const isDoorOpen = curr?.door_status === "open" || zC?.door_status === "open";
       const isCompFailed = allZones.some((z) => z.compressor_status === "failed" || z.compressor_status === "stopped");
       const isDegraded = allZones.some((z) => z.compressor_status === "degraded");
       const isSensorAnomaly = allZones.some((z) => z.scenario === "sensor_anomaly" || z.sensor_health === "spike_anomaly" || z.sensor_health === "stuck_frozen");
+
+      const isRecovering = (curr?.recovery_phase && curr.recovery_phase !== "none" && curr.recovery_phase !== "recovered") || (curr?.residual_rise_predicted ?? 0) > 0.05;
 
       if (isDoorOpen) {
         setActiveScenario("door_open");
@@ -2308,6 +2347,11 @@ export default function DigitalTwin() {
       setSimState((prev) => ({
         ...prev,
         doorOpen: isDoorOpen,
+        isRecovering,
+        recoveryProgressPct: curr?.recovery_progress_pct ?? 100,
+        residualRise: curr?.residual_rise_predicted ?? 0,
+        peakTemp: curr?.peak_temp_predicted ?? null,
+        recoveryMinutes: curr?.recovery_time_minutes ?? 0,
         compressorRunning: !isCompFailed,
         fansActive: !isCompFailed,
         zoneTemps: {
@@ -2317,7 +2361,7 @@ export default function DigitalTwin() {
         },
       }));
     }
-  }, [allZones]);
+  }, [allZones, selectedZoneId]);
 
   // 🧭 Google Maps Turn-by-Turn Navigation State
   const [isNavigating, setIsNavigating] = useState(false);
@@ -2368,24 +2412,30 @@ export default function DigitalTwin() {
     handleZoneSelect(nextId);
   }, [selectedZoneId, handleZoneSelect]);
 
-  // Toggle Door simulation
-  const handleToggleDoor = useCallback(() => {
-    setSimState((prev) => {
-      const willOpen = !prev.doorOpen;
+  // Toggle Door simulation statefully via backend API
+  const handleToggleDoor = useCallback(async () => {
+    const targetZoneId = selectedZoneId || "zone-c";
+    const targetConfig = ZONE_CONFIGS.find((c) => c.id === targetZoneId);
+    const willOpen = !simState.doorOpen;
+    try {
+      await api.setDoor(targetZoneId, willOpen ? "open" : "closed");
       if (willOpen) {
         setActiveScenario("door_open");
         setDoorOpenSeconds(0);
-        addEvent("🚪 LOADING DOCK DOOR OPENED: Ambient thermal ingress active", "warning", "Zone C");
-        handleZoneSelect("zone-c");
-        api.setScenario("zone-c", "door_open").catch(() => {});
+        addEvent(`🚪 ${targetConfig?.name ?? targetZoneId} DOOR OPENED: Ambient thermal ingress active`, "warning", targetConfig?.name ?? "Chamber");
       } else {
         setActiveScenario("normal");
-        addEvent("✓ Loading dock door sealed; temperature stabilizing", "info", "Zone C");
-        api.reset("scenario", "zone-c").catch(() => {});
+        addEvent(`✓ ${targetConfig?.name ?? targetZoneId} door sealed; post-closure cooling recovery initiated (risk retained)`, "info", targetConfig?.name ?? "Chamber");
       }
-      return { ...prev, doorOpen: willOpen };
-    });
-  }, [addEvent, handleZoneSelect]);
+      setSimState((prev) => ({
+        ...prev,
+        doorOpen: willOpen,
+        isRecovering: !willOpen,
+      }));
+    } catch (err) {
+      console.error("Failed to toggle door:", err);
+    }
+  }, [addEvent, selectedZoneId, simState.doorOpen]);
 
   // Trip / Restore Compressor
   const handleToggleCompressor = useCallback(() => {
@@ -2449,6 +2499,11 @@ export default function DigitalTwin() {
       fansActive: true,
       compressorRunning: true,
       doorOpen: false,
+      isRecovering: false,
+      recoveryProgressPct: 100,
+      residualRise: 0,
+      peakTemp: null,
+      recoveryMinutes: 0,
       zoneTemps: {
         "zone-a": 5.0,
         "zone-b": 3.0,
@@ -2496,6 +2551,19 @@ export default function DigitalTwin() {
         label: "Loading Door Ingress",
         detail: `Dock door open for ${Math.floor(doorOpenSeconds / 60)}m ${doorOpenSeconds % 60}s allowing +26.0°C ambient heat rush`,
         points: doorPts,
+      });
+    }
+
+    if (simState.isRecovering || (selectedZone?.residual_rise_predicted ?? 0) > 0.05) {
+      const residualRise = selectedZone?.residual_rise_predicted ?? simState.residualRise ?? 0.5;
+      const recMins = selectedZone?.recovery_time_minutes ?? simState.recoveryMinutes ?? 15;
+      const recProg = selectedZone?.recovery_progress_pct ?? simState.recoveryProgressPct ?? 40;
+      const recPts = Math.min(35, Math.max(15, Math.round((100 - recProg) * 0.35)));
+      localScore += recPts;
+      localFactors.push({
+        label: "Post-Closure Residual Thermal Heat",
+        detail: `Door sealed. Trapped warm air entering thermal inertia wave (ΔT residual +${residualRise.toFixed(1)}°C, est. cooling recovery ~${Math.round(recMins)} min, ${Math.round(recProg)}% complete). Risk retained during recovery phase.`,
+        points: recPts,
       });
     }
 
@@ -2562,9 +2630,14 @@ export default function DigitalTwin() {
     let onAction: (() => void) | null = null;
 
     if (simState.doorOpen) {
-      recommendation = "CRITICAL ACTION: Close Loading Dock Door C immediately. Seal magnetic gaskets and engage booster blower to stabilize frozen inventory.";
-      actionLabel = "⚡ Close Door & Seal Loading Dock";
+      recommendation = `CRITICAL ACTION: Close ${selectedConfig.name} door immediately. Seal magnetic gaskets and engage booster blower to prevent excursion.`;
+      actionLabel = `⚡ Close Door & Seal ${selectedConfig.name}`;
       onAction = handleToggleDoor;
+    } else if (simState.isRecovering || (selectedZone?.residual_rise_predicted ?? 0) > 0.05) {
+      const recMins = selectedZone?.recovery_time_minutes ?? simState.recoveryMinutes ?? 12;
+      recommendation = `RECOVERY IN PROGRESS: Chamber door sealed. Active refrigeration working against trapped thermal inertia. Predicted peak temp ${selectedZone?.peak_temp_predicted ? `${selectedZone.peak_temp_predicted.toFixed(1)}°C` : "elevated"}. Full recovery in ~${Math.round(recMins)} min. Avoid reopening doors.`;
+      actionLabel = null;
+      onAction = null;
     } else if (!simState.compressorRunning) {
       recommendation = "URGENT ACTION: Reset compressor breaker panel; switch to secondary backup condensing unit and notify HVAC technician.";
       actionLabel = "⚡ Reset Compressor & Restore Cooling";
@@ -3010,6 +3083,103 @@ export default function DigitalTwin() {
                   </div>
                   <div className="text-[9px] text-fg-faint font-mono uppercase">{riskAnalysis.category} Risk</div>
                 </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Stateful Door & Cooling Recovery Card */}
+          <Card
+            title={
+              <div className="flex items-center justify-between w-full">
+                <span className="flex items-center gap-1.5">
+                  <DoorOpen size={14} className={simState.doorOpen ? "text-rose-400" : simState.isRecovering ? "text-amber-400" : "text-emerald-400"} />
+                  Door State & Cooling Recovery
+                </span>
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold border ${
+                  simState.doorOpen
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse"
+                    : simState.isRecovering
+                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                }`}>
+                  {simState.doorOpen ? "OPEN (INGRESS)" : simState.isRecovering ? "SEALED (RECOVERING)" : "SEALED (NOMINAL)"}
+                </span>
+              </div>
+            }
+          >
+            <div className="space-y-2.5 text-xs">
+              <div className="grid grid-cols-2 gap-2 font-mono">
+                <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
+                  <div className="text-[10px] text-fg-muted">Residual Rise ΔT</div>
+                  <div className="text-sm font-bold text-amber-300 mt-0.5">
+                    +{(selectedZone?.residual_rise_predicted ?? simState.residualRise ?? 0).toFixed(1)}°C
+                  </div>
+                  <div className="text-[9px] text-fg-faint">trapped warm air</div>
+                </div>
+
+                <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
+                  <div className="text-[10px] text-fg-muted">Predicted Peak</div>
+                  <div className="text-sm font-bold text-rose-300 mt-0.5">
+                    {selectedZone?.peak_temp_predicted != null
+                      ? fmtTemp(selectedZone.peak_temp_predicted)
+                      : simState.peakTemp != null
+                      ? fmtTemp(simState.peakTemp)
+                      : fmtTemp(currentZoneTemp)}
+                  </div>
+                  <div className="text-[9px] text-fg-faint">before cooling dominates</div>
+                </div>
+
+                <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
+                  <div className="text-[10px] text-fg-muted">Est. Recovery Time</div>
+                  <div className="text-sm font-bold text-cyan-300 mt-0.5">
+                    ~{Math.round(selectedZone?.recovery_time_minutes ?? simState.recoveryMinutes ?? 0)} min
+                  </div>
+                  <div className="text-[9px] text-fg-faint">exponential cooldown</div>
+                </div>
+
+                <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
+                  <div className="text-[10px] text-fg-muted">24h Door Ingress</div>
+                  <div className="text-sm font-bold text-white mt-0.5">
+                    {(selectedZone?.cumulative_open_minutes_24h ?? 0).toFixed(0)} min
+                  </div>
+                  <div className="text-[9px] text-fg-faint">{selectedZone?.door_events_count_24h ?? 0} events logged</div>
+                </div>
+              </div>
+
+              {/* Recovery Progress Bar */}
+              <div>
+                <div className="flex items-center justify-between text-[10px] font-mono text-fg-muted mb-1">
+                  <span>Cooling Recovery Progress</span>
+                  <span className="font-bold text-cyan-300">{Math.round(selectedZone?.recovery_progress_pct ?? simState.recoveryProgressPct ?? 100)}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-500 via-cyan-500 to-emerald-400 transition-all duration-500"
+                    style={{ width: `${Math.min(100, Math.max(5, selectedZone?.recovery_progress_pct ?? simState.recoveryProgressPct ?? 100))}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Door Interactive Actions */}
+              <div className="flex items-center gap-1.5 pt-1">
+                <button
+                  onClick={() => api.setDoor(selectedZoneId, "open", 120).then(handleToggleDoor)}
+                  className="flex-1 py-1.5 px-2 rounded-lg border border-amber-500/40 bg-amber-950/40 hover:bg-amber-950/70 text-amber-300 text-[10px] font-mono font-bold transition cursor-pointer"
+                >
+                  🚪 Open (2m)
+                </button>
+                <button
+                  onClick={() => api.setDoor(selectedZoneId, "open", 300).then(handleToggleDoor)}
+                  className="flex-1 py-1.5 px-2 rounded-lg border border-rose-500/40 bg-rose-950/40 hover:bg-rose-950/70 text-rose-300 text-[10px] font-mono font-bold transition cursor-pointer"
+                >
+                  🚪 Open (5m)
+                </button>
+                <button
+                  onClick={() => api.setDoor(selectedZoneId, "closed").then(handleToggleDoor)}
+                  className="flex-1 py-1.5 px-2 rounded-lg border border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-950/70 text-emerald-300 text-[10px] font-mono font-bold transition cursor-pointer"
+                >
+                  ✓ Close Door
+                </button>
               </div>
             </div>
           </Card>

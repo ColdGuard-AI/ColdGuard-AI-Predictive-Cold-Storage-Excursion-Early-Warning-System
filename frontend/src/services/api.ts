@@ -138,6 +138,11 @@ export const api = {
   events: (limit: number = 20) => request<EventItem[]>(`/api/events${qs({ limit })}`),
   controlDoor: (zoneId: string, action: "open" | "close", durationMinutes?: number) =>
     post<RecoveryStatus>(`/api/zones/${zoneId}/door`, { action, duration_minutes: durationMinutes ?? null }),
+  setDoor: (zoneId: string, action: "open" | "close" | "closed", durationSeconds?: number) =>
+    post<RecoveryStatus>(`/api/zones/${zoneId}/door`, {
+      action: action === "closed" ? "close" : action,
+      duration_minutes: durationSeconds ? durationSeconds / 60 : null,
+    }),
   recoveryStatus: (zoneId: string) => request<RecoveryStatus>(`/api/zones/${zoneId}/recovery-status`),
   doorEvents: (zoneId: string, limit: number = 50) => request<DoorEventItem[]>(`/api/zones/${zoneId}/door-events${qs({ limit })}`),
   modelEvaluation: () => request<ModelEvaluationResponse>("/api/model/evaluation"),

@@ -211,6 +211,14 @@ export interface ZoneSummary {
   forecast_points?: any[];
   excursion_expected?: boolean;
   slope_per_min?: number;
+  residual_rise_predicted?: number;
+  peak_temp_predicted?: number | null;
+  recovery_time_minutes?: number;
+  recovery_progress_pct?: number;
+  recovery_phase?: string;
+  time_since_closure_minutes?: number;
+  door_events_count_24h?: number;
+  cumulative_open_minutes_24h?: number;
   is_synthetic?: boolean;
 }
 

@@ -77,7 +77,15 @@ export default function AIExplanation() {
 
         <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 text-sm text-slate-200 leading-relaxed mb-6">
           {data?.ai_explanation?.narrative || (
-            "The door of Zone B has been open for 5 minutes, allowing warm air from outside (25°C) to enter. This has caused a rapid increase in temperature from 3.6°C to 6.8°C. Based on current trends, the temperature is predicted to cross the safe limit (8°C) in approximately 40 minutes if the door remains open."
+            currentZone?.door_status === "open"
+              ? `The door of ${currentZone.name} has been open for ${currentZone.door_open_minutes.toFixed(0)} minutes, allowing warm air from outside (${(currentZone.ambient_temperature ?? 25).toFixed(1)}°C) to enter. This is driving a positive temperature gradient (${currentZone.trend_per_hour >= 0 ? "+" : ""}${currentZone.trend_per_hour.toFixed(1)}°C/h). Upon closure, the chamber will experience residual temperature rise before active refrigeration restabilizes the core.`
+              : (currentZone?.residual_rise_predicted ?? 0) > 0.05
+              ? `${currentZone?.name} is currently in post-closure thermal recovery. While the door is sealed, trapped warm air is causing a residual rise of +${(currentZone?.residual_rise_predicted ?? 0).toFixed(1)}°C towards a predicted peak of ${
+                  currentZone?.peak_temp_predicted != null ? `${currentZone.peak_temp_predicted.toFixed(1)}°C` : "nominal limit"
+                }. Risk remains retained until active cooling restabilizes the chamber (estimated ~${Math.round(currentZone?.recovery_time_minutes ?? 0)} minutes remaining).`
+              : `${currentZone?.name ?? "Chamber"} is operating within nominal thermodynamic boundary conditions. Current temperature is ${
+                  currentZone?.temperature != null ? `${currentZone.temperature.toFixed(1)}°C` : "monitored"
+                } against a safe band of ${currentZone?.lower_limit ?? 2}°C to ${currentZone?.upper_limit ?? 8}°C. Continuous ML forecasting indicates low excursion probability.`
           )}
         </div>
 
@@ -89,11 +97,17 @@ export default function AIExplanation() {
               Primary Driving Factors (Feature Attribution)
             </h3>
             <ul className="space-y-2 text-xs text-slate-300">
-              {(data?.ai_explanation?.contributing_factors || [
-                "Door open for 5 minutes (major impact)",
-                "Outdoor temperature 25°C (higher heat load)",
-                "Rising temperature trend (+3.2°C in last 10 minutes)",
-                "Compressor is working but may not compensate if door remains open",
+              {(data?.ai_explanation?.contributing_factors?.length ? data.ai_explanation.contributing_factors : [
+                currentZone?.door_status === "open"
+                  ? `Door open for ${currentZone.door_open_minutes.toFixed(0)} minutes (major thermal ingress)`
+                  : (currentZone?.residual_rise_predicted ?? 0) > 0.05
+                  ? `Post-closure trapped thermal inertia (ΔT residual +${(currentZone?.residual_rise_predicted ?? 0).toFixed(1)}°C)`
+                  : "Chamber door sealed; thermal boundary intact",
+                `Outdoor ambient temperature ${(currentZone?.ambient_temperature ?? 24.5).toFixed(1)}°C`,
+                `10-minute temperature drift: ${currentZone?.trend_per_hour != null ? `${currentZone.trend_per_hour >= 0 ? "+" : ""}${currentZone.trend_per_hour.toFixed(1)}°C/h` : "nominal"}`,
+                currentZone?.compressor_status === "running"
+                  ? `Refrigeration compressor active (${Math.round(currentZone?.compressor_load_pct ?? 75)}% capacity)`
+                  : "Compressor cycling or offline",
               ]).map((factor, i) => (
                 <li key={i} className="flex items-start gap-2.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-rose-400 mt-1.5 shrink-0" />
@@ -109,12 +123,15 @@ export default function AIExplanation() {
               Recommended Corrective Procedures
             </h3>
             <ol className="space-y-2 text-xs text-slate-300">
-              {(data?.ai_explanation?.recommended_actions || [
-                "Close the door immediately.",
-                "Monitor temperature for next 1 hour.",
-                "Verify door seal and check for any obstruction.",
-                "Ensure compressor is functioning properly.",
-                "If temperature does not recover, inspect cooling system.",
+              {(data?.ai_explanation?.recommended_actions?.length ? data.ai_explanation.recommended_actions : [
+                currentZone?.door_status === "open"
+                  ? "Close the chamber door immediately to arrest ambient heat rush."
+                  : (currentZone?.residual_rise_predicted ?? 0) > 0.05
+                  ? "Maintain door sealed; allow refrigeration compressor to overcome thermal inertia."
+                  : "Maintain standard temperature compliance logging.",
+                "Verify door seal integrity and magnetic gasket contact.",
+                "Observe multi-horizon ML predictions for latent excursion spikes.",
+                "If temperature exceeds safe boundary, activate backup refrigeration loop.",
               ]).map((action, i) => (
                 <li key={i} className="flex items-center gap-2.5">
                   <span className="h-5 w-5 rounded-full bg-blue-600/40 text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0 border border-blue-500/30">

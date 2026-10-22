@@ -107,6 +107,14 @@ interface StreamZone {
   forecast_points: ForecastPoint[];
   excursion_expected: boolean;
   slope_per_min: number;
+  residual_rise_predicted?: number;
+  peak_temp_predicted?: number | null;
+  recovery_time_minutes?: number;
+  recovery_progress_pct?: number;
+  recovery_phase?: string;
+  time_since_closure_minutes?: number;
+  door_events_count_24h?: number;
+  cumulative_open_minutes_24h?: number;
   is_synthetic?: boolean;
 }
 
@@ -369,13 +377,19 @@ function ZoneRiskCard({ zone, selected, onSelect }: { zone: StreamZone; selected
         )}
         <div
           className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium border ${
-            zone.door_status === "closed"
-              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
-              : "bg-amber-500/10 border-amber-500/20 text-amber-300"
+            zone.door_status === "open"
+              ? "bg-rose-500/15 border-rose-500/30 text-rose-300 animate-pulse"
+              : ((zone.recovery_phase && zone.recovery_phase !== "none" && zone.recovery_phase !== "recovered") || (zone.residual_rise_predicted ?? 0) > 0.05)
+              ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
+              : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
           }`}
         >
           <DoorOpen size={9} />
-          {zone.door_status === "closed" ? "Door Sealed" : "Door OPEN"}
+          {zone.door_status === "open"
+            ? "Door OPEN"
+            : ((zone.recovery_phase && zone.recovery_phase !== "none" && zone.recovery_phase !== "recovered") || (zone.residual_rise_predicted ?? 0) > 0.05)
+            ? `Door Sealed (Recovering ${Math.round(zone.recovery_progress_pct ?? 0)}%)`
+            : "Door Sealed"}
         </div>
         {zone.sensor_health && zone.sensor_health !== "healthy" && (
           <div className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium border bg-purple-500/10 border-purple-500/20 text-purple-300">
@@ -701,8 +715,20 @@ function SensorHealthMatrix({ zones }: { zones: StreamZone[] }) {
             <div className="flex items-center gap-2 text-[10px]">
               <DoorOpen size={10} className="text-amber-400/60" />
               <span className="text-slate-400">Door Seal</span>
-              <span className={`ml-auto font-mono ${z.door_status === "closed" ? "text-emerald-300" : "text-amber-300"}`}>
-                {z.door_status === "closed" ? "● SEALED" : "⚠ OPEN"}
+              <span
+                className={`ml-auto font-mono ${
+                  z.door_status === "open"
+                    ? "text-rose-300"
+                    : ((z.recovery_phase && z.recovery_phase !== "none" && z.recovery_phase !== "recovered") || (z.residual_rise_predicted ?? 0) > 0.05)
+                    ? "text-amber-300"
+                    : "text-emerald-300"
+                }`}
+              >
+                {z.door_status === "open"
+                  ? "⚠ OPEN"
+                  : ((z.recovery_phase && z.recovery_phase !== "none" && z.recovery_phase !== "recovered") || (z.residual_rise_predicted ?? 0) > 0.05)
+                  ? "● RECOVERING"
+                  : "● SEALED"}
               </span>
             </div>
             {/* Issues */}

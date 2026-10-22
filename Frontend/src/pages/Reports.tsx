@@ -7,15 +7,22 @@ import {
   FileText,
   Filter,
   Printer,
+  ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "../hooks/AppContext";
+import { usePolling } from "../hooks/usePolling";
+import { fmtTemp, POLL_MS } from "../lib/format";
+import { api } from "../services/api";
 
 export default function Reports() {
   const { zones } = useApp();
   const [reportType, setReportType] = useState("excursion");
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+
+  const alertsQuery = usePolling(() => api.alerts({ limit: 15 }), POLL_MS);
+  const alerts = alertsQuery.data ?? [];
 
   const handleDownload = () => {
     setDownloadSuccess(true);
@@ -86,8 +93,8 @@ export default function Reports() {
       <div className="rounded-2xl bg-[#0F192C]/90 border border-slate-800 p-6 shadow-2xl backdrop-blur-xl">
         <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
           <div>
-            <h2 className="text-base font-bold text-white">Facility Excursion Summary (Past 24 Hours)</h2>
-            <div className="text-xs text-slate-400 mt-0.5">Facility ID: CG-FAC-01 • Auditor: Ruchita (Manager)</div>
+            <h2 className="text-base font-bold text-white">Facility Excursion Summary (Live Telemetry & Audit Logs)</h2>
+            <div className="text-xs text-slate-400 mt-0.5">Facility ID: CG-FAC-01 • Auditor: Ruchita (Manager) • Part 11 Digital Signature</div>
           </div>
           <div className="text-xs font-mono text-emerald-400 flex items-center gap-1">
             <ShieldCheck size={14} />
@@ -101,41 +108,70 @@ export default function Reports() {
               <tr className="border-b border-slate-800 text-slate-400 uppercase text-[11px] font-semibold">
                 <th className="pb-3">Timestamp</th>
                 <th className="pb-3">Zone</th>
-                <th className="pb-3">Event Type</th>
-                <th className="pb-3">Max Temp</th>
-                <th className="pb-3">Allowed Range</th>
-                <th className="pb-3">Duration</th>
-                <th className="pb-3">Resolution</th>
+                <th className="pb-3">Event / Incident</th>
+                <th className="pb-3">Recorded Temp</th>
+                <th className="pb-3">Safe Band</th>
+                <th className="pb-3">Occurrences</th>
+                <th className="pb-3">Compliance Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              <tr className="hover:bg-slate-800/30">
-                <td className="py-3 font-mono text-slate-300">22 Oct 2026, 03:15 PM</td>
-                <td className="py-3 font-semibold text-white">Dairy Chiller B</td>
-                <td className="py-3 text-rose-400 font-medium">Door Left Open (5 min)</td>
-                <td className="py-3 font-mono text-rose-400 font-bold">6.8°C</td>
-                <td className="py-3 font-mono text-slate-400">0.0°C to 6.0°C</td>
-                <td className="py-3 font-mono">5 min</td>
-                <td className="py-3 text-rose-400 font-semibold">• Active Incident</td>
-              </tr>
-              <tr className="hover:bg-slate-800/30">
-                <td className="py-3 font-mono text-slate-300">22 Oct 2026, 02:40 PM</td>
-                <td className="py-3 font-semibold text-white">Vaccine Store A</td>
-                <td className="py-3 text-amber-400 font-medium">Sensor Dropout (TS-A01)</td>
-                <td className="py-3 font-mono text-slate-400">—</td>
-                <td className="py-3 font-mono text-slate-400">2.0°C to 8.0°C</td>
-                <td className="py-3 font-mono">2 min</td>
-                <td className="py-3 text-emerald-400 font-semibold">• Handled (Auto-Resolved)</td>
-              </tr>
-              <tr className="hover:bg-slate-800/30">
-                <td className="py-3 font-mono text-slate-300">22 Oct 2026, 01:20 PM</td>
-                <td className="py-3 font-semibold text-white">System Refrigeration</td>
-                <td className="py-3 text-amber-400 font-medium">Compressor Inverter Derate</td>
-                <td className="py-3 font-mono text-slate-400">—</td>
-                <td className="py-3 font-mono text-slate-400">Nominal</td>
-                <td className="py-3 font-mono">18 min</td>
-                <td className="py-3 text-emerald-400 font-semibold">• Acknowledged & Resolved</td>
-              </tr>
+              {alerts.length > 0 ? (
+                alerts.map((a) => {
+                  const z = zones?.find((x) => x.zone_id === a.zone_id);
+                  const isCrit = a.severity === "critical";
+                  const isWarn = a.severity === "warning";
+
+                  return (
+                    <tr key={a.id} className="hover:bg-slate-800/30">
+                      <td className="py-3 font-mono text-slate-300">
+                        {new Date(a.created_at).toLocaleString([], {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                        })}
+                      </td>
+                      <td className="py-3 font-semibold text-white">{z?.name ?? a.zone_id}</td>
+                      <td className={`py-3 font-medium ${isCrit ? "text-rose-400" : isWarn ? "text-amber-400" : "text-cyan-300"}`}>
+                        {a.title}
+                      </td>
+                      <td className="py-3 font-mono text-white font-bold">
+                        {z?.temperature != null ? fmtTemp(z.temperature) : "—"}
+                      </td>
+                      <td className="py-3 font-mono text-slate-400">
+                        {z ? `${z.lower_limit}°C to ${z.upper_limit}°C` : "—"}
+                      </td>
+                      <td className="py-3 font-mono text-slate-300">
+                        {a.occurrences} {a.occurrences === 1 ? "time" : "times"}
+                      </td>
+                      <td className="py-3 font-semibold">
+                        {a.active ? (
+                          <span className="text-rose-400 flex items-center gap-1">
+                            <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
+                            • Active Incident
+                          </span>
+                        ) : (
+                          <span className="text-emerald-400">• Resolved & Audited</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                zones?.map((z) => (
+                  <tr key={z.zone_id} className="hover:bg-slate-800/30">
+                    <td className="py-3 font-mono text-slate-300">Continuous Monitoring</td>
+                    <td className="py-3 font-semibold text-white">{z.name}</td>
+                    <td className="py-3 text-emerald-400 font-medium">Nominal Operating Baseline</td>
+                    <td className="py-3 font-mono text-white font-bold">{z.temperature != null ? fmtTemp(z.temperature) : "—"}</td>
+                    <td className="py-3 font-mono text-slate-400">{z.lower_limit}°C to {z.upper_limit}°C</td>
+                    <td className="py-3 font-mono text-slate-300">0 breaches</td>
+                    <td className="py-3 text-emerald-400 font-semibold">• Fully Compliant</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
