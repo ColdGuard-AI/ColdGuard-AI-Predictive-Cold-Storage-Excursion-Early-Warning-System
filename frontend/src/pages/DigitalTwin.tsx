@@ -2319,6 +2319,7 @@ export default function DigitalTwin() {
   const [autoRotate, setAutoRotate] = useState(false);
   const [userInteracting, setUserInteracting] = useState(false);
   const [compassHeading, setCompassHeading] = useState(0);
+  const [is3DExpanded, setIs3DExpanded] = useState(false);
 
   const controlsRef = useRef<any>(null);
 
@@ -3062,128 +3063,139 @@ export default function DigitalTwin() {
       <StaleBanner error={zonesError} />
 
       {/* ═══════════════════════════════════════════════════════════════════
-          REGION B (3D WORKSPACE) & REGION C (SELECTED-ZONE OPERATIONS)
+          REGION B (EXPANDED 3D WORKSPACE) & REGION C (SELECTED-ZONE OPERATIONS)
           ═══════════════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        {/* Left Column (8 cols): 3D Facility Workspace */}
-        <div className="xl:col-span-8">
-          <Card className="p-0 overflow-hidden" bodyClassName="p-0">
-            {/* Top Navigation & Flight Presets Bar */}
-            {isNavigating && selectedConfig ? (
-              <GoogleMapsTopNavBanner
-                zoneConfig={selectedConfig}
-                distanceMeters={navDistance}
-                isArrived={navArrived}
-                onExit={handleExitNavigation}
-                onRecenter={handleRecenter}
-                onWalkInside={handleWalkInside}
-              />
-            ) : (
-              <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-white/10 bg-slate-900/90 flex-wrap">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold flex items-center gap-1 mr-1">
-                    <Navigation size={12} className="animate-pulse" /> Camera Flight:
-                  </span>
+      <div className={`grid grid-cols-1 gap-4 ${is3DExpanded ? "xl:grid-cols-12" : "xl:grid-cols-12"}`}>
+        {/* 3D Facility Workspace (Spacious, Clear & Expandable) */}
+        <div className={is3DExpanded ? "xl:col-span-12" : "xl:col-span-8"}>
+          <Card className="p-0 overflow-hidden shadow-2xl border-cyan-500/20" bodyClassName="p-0">
+            {/* Unified Control & Flight Navigation Bar */}
+            <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 border-b border-white/10 bg-slate-900/90 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold flex items-center gap-1 mr-1">
+                  <Navigation size={12} className="animate-pulse" /> Camera Flight:
+                </span>
 
-                  <button
-                    onClick={() => {
-                      setIsNavigating(false);
-                      setCameraPreset("isometric");
-                    }}
-                    className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer ${
-                      cameraPreset === "isometric" && !isNavigating
-                        ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold"
-                        : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
-                    }`}
-                  >
-                    🌐 Overview
-                  </button>
+                <button
+                  onClick={() => {
+                    setIsNavigating(false);
+                    setCameraPreset("isometric");
+                  }}
+                  className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer ${
+                    cameraPreset === "isometric" && !isNavigating
+                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold"
+                      : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
+                  }`}
+                >
+                  🌐 Overview
+                </button>
 
-                  {ZONE_CONFIGS.map((cfg) => (
+                {ZONE_CONFIGS.map((cfg) => {
+                  const isActive = selectedZoneId === cfg.id && isNavigating;
+                  return (
                     <button
                       key={`fly-${cfg.id}`}
                       onClick={() => handleZoneSelect(cfg.id)}
                       className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
-                        selectedZoneId === cfg.id && isNavigating
+                        isActive
                           ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold shadow-sm"
                           : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-cyan-400"
                       }`}
                     >
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: cfg.color }} />
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cfg.color }} />
                       <span>{cfg.name}</span>
                       <span className="text-[9px] text-cyan-400 font-bold">
                         {cfg.id === "zone-a" ? "16m" : cfg.id === "zone-b" ? "10m" : "8m"}
                       </span>
+                      {isActive && (
+                        <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
+                          Arrived
+                        </span>
+                      )}
                     </button>
-                  ))}
+                  );
+                })}
 
-                  <button
-                    onClick={() => handleToggleDoor()}
-                    className="px-2.5 py-1 text-[11px] font-mono rounded-lg border bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-amber-400 cursor-pointer flex items-center gap-1.5"
-                  >
-                    <DoorOpen size={12} className="text-amber-400" />
-                    <span>Loading Bay</span>
-                    <span className="text-[9px] text-amber-400 font-bold">0m</span>
-                  </button>
-                </div>
-
-                {/* Layer Toggles & View Modes */}
-                <div className="flex items-center gap-1.5 ml-auto">
-                  <button
-                    onClick={() => setViewMode(viewMode === "thermal" ? "standard" : "thermal")}
-                    className={`px-2 py-0.5 text-[10px] font-mono rounded border flex items-center gap-1 cursor-pointer ${
-                      viewMode === "thermal"
-                        ? "bg-amber-500/20 text-amber-300 border-amber-400 font-bold"
-                        : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
-                    }`}
-                    title="Interpolated CFD Thermal Heatmap"
-                  >
-                    <Thermometer size={10} /> Thermal
-                  </button>
-
-                  <button
-                    onClick={() => setViewMode(viewMode === "airflow" ? "standard" : "airflow")}
-                    className={`px-2 py-0.5 text-[10px] font-mono rounded border flex items-center gap-1 cursor-pointer ${
-                      viewMode === "airflow"
-                        ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold"
-                        : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
-                    }`}
-                    title="Forced Air Circulation Vectors"
-                  >
-                    <Wind size={10} /> Airflow
-                  </button>
-
-                  <button
-                    onClick={() => setShowLabels(!showLabels)}
-                    className={`px-2 py-0.5 text-[10px] font-mono rounded border flex items-center gap-1 cursor-pointer ${
-                      showLabels
-                        ? "bg-cyan-500/20 text-cyan-300 border-cyan-400"
-                        : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
-                    }`}
-                  >
-                    {showLabels ? <Eye size={10} /> : <EyeOff size={10} />} Labels
-                  </button>
-
-                  <button
-                    onClick={() => setAutoRotate(!autoRotate)}
-                    className={`px-2 py-0.5 text-[10px] font-mono rounded border flex items-center gap-1 cursor-pointer ${
-                      autoRotate
-                        ? "bg-purple-500/20 text-purple-300 border-purple-400"
-                        : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
-                    }`}
-                  >
-                    <RefreshCw size={10} className={autoRotate ? "animate-spin" : ""} /> Orbit
-                  </button>
-                </div>
+                <button
+                  onClick={() => handleToggleDoor()}
+                  className="px-2.5 py-1 text-[11px] font-mono rounded-lg border bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-amber-400 cursor-pointer flex items-center gap-1.5"
+                >
+                  <DoorOpen size={12} className="text-amber-400" />
+                  <span>Loading Bay</span>
+                  <span className="text-[9px] text-amber-400 font-bold">0m</span>
+                </button>
               </div>
-            )}
 
-            {/* 3D Canvas Viewport */}
-            <div className="relative" style={{ height: "580px" }}>
+              {/* Layer Toggles & Viewport Expand */}
+              <div className="flex items-center gap-1.5 ml-auto">
+                <button
+                  onClick={() => setViewMode(viewMode === "thermal" ? "standard" : "thermal")}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
+                    viewMode === "thermal"
+                      ? "bg-amber-500/20 text-amber-300 border-amber-400 font-bold shadow-sm"
+                      : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
+                  }`}
+                  title="Interpolated CFD Thermal Heatmap"
+                >
+                  <Thermometer size={11} /> Thermal
+                </button>
+
+                <button
+                  onClick={() => setViewMode(viewMode === "airflow" ? "standard" : "airflow")}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
+                    viewMode === "airflow"
+                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold shadow-sm"
+                      : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
+                  }`}
+                  title="Forced Air Circulation Vectors"
+                >
+                  <Wind size={11} /> Airflow
+                </button>
+
+                <button
+                  onClick={() => setShowLabels(!showLabels)}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
+                    showLabels
+                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400"
+                      : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
+                  }`}
+                >
+                  {showLabels ? <Eye size={11} /> : <EyeOff size={11} />} Labels
+                </button>
+
+                <button
+                  onClick={() => setAutoRotate(!autoRotate)}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
+                    autoRotate
+                      ? "bg-purple-500/20 text-purple-300 border-purple-400 font-bold"
+                      : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
+                  }`}
+                >
+                  <RefreshCw size={11} className={autoRotate ? "animate-spin" : ""} /> Orbit
+                </button>
+
+                {/* Theater / Full Width Expand Toggle */}
+                <button
+                  onClick={() => setIs3DExpanded(!is3DExpanded)}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1.5 cursor-pointer transition font-bold ${
+                    is3DExpanded
+                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-md"
+                      : "bg-slate-800 text-fg-muted border-slate-700 hover:text-white hover:border-cyan-400"
+                  }`}
+                  title={is3DExpanded ? "Restore side-by-side view" : "Maximize 3D Digital Twin View"}
+                >
+                  {is3DExpanded ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
+                  <span>{is3DExpanded ? "Side Panel" : "Maximize View"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 3D Canvas Viewport with Increased Height */}
+            <div className="relative" style={{ height: is3DExpanded ? "740px" : "680px" }}>
               <Canvas shadows gl={{ antialias: true, alpha: true }} dpr={[1, 2]}>
                 <Suspense fallback={null}>
                   <color attach="background" args={["#060d17"]} />
-                  <fog attach="fog" args={["#060d17", 18, 38]} />
+                  <fog attach="fog" args={["#060d17", 18, 42]} />
                   <ColdStorageScene
                     zones={allZones.length > 0 ? allZones : zones ?? []}
                     selectedZoneId={selectedZoneId}
@@ -3205,21 +3217,7 @@ export default function DigitalTwin() {
                 </Suspense>
               </Canvas>
 
-              {/* Bottom Docked Place Bar */}
-              {isNavigating && selectedConfig && (
-                <GoogleMapsBottomDock
-                  zoneConfig={selectedConfig}
-                  currentTemp={currentZoneTemp}
-                  simulationState={simState}
-                  activeZone={selectedZone}
-                  onExitNavigation={handleExitNavigation}
-                  onCycleNextZone={handleCycleNextZone}
-                  onWalkInside={handleWalkInside}
-                  onRecenter={handleRecenter}
-                />
-              )}
-
-              {/* Floating Camera Navigation Controls (Right Side) */}
+              {/* Floating Camera Controls (Right Side) */}
               <div className="absolute top-3 right-3 z-30 flex flex-col items-center gap-1.5 pointer-events-auto">
                 {/* Compass Heading Indicator */}
                 <button
@@ -3242,7 +3240,7 @@ export default function DigitalTwin() {
                       ? "bg-cyan-500/30 text-cyan-200 border-cyan-400"
                       : "bg-slate-900/90 text-fg-muted border-white/20 hover:text-white"
                   }`}
-                  title="Toggle 2D Floor Plan / 3D Isometric Mode"
+                  title="Toggle 2D Floor Plan / 3D Isometric View"
                 >
                   {cameraPreset === "top" ? "2D" : "3D"}
                 </button>
@@ -3279,7 +3277,30 @@ export default function DigitalTwin() {
                 </button>
               </div>
 
-              {/* Bottom Radar Minimap */}
+              {/* Sleek Floating Location Pill (Non-blocking, leaves warehouse floor 100% visible) */}
+              {selectedConfig && (
+                <div className="absolute bottom-3 left-3 z-20 pointer-events-auto flex items-center gap-2.5 rounded-xl border border-cyan-500/30 bg-slate-950/85 px-3 py-2 shadow-2xl backdrop-blur-md">
+                  <div className="relative h-9 w-9 rounded-lg overflow-hidden border border-white/20 shrink-0">
+                    <img src={selectedConfig.image} alt={selectedConfig.name} className="h-full w-full object-cover" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-white">
+                      <MapPin size={12} className="text-cyan-400" />
+                      <span>{selectedConfig.name}</span>
+                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-bold ${
+                        currentZoneTemp > selectedConfig.upperLimit ? "bg-rose-500/20 text-rose-300 border border-rose-500/40" :
+                        currentZoneTemp > selectedConfig.upperLimit - 1.5 ? "bg-amber-500/20 text-amber-300 border border-amber-500/40" :
+                        "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                      }`}>
+                        {fmtTemp(currentZoneTemp)}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-cyan-300/80 font-mono">{selectedConfig.product} • Safe: {selectedConfig.tempRange}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Bottom Radar Minimap (Cleanly Positioned on Right) */}
               <RadarMinimap
                 selectedZoneId={selectedZoneId}
                 onSelectZone={handleZoneSelect}
@@ -3288,7 +3309,7 @@ export default function DigitalTwin() {
 
               {/* Measured vs Simulated Data Distinction Legend */}
               <div className="absolute top-3 left-3 z-20 pointer-events-none">
-                <div className="rounded-lg border border-white/10 bg-slate-950/80 px-2.5 py-1 text-[9px] font-mono text-fg-faint backdrop-blur-sm flex items-center gap-2">
+                <div className="rounded-lg border border-white/10 bg-slate-950/85 px-2.5 py-1 text-[9px] font-mono text-fg-faint backdrop-blur-sm flex items-center gap-2">
                   <span className="flex items-center gap-1 text-emerald-400 font-bold">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Measured Probes
                   </span>
@@ -3301,7 +3322,7 @@ export default function DigitalTwin() {
 
               {/* In-Canvas Notification Floater */}
               {hasAnyAlert && (
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex flex-wrap gap-2 pointer-events-none z-20">
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 flex flex-wrap gap-2 pointer-events-none z-20">
                   {simState.doorOpen && (
                     <span className="pointer-events-auto rounded-lg border border-amber-500/80 bg-amber-950/95 px-3 py-1.5 text-xs font-bold text-amber-200 animate-pulse backdrop-blur-md shadow-xl flex items-center gap-1.5">
                       <DoorOpen size={14} /> DOCK DOOR OPEN: +26°C INGRESS ({Math.floor(doorOpenSeconds / 60)}m {doorOpenSeconds % 60}s)
@@ -3328,18 +3349,29 @@ export default function DigitalTwin() {
           </Card>
         </div>
 
-        {/* Right Column (4 cols): Context-Aware Selected-Zone Operations Panel */}
-        <div className="xl:col-span-4 space-y-3.5">
-          {/* Section 1: Measured Telemetry Card */}
+        {/* Right Column: Neat 2-Card Selected-Zone Operations Panel */}
+        <div className={is3DExpanded ? "xl:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-4" : "xl:col-span-4 space-y-4"}>
+          {/* Card 1: Selected Zone Telemetry & Operational State */}
           <Card
             title={
-              <div className="flex items-center justify-between w-full">
-                <span className="flex items-center gap-1.5">
-                  <Layers size={14} className="text-cyan-400" />
-                  {selectedConfig.name} Physical Telemetry
-                </span>
-                <span className="text-[10px] font-mono text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/30">
+              <span className="flex items-center gap-1.5">
+                <Layers size={14} className="text-cyan-400" />
+                {selectedConfig.name} Telemetry & Operations
+              </span>
+            }
+            actions={
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/30 font-bold">
                   {selectedConfig.product}
+                </span>
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold border ${
+                  simState.doorOpen
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse"
+                    : simState.isRecovering
+                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                }`}>
+                  {simState.doorOpen ? "OPEN — INGRESS" : simState.isRecovering ? "CLOSED — RECOVERING" : "CLOSED — NOMINAL"}
                 </span>
               </div>
             }
@@ -3403,32 +3435,9 @@ export default function DigitalTwin() {
                   </div>
                 </div>
               </div>
-            </div>
-          </Card>
 
-          {/* Section 2: Calculated Operational & Recovery Card */}
-          <Card
-            title={
-              <div className="flex items-center justify-between w-full">
-                <span className="flex items-center gap-1.5">
-                  <DoorOpen size={14} className={simState.doorOpen ? "text-rose-400" : simState.isRecovering ? "text-amber-400" : "text-emerald-400"} />
-                  Calculated Operational State
-                </span>
-                <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold border ${
-                  simState.doorOpen
-                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse"
-                    : simState.isRecovering
-                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                }`}>
-                  {simState.doorOpen ? "OPEN — INGRESS" : simState.isRecovering ? "CLOSED — RECOVERING" : "CLOSED — NOMINAL"}
-                </span>
-              </div>
-            }
-          >
-            <div className="space-y-2.5 text-xs">
-              <div className="grid grid-cols-2 gap-2 font-mono">
-                {/* Residual Thermal Ingress */}
+              {/* Calculated Operational State */}
+              <div className="grid grid-cols-2 gap-2 font-mono text-xs">
                 <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
                   <div className="text-[10px] text-fg-muted">Residual Rise ΔT</div>
                   <div className="text-sm font-bold text-amber-300 mt-0.5">
@@ -3437,7 +3446,6 @@ export default function DigitalTwin() {
                   <div className="text-[9px] text-fg-faint">accumulated warm air</div>
                 </div>
 
-                {/* Predicted Peak */}
                 <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
                   <div className="text-[10px] text-fg-muted">Predicted Peak Temp</div>
                   <div className="text-sm font-bold text-rose-300 mt-0.5">
@@ -3450,7 +3458,6 @@ export default function DigitalTwin() {
                   <div className="text-[9px] text-fg-faint">thermal inertia peak</div>
                 </div>
 
-                {/* Est. Recovery Time */}
                 <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
                   <div className="text-[10px] text-fg-muted">Est. Recovery Duration</div>
                   <div className="text-sm font-bold text-cyan-300 mt-0.5">
@@ -3459,7 +3466,6 @@ export default function DigitalTwin() {
                   <div className="text-[9px] text-fg-faint">exponential cooldown</div>
                 </div>
 
-                {/* 24h Cumulative Door Ingress */}
                 <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
                   <div className="text-[10px] text-fg-muted">24h Ingress Time</div>
                   <div className="text-sm font-bold text-white mt-0.5">
@@ -3485,7 +3491,7 @@ export default function DigitalTwin() {
                 </div>
               </div>
 
-              {/* Door Interactive Actions */}
+              {/* Door Quick Actions */}
               <div className="flex items-center gap-1.5 pt-1">
                 <button
                   onClick={() => api.setDoor(selectedZoneId, "open", 120).then(handleToggleDoor)}
@@ -3509,74 +3515,67 @@ export default function DigitalTwin() {
             </div>
           </Card>
 
-          {/* Section 3: Explainable Risk Breakdown Card */}
+          {/* Card 2: Explainable Risk Assessment & Operator Guidance */}
           <Card
-            title={
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert size={14} className={riskAnalysis.category === "critical" ? "text-rose-400" : "text-amber-400"} />
-                  <span>Explainable Risk Assessment</span>
-                </div>
-                <div className="text-right">
-                  <span className={`font-mono text-sm font-bold ${
-                    riskAnalysis.category === "critical" ? "text-rose-400" :
-                    riskAnalysis.category === "warning" ? "text-amber-400" : "text-emerald-400"
-                  }`}>
-                    {riskAnalysis.score} / 100
-                  </span>
-                </div>
-              </div>
-            }
-          >
-            <div className="space-y-2">
-              <div className="text-xs text-fg-muted">
-                {riskAnalysis.factors.length > 0 ? (
-                  <span>Authoritative model factors driving current risk:</span>
-                ) : (
-                  <span className="text-emerald-400">✓ All risk indicators nominal. No thermal risk factors active.</span>
-                )}
-              </div>
-
-              {riskAnalysis.factors.map((factor, idx) => (
-                <div
-                  key={idx}
-                  className="rounded-lg border border-rose-500/30 bg-rose-950/20 p-2 text-xs font-mono space-y-1"
-                >
-                  <div className="flex items-center justify-between text-rose-300 font-bold">
-                    <span>{factor.label}</span>
-                    <span className="text-rose-400">+{factor.points} pts</span>
-                  </div>
-                  <div className="text-[10px] text-fg-faint">{factor.detail}</div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* Section 4: Actionable Guidance & Equipment Mitigation */}
-          <Card
-            title={
+            title="Explainable Risk & Guidance"
+            icon={<ShieldAlert size={14} className={riskAnalysis.category === "critical" ? "text-rose-400" : "text-amber-400"} />}
+            actions={
               <div className="flex items-center gap-2">
-                <CheckCircle2 size={14} className="text-cyan-400" />
-                <span>Actionable Operator Guidance</span>
+                <span className="text-[10px] font-mono text-fg-muted uppercase">{riskAnalysis.category} Risk</span>
+                <span className={`font-mono text-sm font-bold ${
+                  riskAnalysis.category === "critical" ? "text-rose-400" :
+                  riskAnalysis.category === "warning" ? "text-amber-400" : "text-emerald-400"
+                }`}>
+                  {riskAnalysis.score} / 100
+                </span>
               </div>
             }
           >
             <div className="space-y-3">
-              <div className="rounded-lg border border-cyan-500/30 bg-slate-900/90 p-3 text-xs">
-                <p className="text-fg font-medium leading-relaxed">
-                  {riskAnalysis.recommendation}
-                </p>
+              {/* Explainable Factor Breakdown */}
+              <div className="space-y-1.5">
+                <div className="text-[11px] text-fg-muted">
+                  {riskAnalysis.factors.length > 0 ? (
+                    <span>Authoritative factors contributing to current risk:</span>
+                  ) : (
+                    <span className="text-emerald-400 font-medium">✓ All risk indicators nominal. No thermal risk factors active.</span>
+                  )}
+                </div>
+
+                {riskAnalysis.factors.map((factor, idx) => (
+                  <div
+                    key={idx}
+                    className="rounded-lg border border-rose-500/30 bg-rose-950/20 p-2 text-xs font-mono space-y-0.5"
+                  >
+                    <div className="flex items-center justify-between text-rose-300 font-bold">
+                      <span>{factor.label}</span>
+                      <span className="text-rose-400">+{factor.points} pts</span>
+                    </div>
+                    <div className="text-[10px] text-fg-faint">{factor.detail}</div>
+                  </div>
+                ))}
               </div>
 
-              {riskAnalysis.actionLabel && riskAnalysis.onAction && (
-                <button
-                  onClick={riskAnalysis.onAction}
-                  className="w-full py-2.5 px-3 rounded-lg border border-emerald-500/60 bg-emerald-950/60 text-emerald-200 hover:bg-emerald-950/90 font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg animate-pulse"
-                >
-                  <Check size={14} />
-                  {riskAnalysis.actionLabel}
-                </button>
-              )}
+              {/* Actionable Operator Guidance */}
+              <div className="pt-2 border-t border-white/5 space-y-2">
+                <div className="text-[11px] font-bold text-cyan-300 flex items-center gap-1.5 font-mono">
+                  <CheckCircle2 size={13} className="text-cyan-400" />
+                  Recommended Operator Action
+                </div>
+                <div className="rounded-lg border border-cyan-500/20 bg-slate-900/90 p-2.5 text-xs text-fg leading-relaxed">
+                  {riskAnalysis.recommendation}
+                </div>
+
+                {riskAnalysis.actionLabel && riskAnalysis.onAction && (
+                  <button
+                    onClick={riskAnalysis.onAction}
+                    className="w-full py-2.5 px-3 rounded-lg border border-emerald-500/60 bg-emerald-950/60 text-emerald-200 hover:bg-emerald-950/90 font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg animate-pulse"
+                  >
+                    <Check size={14} />
+                    {riskAnalysis.actionLabel}
+                  </button>
+                )}
+              </div>
             </div>
           </Card>
         </div>
