@@ -105,7 +105,7 @@ def _excursion_scores(actual_breach: np.ndarray, predicted_breach: np.ndarray) -
             "precision": precision, "recall": recall, "f1": f1}
 
 
-def train_and_evaluate(df: pd.DataFrame, seed: int = 42, n_estimators: int = 80) -> TemperatureForecaster:
+def train_and_evaluate(df: pd.DataFrame, seed: int = 42, n_estimators: int = 100) -> TemperatureForecaster:
     """Chronological train/test split per zone, fit, evaluate against baselines, refit on all data."""
     started = time.perf_counter()
     train_X, train_y, test_parts = [], [], []
@@ -130,7 +130,7 @@ def train_and_evaluate(df: pd.DataFrame, seed: int = 42, n_estimators: int = 80)
     # Every 2nd minute is enough for neighbouring, highly-correlated samples.
     X_fit, y_fit = X_train.iloc[::2], y_train.iloc[::2]
     model = RandomForestRegressor(
-        n_estimators=n_estimators, max_depth=14, min_samples_leaf=4, max_features=0.6, n_jobs=-1, random_state=seed
+        n_estimators=n_estimators, max_depth=16, min_samples_leaf=3, max_features=0.65, n_jobs=-1, random_state=seed
     )
     model.fit(X_fit, y_fit)
 
@@ -212,7 +212,7 @@ def train_and_evaluate(df: pd.DataFrame, seed: int = 42, n_estimators: int = 80)
     X_all = pd.concat([X_train] + [p[2] for p in test_parts]).iloc[::2]
     y_all = pd.concat([y_train] + [p[3] for p in test_parts]).iloc[::2]
     final = RandomForestRegressor(
-        n_estimators=n_estimators, max_depth=14, min_samples_leaf=4, max_features=0.6, n_jobs=-1, random_state=seed
+        n_estimators=n_estimators, max_depth=16, min_samples_leaf=3, max_features=0.65, n_jobs=-1, random_state=seed
     )
     final.fit(X_all, y_all)
     final.n_jobs = 1
