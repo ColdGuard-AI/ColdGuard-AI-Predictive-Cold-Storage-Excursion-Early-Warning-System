@@ -86,7 +86,7 @@ class ZoneSimulator:
         config: ZoneConfig,
         seed: int,
         start_time: datetime,
-        routine_door_openings: bool = True,
+        routine_door_openings: bool = False,
     ) -> None:
         self.config = config
         self.rng = np.random.default_rng(seed)

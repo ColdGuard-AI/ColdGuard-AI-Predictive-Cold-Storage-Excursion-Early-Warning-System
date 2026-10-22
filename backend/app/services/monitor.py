@@ -77,7 +77,7 @@ class MonitoringService:
             self._active_door_event_ids = {zid: None for zid in ZONES}
             history = []
             for i, (zone_id, cfg) in enumerate(ZONES.items()):
-                sim = ZoneSimulator(cfg, seed=self.settings.seed + i * 17, start_time=now)
+                sim = ZoneSimulator(cfg, seed=self.settings.seed + i * 17, start_time=now, routine_door_openings=False)
                 history.extend(seed_live_history(cfg, sim, self.settings.seed_history_minutes))
                 self.sims[zone_id] = sim
             self.db.insert_readings(history)

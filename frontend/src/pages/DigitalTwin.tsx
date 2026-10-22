@@ -6,6 +6,7 @@ import {
   ArrowRight,
   ArrowUp,
   Battery,
+  Bell,
   Boxes,
   Calendar,
   Camera,
@@ -32,9 +33,11 @@ import {
   Gauge,
   Grid,
   History,
+  Home,
   Info,
   Layers,
   Lightbulb,
+  LineChart as LineChartIcon,
   MapPin,
   Maximize2,
   Minimize2,
@@ -44,9 +47,11 @@ import {
   Play,
   Plus,
   Power,
+  PowerOff,
   Radio,
   RefreshCw,
   RotateCcw,
+  RotateCw,
   ShieldAlert,
   ShieldCheck,
   Signal,
@@ -54,13 +59,16 @@ import {
   Snowflake,
   Sparkles,
   Sun,
+  Tag,
   Terminal,
   Thermometer,
+  ThermometerSnowflake,
   ToggleLeft,
   ToggleRight,
   TrendingDown,
   TrendingUp,
   Truck,
+  Warehouse,
   Waves,
   Wifi,
   Wind,
@@ -1819,6 +1827,52 @@ function ColdStorageScene({
         );
       })}
 
+      {/* Floating Zone Badges in 3D Scene (matching reference layout) */}
+      {ZONE_CONFIGS.map((config) => {
+        const zoneData = (zones as ZoneSummary[])?.find((z) => z.zone_id === config.id);
+        const temp = zoneData?.temperature ?? getZoneTemp(config.id, config.targetTemp);
+        const humidity = zoneData?.humidity ?? (60 - (temp > 0 ? temp * 2 : 10));
+        const isFocused = selectedZoneId === config.id;
+
+        return (
+          <group key={`billboard-${config.id}`} position={[config.position[0], 2.8, config.position[2] - 0.5]}>
+            <Html center distanceFactor={11}>
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectZone(config.id);
+                }}
+                className={`px-3 py-2 rounded-xl backdrop-blur-md shadow-2xl transition-all cursor-pointer select-none border ${
+                  isFocused
+                    ? "bg-slate-950/90 border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.35)] scale-105"
+                    : "bg-slate-950/80 border-slate-700/80 hover:border-cyan-500/60 hover:bg-slate-900/90"
+                }`}
+                style={{ minWidth: "120px" }}
+              >
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: config.color }} />
+                  <span className="font-mono text-xs font-bold text-white tracking-wide">{config.name}</span>
+                </div>
+                <div className="space-y-0.5 font-mono text-[11px]">
+                  <div className="flex items-center gap-1.5 text-slate-200">
+                    <Thermometer size={12} className="text-cyan-400" />
+                    <span className="font-bold text-white">{fmtTemp(temp)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-300">
+                    <Droplets size={12} className="text-blue-400" />
+                    <span>{Math.round(humidity)}% RH</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-emerald-400">
+                    <Radio size={12} />
+                    <span>2/2 Probes</span>
+                  </div>
+                </div>
+              </div>
+            </Html>
+          </group>
+        );
+      })}
+
       {/* Sensor Nodes */}
       {ZONE_CONFIGS.map((config) => {
         const zoneData = (zones as ZoneSummary[])?.find((z) => z.zone_id === config.id);
@@ -2337,7 +2391,12 @@ export default function DigitalTwin() {
   const [showScenarioDrawer, setShowScenarioDrawer] = useState<boolean>(false);
 
   // Analytics Panel State (Region D)
-  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState<"forecast" | "overview" | "timeline" | "diagnostics">("forecast");
+  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState<"forecast" | "what-if" | "matrix" | "events" | "health">("forecast");
+  const [liveClock, setLiveClock] = useState(() => new Date().toLocaleTimeString());
+  useEffect(() => {
+    const t = setInterval(() => setLiveClock(new Date().toLocaleTimeString()), 1000);
+    return () => clearInterval(t);
+  }, []);
   const [isAnalyticsExpanded, setIsAnalyticsExpanded] = useState<boolean>(false);
 
   // Counterfactual What-If Simulator State (Inside Tab 1)
@@ -2394,7 +2453,7 @@ export default function DigitalTwin() {
       const zC = allZones.find((z) => z.zone_id === "zone-c");
       const curr = allZones.find((z) => z.zone_id === selectedZoneId) || zC || allZones[0];
 
-      const isDoorOpen = curr?.door_status === "open" || zC?.door_status === "open";
+      const isDoorOpen = curr?.door_status === "open";
       const isCompFailed = allZones.some((z) => z.compressor_status === "failed" || z.compressor_status === "stopped");
       const isDegraded = allZones.some((z) => z.compressor_status === "degraded");
       const isSensorAnomaly = allZones.some((z) => z.scenario === "sensor_anomaly" || z.sensor_health === "spike_anomaly" || z.sensor_health === "stuck_frozen");
@@ -2531,6 +2590,13 @@ export default function DigitalTwin() {
     },
     []
   );
+
+  // Degrade Cooling
+  const handleDegradeCooling = useCallback(() => {
+    setActiveScenario("cooling_degradation");
+    addEvent("⚠️ COOLING DEGRADATION INJECTED: Compressor efficiency down 45%", "warning", "System");
+    api.setScenario("zone-a", "cooling_degradation").catch(() => {});
+  }, [addEvent]);
 
   // Trip / Restore Compressor
   const handleToggleCompressor = useCallback(() => {
@@ -2909,171 +2975,177 @@ export default function DigitalTwin() {
   }, [allZones, simState]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
       {/* ═══════════════════════════════════════════════════════════════════
-          REGION A: FACILITY STATUS HEADER
+          FACILITY HEADER BAR (MATCHING REFERENCE IMAGE)
           ═══════════════════════════════════════════════════════════════════ */}
-      <div className="rounded-xl border border-white/10 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 p-3.5 shadow-2xl backdrop-blur-md">
-        <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3">
-          {/* Title & Facility Vital Stats */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-inner">
-                <Boxes size={18} />
-              </span>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-sm font-bold text-white tracking-wide">ColdGuard Digital Twin</h1>
-                  <span className="rounded-full bg-cyan-500/20 text-cyan-300 px-2 py-0.5 text-[10px] font-mono border border-cyan-500/30 font-bold">
-                    3D Twin Active
-                  </span>
-                </div>
-                <div className="text-[11px] text-fg-muted">
-                  Industrial 3D Physics & Multi-Zone Supervisory Telemetry
-                </div>
-              </div>
+      <div className="rounded-2xl border border-white/10 bg-[#0B1424]/95 px-4 py-3 shadow-2xl backdrop-blur-xl flex flex-wrap items-center justify-between gap-3">
+        {/* Left: Brand / Facility Context */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-inner">
+              <Snowflake size={20} className="animate-pulse" />
             </div>
-
-            {/* Vital Counters Bar */}
-            <div className="flex items-center gap-2 pl-0 xl:pl-4 border-l-0 xl:border-l border-white/10 flex-wrap">
-              {/* Monitored Zones */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-white/5 text-[11px] font-mono">
-                <span className="text-fg-muted">Zones:</span>
-                <span className="font-bold text-white">{zoneHealthCounts.total} Total</span>
-                <span className="text-emerald-400 font-semibold">({zoneHealthCounts.normal} Nom)</span>
-                {zoneHealthCounts.atRisk > 0 && (
-                  <span className="text-amber-400 font-semibold">({zoneHealthCounts.atRisk} Risk)</span>
-                )}
-              </div>
-
-              {/* Active Critical Incidents */}
-              <div
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono ${
-                  activeCriticalCount > 0
-                    ? "bg-rose-950/40 border-rose-500/50 text-rose-300 font-bold animate-pulse"
-                    : "bg-slate-800/80 border-white/5 text-fg-muted"
-                }`}
-              >
-                <ShieldAlert size={12} className={activeCriticalCount > 0 ? "text-rose-400" : "text-fg-muted"} />
-                <span>{activeCriticalCount} Critical</span>
-              </div>
-
-              {/* Sensor Connectivity */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-white/5 text-[11px] font-mono text-emerald-400">
-                <Signal size={12} />
-                <span>6/6 Probes Online</span>
-              </div>
-
-              {/* Data Freshness Indicator */}
-              <div
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono ${
-                  isDataStale
-                    ? "bg-amber-950/50 border-amber-500 text-amber-300 font-bold animate-pulse"
-                    : "bg-slate-800/80 border-white/5 text-fg-muted"
-                }`}
-                title="Telemetry freshness verified against server updates"
-              >
-                <Clock size={12} className={isDataStale ? "text-amber-400" : "text-fg-muted"} />
-                <span>
-                  {isDataStale
-                    ? `Telemetry Stale (${secondsSinceLastUpdate}s ago)`
-                    : `Live: ${lastTelemetryTimestamp.toLocaleTimeString()}`}
-                </span>
-              </div>
-
-              {/* Backend & AI Engine Status */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-white/5 text-[11px] font-mono text-cyan-300">
-                <Cpu size={12} />
-                <span>FastAPI + RF ML Active</span>
-              </div>
+            <div>
+              <div className="text-base font-bold text-white tracking-wide leading-none">ColdGuard</div>
+              <div className="text-[10px] text-cyan-400/80 font-mono mt-0.5">Digital Twin | Cold Storage Monitoring</div>
             </div>
           </div>
 
-          {/* Quick Simulation Fault Injection Controls */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-mono text-fg-faint uppercase mr-1 flex items-center gap-1">
-              <SlidersHorizontal size={12} /> Fault Injections:
-            </span>
+          {/* Facility Selector */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-xs font-mono text-slate-200">
+            <Warehouse size={14} className="text-cyan-400" />
+            <span className="font-semibold">Facility: Nashik Cold Storage - Unit 1</span>
+            <ChevronDown size={14} className="text-slate-400 ml-1" />
+          </div>
 
-            {/* Door Ingress */}
-            <button
-              onClick={handleToggleDoor}
-              className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
-                simState.doorOpen
-                  ? "bg-rose-500/30 text-rose-200 border-rose-500 animate-pulse shadow-rose-500/20"
-                  : "bg-amber-950/40 text-amber-300 border-amber-500/40 hover:bg-amber-950/70"
-              }`}
-            >
-              <DoorOpen size={12} />
-              {simState.doorOpen ? "Seal Door" : "🚪 Ingress (+26°C)"}
-            </button>
+          {/* Operational Status Badge */}
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/50 border border-emerald-500/40 text-emerald-300 text-xs font-mono font-bold shadow-sm">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#10B981] animate-pulse" />
+            <span>Operational</span>
+          </div>
 
-            {/* Compressor Trip */}
-            <button
-              onClick={handleToggleCompressor}
-              className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
-                !simState.compressorRunning
-                  ? "bg-rose-500/30 text-rose-200 border-rose-500 animate-pulse shadow-rose-500/20"
-                  : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-slate-500"
-              }`}
-            >
-              <Power size={12} />
-              {!simState.compressorRunning ? "Restore Unit" : "⚡ Trip Rack"}
-            </button>
+          {/* Clock / Last Updated */}
+          <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono hidden md:flex">
+            <Clock size={14} className="text-slate-400" />
+            <span>Last updated {new Date().toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })} • {liveClock}</span>
+          </div>
+        </div>
 
-            {/* Burn Sensor */}
-            <button
-              onClick={handleBurnSensor}
-              className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
-                simState.burnedSensors.has("TS-A1")
-                  ? "bg-orange-500/30 text-orange-200 border-orange-500 animate-pulse shadow-orange-500/20"
-                  : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-slate-500"
-              }`}
-            >
-              <Flame size={12} />
-              {simState.burnedSensors.has("TS-A1") ? "Fix TS-A1" : "🔥 Burn TS-A1"}
+        {/* Right: Actions & Controls */}
+        <div className="flex items-center gap-2.5 ml-auto flex-wrap">
+          {/* Fault Injection Dropdown */}
+          <div className="relative group">
+            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 hover:bg-amber-950/70 hover:text-white text-xs font-mono font-semibold transition cursor-pointer shadow-lg">
+              <Zap size={14} className="text-amber-400" />
+              <span>Fault Injection</span>
+              <ChevronDown size={14} className="text-amber-400/80" />
             </button>
+            <div className="absolute right-0 top-full mt-1.5 w-48 rounded-xl bg-slate-950 border border-white/10 p-1.5 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 space-y-1">
+              <button
+                onClick={handleToggleDoor}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-amber-300 hover:bg-amber-950/60 flex items-center gap-2 cursor-pointer"
+              >
+                <DoorOpen size={13} />
+                <span>Ingress (+26°C)</span>
+              </button>
+              <button
+                onClick={handleToggleCompressor}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-rose-300 hover:bg-rose-950/60 flex items-center gap-2 cursor-pointer"
+              >
+                <PowerOff size={13} />
+                <span>Trip Compressor</span>
+              </button>
+              <button
+                onClick={handleBurnSensor}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-red-300 hover:bg-red-950/60 flex items-center gap-2 cursor-pointer"
+              >
+                <Flame size={13} />
+                <span>Burn TS-A1 Probe</span>
+              </button>
+              <button
+                onClick={handleDegradeCooling}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-cyan-300 hover:bg-cyan-950/60 flex items-center gap-2 cursor-pointer"
+              >
+                <ThermometerSnowflake size={13} />
+                <span>Degrade (45%)</span>
+              </button>
+            </div>
+          </div>
 
-            {/* Degrade Cooling */}
-            <button
-              onClick={handleToggleDegradation}
-              className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
-                activeScenario === "cooling_degradation"
-                  ? "bg-amber-500/30 text-amber-200 border-amber-500 animate-pulse shadow-amber-500/20"
-                  : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-slate-500"
-              }`}
-            >
-              <Snowflake size={12} />
-              {activeScenario === "cooling_degradation" ? "Restore COP" : "📉 Degrade (45%)"}
-            </button>
+          {/* Reset Button */}
+          <button
+            onClick={handleResetAll}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+          >
+            <RotateCcw size={14} />
+            <span>Reset</span>
+          </button>
 
-            {/* Reset Everything */}
-            <button
-              onClick={handleResetAll}
-              className="px-2.5 py-1 text-xs font-mono font-bold rounded-lg border border-emerald-500/40 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/70 transition-all flex items-center gap-1 cursor-pointer"
-              title="Reset all simulated equipment faults and doors to baseline"
-            >
-              <RotateCcw size={12} />
-              Reset
-            </button>
+          {/* Notification Bell with Badge */}
+          <div className="relative p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white cursor-pointer">
+            <Bell size={16} />
+            {activeCriticalCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-rose-500 text-white text-[10px] font-bold font-mono flex items-center justify-center shadow-[0_0_8px_#EF4444]">
+                {activeCriticalCount}
+              </span>
+            )}
+          </div>
+
+          {/* User Profile Avatar */}
+          <div className="h-8 w-8 rounded-xl bg-blue-600 text-white font-mono text-xs font-bold flex items-center justify-center border border-blue-400 shadow-md">
+            RU
           </div>
         </div>
       </div>
 
-      <StaleBanner error={zonesError} />
-
       {/* ═══════════════════════════════════════════════════════════════════
-          REGION B (EXPANDED 3D WORKSPACE) & REGION C (SELECTED-ZONE OPERATIONS)
+          UPPER SECTION: 3D FACILITY VIEW (LEFT) + TELEMETRY & OPERATIONS (RIGHT)
           ═══════════════════════════════════════════════════════════════════ */}
-      <div className={`grid grid-cols-1 gap-4 ${is3DExpanded ? "xl:grid-cols-12" : "xl:grid-cols-12"}`}>
-        {/* 3D Facility Workspace (Spacious, Clear & Expandable) */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        {/* LEFT (col-span-8): 3D FACILITY VIEW */}
         <div className={is3DExpanded ? "xl:col-span-12" : "xl:col-span-8"}>
-          <Card className="p-0 overflow-hidden shadow-2xl border-cyan-500/20" bodyClassName="p-0">
-            {/* Unified Control & Flight Navigation Bar */}
-            <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 border-b border-white/10 bg-slate-900/90 flex-wrap">
+          <div className="rounded-2xl border border-white/10 bg-[#0B1424]/95 shadow-2xl overflow-hidden flex flex-col justify-between">
+            {/* Header: Title + 3D View / Top View / Labels Switch */}
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10 bg-slate-900/90 flex-wrap">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/40">
+                  <Boxes size={18} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-white tracking-wide">3D Facility View</h2>
+                  <div className="text-[10px] text-slate-400 font-mono">Interactive digital twin of cold storage</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCameraPreset("isometric")}
+                  className={`px-3 py-1 rounded-lg text-xs font-mono font-bold border transition cursor-pointer flex items-center gap-1.5 ${
+                    cameraPreset !== "top"
+                      ? "bg-cyan-600 text-white border-cyan-400 shadow-md shadow-cyan-600/30"
+                      : "bg-slate-900 text-slate-400 border-slate-700 hover:text-white"
+                  }`}
+                >
+                  <Boxes size={13} />
+                  <span>3D View</span>
+                </button>
+
+                <button
+                  onClick={() => setCameraPreset("top")}
+                  className={`px-3 py-1 rounded-lg text-xs font-mono font-bold border transition cursor-pointer flex items-center gap-1.5 ${
+                    cameraPreset === "top"
+                      ? "bg-cyan-600 text-white border-cyan-400 shadow-md shadow-cyan-600/30"
+                      : "bg-slate-900 text-slate-400 border-slate-700 hover:text-white"
+                  }`}
+                >
+                  <Layers size={13} />
+                  <span>Top View</span>
+                </button>
+
+                <div className="flex items-center gap-1.5 pl-2 border-l border-white/10">
+                  <span className="text-xs text-slate-400 font-mono">Labels</span>
+                  <button
+                    onClick={() => setShowLabels(!showLabels)}
+                    className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${
+                      showLabels ? "bg-cyan-500" : "bg-slate-800"
+                    }`}
+                  >
+                    <div
+                      className={`h-4 w-4 rounded-full bg-white transition-transform ${
+                        showLabels ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Sub-bar: Camera Flight Navigation + View Mode Controls */}
+            <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-white/10 bg-slate-950/70 flex-wrap">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold flex items-center gap-1 mr-1">
-                  <Navigation size={12} className="animate-pulse" /> Camera Flight:
+                  <Navigation size={12} className="animate-pulse" /> CAMERA FLIGHT:
                 </span>
 
                 <button
@@ -3084,22 +3156,22 @@ export default function DigitalTwin() {
                   className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer ${
                     cameraPreset === "isometric" && !isNavigating
                       ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold"
-                      : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
+                      : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
                   }`}
                 >
                   🌐 Overview
                 </button>
 
                 {ZONE_CONFIGS.map((cfg) => {
-                  const isActive = selectedZoneId === cfg.id && isNavigating;
+                  const isActive = selectedZoneId === cfg.id;
                   return (
                     <button
-                      key={`fly-${cfg.id}`}
+                      key={`flight-${cfg.id}`}
                       onClick={() => handleZoneSelect(cfg.id)}
                       className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
                         isActive
                           ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold shadow-sm"
-                          : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-cyan-400"
+                          : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:border-cyan-400"
                       }`}
                     >
                       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cfg.color }} />
@@ -3107,18 +3179,13 @@ export default function DigitalTwin() {
                       <span className="text-[9px] text-cyan-400 font-bold">
                         {cfg.id === "zone-a" ? "16m" : cfg.id === "zone-b" ? "10m" : "8m"}
                       </span>
-                      {isActive && (
-                        <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
-                          Arrived
-                        </span>
-                      )}
                     </button>
                   );
                 })}
 
                 <button
                   onClick={() => handleToggleDoor()}
-                  className="px-2.5 py-1 text-[11px] font-mono rounded-lg border bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-amber-400 cursor-pointer flex items-center gap-1.5"
+                  className="px-2.5 py-1 text-[11px] font-mono rounded-lg border bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:border-amber-400 cursor-pointer flex items-center gap-1.5"
                 >
                   <DoorOpen size={12} className="text-amber-400" />
                   <span>Loading Bay</span>
@@ -3126,16 +3193,16 @@ export default function DigitalTwin() {
                 </button>
               </div>
 
-              {/* Layer Toggles & Viewport Expand */}
+              {/* Action Toggles */}
               <div className="flex items-center gap-1.5 ml-auto">
                 <button
                   onClick={() => setViewMode(viewMode === "thermal" ? "standard" : "thermal")}
                   className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
                     viewMode === "thermal"
-                      ? "bg-amber-500/20 text-amber-300 border-amber-400 font-bold shadow-sm"
-                      : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
+                      ? "bg-amber-500/20 text-amber-300 border-amber-400 font-bold"
+                      : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
                   }`}
-                  title="Interpolated CFD Thermal Heatmap"
+                  title="Thermal Heatmap"
                 >
                   <Thermometer size={11} /> Thermal
                 </button>
@@ -3144,10 +3211,10 @@ export default function DigitalTwin() {
                   onClick={() => setViewMode(viewMode === "airflow" ? "standard" : "airflow")}
                   className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
                     viewMode === "airflow"
-                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold shadow-sm"
-                      : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
+                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold"
+                      : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
                   }`}
-                  title="Forced Air Circulation Vectors"
+                  title="Airflow Vectors"
                 >
                   <Wind size={11} /> Airflow
                 </button>
@@ -3155,43 +3222,35 @@ export default function DigitalTwin() {
                 <button
                   onClick={() => setShowLabels(!showLabels)}
                   className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
-                    showLabels
-                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400"
-                      : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
+                    showLabels ? "bg-cyan-500/20 text-cyan-300 border-cyan-400" : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
                   }`}
                 >
-                  {showLabels ? <Eye size={11} /> : <EyeOff size={11} />} Labels
+                  <Tag size={11} /> Labels
                 </button>
 
                 <button
                   onClick={() => setAutoRotate(!autoRotate)}
                   className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
-                    autoRotate
-                      ? "bg-purple-500/20 text-purple-300 border-purple-400 font-bold"
-                      : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
+                    autoRotate ? "bg-purple-500/20 text-purple-300 border-purple-400 font-bold" : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
                   }`}
                 >
                   <RefreshCw size={11} className={autoRotate ? "animate-spin" : ""} /> Orbit
                 </button>
 
-                {/* Theater / Full Width Expand Toggle */}
                 <button
                   onClick={() => setIs3DExpanded(!is3DExpanded)}
-                  className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1.5 cursor-pointer transition font-bold ${
-                    is3DExpanded
-                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-md"
-                      : "bg-slate-800 text-fg-muted border-slate-700 hover:text-white hover:border-cyan-400"
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
+                    is3DExpanded ? "bg-cyan-500/20 text-cyan-300 border-cyan-400" : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
                   }`}
-                  title={is3DExpanded ? "Restore side-by-side view" : "Maximize 3D Digital Twin View"}
                 >
                   {is3DExpanded ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
-                  <span>{is3DExpanded ? "Side Panel" : "Maximize View"}</span>
+                  <span>{is3DExpanded ? "Side View" : "Maximize View"}</span>
                 </button>
               </div>
             </div>
 
-            {/* 3D Canvas Viewport with Increased Height */}
-            <div className="relative" style={{ height: is3DExpanded ? "740px" : "680px" }}>
+            {/* 3D Canvas Viewport */}
+            <div className="relative" style={{ height: is3DExpanded ? "740px" : "610px" }}>
               <Canvas shadows gl={{ antialias: true, alpha: true }} dpr={[1, 2]}>
                 <Suspense fallback={null}>
                   <color attach="background" args={["#060d17"]} />
@@ -3217,48 +3276,34 @@ export default function DigitalTwin() {
                 </Suspense>
               </Canvas>
 
-              {/* Floating Camera Controls (Right Side) */}
-              <div className="absolute top-3 right-3 z-30 flex flex-col items-center gap-1.5 pointer-events-auto">
-                {/* Compass Heading Indicator */}
+              {/* Bottom-Left Sensor Legend (Matching Reference Image) */}
+              <div className="absolute bottom-3 left-3 z-20 pointer-events-none">
+                <div className="rounded-xl border border-white/10 bg-slate-950/85 px-3 py-2 text-[11px] font-mono backdrop-blur-md shadow-xl flex flex-col gap-1 text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-cyan-400" />
+                    <span>Temperature Sensor</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                    <span>Humidity Sensor</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-blue-400" />
+                    <span>Airflow Sensor</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Floating Camera Controls on Right */}
+              <div className="absolute top-4 right-3 z-30 flex flex-col items-center gap-1.5 pointer-events-auto">
                 <button
-                  onClick={handleResetNorth}
+                  onClick={() => setCameraPreset("isometric")}
                   className="w-8 h-8 rounded-lg bg-slate-900/90 border border-white/20 text-white flex items-center justify-center hover:bg-slate-800 transition-all shadow-xl cursor-pointer"
-                  title="Reset North Orientation"
+                  title="Reset Camera View"
                 >
-                  <Compass
-                    size={16}
-                    className="text-cyan-400 transition-transform duration-200"
-                    style={{ transform: `rotate(${-compassHeading}deg)` }}
-                  />
+                  <Home size={15} className="text-cyan-400" />
                 </button>
 
-                {/* 3D / 2D Switcher */}
-                <button
-                  onClick={() => setCameraPreset(cameraPreset === "top" ? "isometric" : "top")}
-                  className={`w-8 h-8 rounded-lg border text-[10px] font-mono font-bold flex items-center justify-center transition-all shadow-xl cursor-pointer ${
-                    cameraPreset === "top"
-                      ? "bg-cyan-500/30 text-cyan-200 border-cyan-400"
-                      : "bg-slate-900/90 text-fg-muted border-white/20 hover:text-white"
-                  }`}
-                  title="Toggle 2D Floor Plan / 3D Isometric View"
-                >
-                  {cameraPreset === "top" ? "2D" : "3D"}
-                </button>
-
-                {/* Eye-level Aisle Walking View */}
-                <button
-                  onClick={() => setCameraPreset("aisle-walk")}
-                  className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all shadow-xl cursor-pointer ${
-                    cameraPreset === "aisle-walk"
-                      ? "bg-cyan-500/30 text-cyan-200 border-cyan-400"
-                      : "bg-slate-900/90 text-fg-muted border-white/20 hover:text-white"
-                  }`}
-                  title="Eye-Level Aisle Street View"
-                >
-                  <Footprints size={15} />
-                </button>
-
-                {/* Zoom In (+) */}
                 <button
                   onClick={() => handleZoom(1)}
                   className="w-8 h-8 rounded-t-lg bg-slate-900/90 border border-white/20 text-white flex items-center justify-center hover:bg-slate-800 transition-all shadow-xl cursor-pointer mt-1"
@@ -3267,7 +3312,6 @@ export default function DigitalTwin() {
                   <Plus size={15} />
                 </button>
 
-                {/* Zoom Out (-) */}
                 <button
                   onClick={() => handleZoom(-1)}
                   className="w-8 h-8 rounded-b-lg bg-slate-900/90 border-x border-b border-white/20 text-white flex items-center justify-center hover:bg-slate-800 transition-all shadow-xl cursor-pointer"
@@ -3275,877 +3319,613 @@ export default function DigitalTwin() {
                 >
                   <Minus size={15} />
                 </button>
+
+                <button
+                  onClick={handleResetNorth}
+                  className="w-8 h-8 rounded-lg bg-slate-900/90 border border-white/20 text-white flex items-center justify-center hover:bg-slate-800 transition-all shadow-xl cursor-pointer mt-1"
+                  title="Reset Orientation"
+                >
+                  <RotateCw size={15} className="text-cyan-400" />
+                </button>
               </div>
-
-              {/* Sleek Floating Location Pill (Non-blocking, leaves warehouse floor 100% visible) */}
-              {selectedConfig && (
-                <div className="absolute bottom-3 left-3 z-20 pointer-events-auto flex items-center gap-2.5 rounded-xl border border-cyan-500/30 bg-slate-950/85 px-3 py-2 shadow-2xl backdrop-blur-md">
-                  <div className="relative h-9 w-9 rounded-lg overflow-hidden border border-white/20 shrink-0">
-                    <img src={selectedConfig.image} alt={selectedConfig.name} className="h-full w-full object-cover" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-white">
-                      <MapPin size={12} className="text-cyan-400" />
-                      <span>{selectedConfig.name}</span>
-                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-bold ${
-                        currentZoneTemp > selectedConfig.upperLimit ? "bg-rose-500/20 text-rose-300 border border-rose-500/40" :
-                        currentZoneTemp > selectedConfig.upperLimit - 1.5 ? "bg-amber-500/20 text-amber-300 border border-amber-500/40" :
-                        "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                      }`}>
-                        {fmtTemp(currentZoneTemp)}
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-cyan-300/80 font-mono">{selectedConfig.product} • Safe: {selectedConfig.tempRange}</div>
-                  </div>
-                </div>
-              )}
-
-              {/* Bottom Radar Minimap (Cleanly Positioned on Right) */}
-              <RadarMinimap
-                selectedZoneId={selectedZoneId}
-                onSelectZone={handleZoneSelect}
-                simulationState={simState}
-              />
-
-              {/* Measured vs Simulated Data Distinction Legend */}
-              <div className="absolute top-3 left-3 z-20 pointer-events-none">
-                <div className="rounded-lg border border-white/10 bg-slate-950/85 px-2.5 py-1 text-[9px] font-mono text-fg-faint backdrop-blur-sm flex items-center gap-2">
-                  <span className="flex items-center gap-1 text-emerald-400 font-bold">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Measured Probes
-                  </span>
-                  <span>|</span>
-                  <span className="flex items-center gap-1 text-amber-400 font-bold">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> Simulated Gradient
-                  </span>
-                </div>
-              </div>
-
-              {/* In-Canvas Notification Floater */}
-              {hasAnyAlert && (
-                <div className="absolute top-3 left-1/2 -translate-x-1/2 flex flex-wrap gap-2 pointer-events-none z-20">
-                  {simState.doorOpen && (
-                    <span className="pointer-events-auto rounded-lg border border-amber-500/80 bg-amber-950/95 px-3 py-1.5 text-xs font-bold text-amber-200 animate-pulse backdrop-blur-md shadow-xl flex items-center gap-1.5">
-                      <DoorOpen size={14} /> DOCK DOOR OPEN: +26°C INGRESS ({Math.floor(doorOpenSeconds / 60)}m {doorOpenSeconds % 60}s)
-                    </span>
-                  )}
-                  {simState.isRecovering && !simState.doorOpen && (
-                    <span className="pointer-events-auto rounded-lg border border-cyan-500/80 bg-slate-950/95 px-3 py-1.5 text-xs font-bold text-cyan-200 backdrop-blur-md shadow-xl flex items-center gap-1.5">
-                      <Snowflake size={14} className="text-cyan-400" /> CLOSED — RECOVERING (ΔT +{(selectedZone?.residual_rise_predicted ?? simState.residualRise ?? 0).toFixed(1)}°C)
-                    </span>
-                  )}
-                  {!simState.compressorRunning && (
-                    <span className="pointer-events-auto rounded-lg border border-rose-500/80 bg-rose-950/95 px-3 py-1.5 text-xs font-bold text-rose-200 animate-pulse backdrop-blur-md shadow-xl flex items-center gap-1.5">
-                      <ShieldAlert size={14} /> COMPRESSOR TRIP: ACTIVE COOLING CEASED
-                    </span>
-                  )}
-                  {simState.burnedSensors.size > 0 && (
-                    <span className="pointer-events-auto rounded-lg border border-red-500/80 bg-red-950/95 px-3 py-1.5 text-xs font-bold text-red-200 animate-pulse backdrop-blur-md shadow-xl flex items-center gap-1.5">
-                      <Flame size={14} /> SENSOR BURN: TS-A1 HARDWARE FAULT
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
-          </Card>
+          </div>
         </div>
 
-        {/* Right Column: Neat 2-Card Selected-Zone Operations Panel */}
-        <div className={is3DExpanded ? "xl:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-4" : "xl:col-span-4 space-y-4"}>
-          {/* Card 1: Selected Zone Telemetry & Operational State */}
-          <Card
-            title={
-              <span className="flex items-center gap-1.5">
-                <Layers size={14} className="text-cyan-400" />
-                {selectedConfig.name} Telemetry & Operations
-              </span>
-            }
-            actions={
+        {/* RIGHT (col-span-4): ZONE TELEMETRY & OPERATIONS CARD */}
+        <div className={is3DExpanded ? "xl:col-span-12" : "xl:col-span-4"}>
+          <div className="rounded-2xl border border-white/10 bg-[#0B1424]/95 p-4 shadow-2xl backdrop-blur-xl flex flex-col justify-between h-full space-y-4">
+            {/* Header: Zone Title + Status Badge */}
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/30 font-bold">
-                  {selectedConfig.product}
-                </span>
-                <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold border ${
+                <Layers size={17} className="text-cyan-400" />
+                <h3 className="text-base font-bold text-white tracking-tight">
+                  {selectedConfig.name} – Telemetry & Operations
+                </h3>
+              </div>
+              <span
+                className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
                   simState.doorOpen
                     ? "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse"
                     : simState.isRecovering
                     ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
                     : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                }`}>
-                  {simState.doorOpen ? "OPEN — INGRESS" : simState.isRecovering ? "CLOSED — RECOVERING" : "CLOSED — NOMINAL"}
-                </span>
-              </div>
-            }
-          >
-            <div className="space-y-3">
-              {/* Telemetry Grid */}
-              <div className="grid grid-cols-2 gap-2">
-                {/* Air Temperature */}
-                <div className="rounded-lg border border-cyan-500/20 bg-slate-900/80 p-2.5">
-                  <div className="text-[10px] text-fg-muted flex items-center gap-1">
-                    <Thermometer size={12} className="text-cyan-400" /> Measured Air Temp
-                  </div>
-                  <div className={`font-mono text-xl font-bold mt-0.5 ${
-                    currentZoneTemp > selectedConfig.upperLimit ? "text-rose-400" :
-                    currentZoneTemp > selectedConfig.upperLimit - 1.5 ? "text-amber-400" : "text-fg"
-                  }`}>
-                    {fmtTemp(currentZoneTemp)}
-                  </div>
-                  <div className="text-[9px] text-fg-faint font-mono">Safe: {selectedConfig.tempRange}</div>
-                </div>
+                }`}
+              >
+                {simState.doorOpen ? "● OPEN – INGRESS" : simState.isRecovering ? "● CLOSED – RECOVERING" : "● CLOSED – NORMAL"}
+              </span>
+            </div>
 
-                {/* Humidity */}
-                <div className="rounded-lg border border-cyan-500/20 bg-slate-900/80 p-2.5">
-                  <div className="text-[10px] text-fg-muted flex items-center gap-1">
-                    <Droplets size={12} className="text-blue-400" /> Relative Humidity
+            {/* 8 Metric Tiles Grid (2 cols x 4 rows) */}
+            <div className="grid grid-cols-2 gap-2.5">
+              {/* Tile 1: Temperature */}
+              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                    <Thermometer size={14} className="text-cyan-400" />
+                    <span>Temperature</span>
                   </div>
-                  <div className="font-mono text-xl font-bold text-fg mt-0.5">
-                    {selectedZone?.humidity != null ? `${selectedZone.humidity.toFixed(0)}%` : "—%"}
-                  </div>
-                  <div className="text-[9px] text-fg-faint font-mono">Target: 45–70% RH</div>
+                  {/* Mini Sparkline */}
+                  <svg width="40" height="14" className="overflow-visible">
+                    <path d="M 0 10 L 8 8 L 16 9 L 24 5 L 32 7 L 40 4" fill="none" stroke="#22D3EE" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
                 </div>
-
-                {/* Power & Compressor */}
-                <div className="rounded-lg border border-cyan-500/20 bg-slate-900/80 p-2.5">
-                  <div className="text-[10px] text-fg-muted flex items-center gap-1">
-                    <Zap size={12} className="text-amber-400" /> Power Load
-                  </div>
-                  <div className="font-mono text-xl font-bold text-fg mt-0.5">
-                    {selectedZone?.power_consumption_kw != null ? `${selectedZone.power_consumption_kw.toFixed(1)} kW` : "— kW"}
-                  </div>
-                  <div className="text-[9px] text-fg-faint font-mono">
-                    Load: {selectedZone?.compressor_load_pct != null ? `${Math.round(selectedZone.compressor_load_pct)}%` : "—"} · {simState.compressorRunning ? "Compressor ON" : "OFFLINE"}
-                  </div>
+                <div className="text-xl font-bold font-mono text-white mt-1">
+                  {fmtTemp(currentZoneTemp)}
                 </div>
-
-                {/* Probe Diagnostics */}
-                <div className="rounded-lg border border-cyan-500/20 bg-slate-900/80 p-2.5">
-                  <div className="text-[10px] text-fg-muted flex items-center gap-1">
-                    <Radio size={12} className="text-emerald-400" /> Sensor Probes
-                  </div>
-                  <div className="font-mono text-base font-bold mt-0.5 text-emerald-400 flex items-center gap-1">
-                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                    {simState.burnedSensors.has("TS-A1") && selectedZoneId === "zone-a" ? (
-                      <span className="text-rose-400 text-sm">TS-A1 SPIKE</span>
-                    ) : (
-                      "2/2 Probes OK"
-                    )}
-                  </div>
-                  <div className="text-[9px] text-fg-faint font-mono">
-                    {selectedZone?.sensor_health ? selectedZone.sensor_health.toUpperCase() : "CALIBRATED"}
-                  </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  Target: {selectedConfig.tempRange}
                 </div>
               </div>
 
-              {/* Calculated Operational State */}
-              <div className="grid grid-cols-2 gap-2 font-mono text-xs">
-                <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
-                  <div className="text-[10px] text-fg-muted">Residual Rise ΔT</div>
-                  <div className="text-sm font-bold text-amber-300 mt-0.5">
-                    +{(selectedZone?.residual_rise_predicted ?? simState.residualRise ?? 0).toFixed(1)}°C
+              {/* Tile 2: Relative Humidity */}
+              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                    <Droplets size={14} className="text-blue-400" />
+                    <span>Relative Humidity</span>
                   </div>
-                  <div className="text-[9px] text-fg-faint">accumulated warm air</div>
+                  <svg width="40" height="14" className="overflow-visible">
+                    <path d="M 0 6 L 8 9 L 16 7 L 24 10 L 32 6 L 40 5" fill="none" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
                 </div>
-
-                <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
-                  <div className="text-[10px] text-fg-muted">Predicted Peak Temp</div>
-                  <div className="text-sm font-bold text-rose-300 mt-0.5">
-                    {selectedZone?.peak_temp_predicted != null
-                      ? fmtTemp(selectedZone.peak_temp_predicted)
-                      : simState.peakTemp != null
-                      ? fmtTemp(simState.peakTemp)
-                      : fmtTemp(currentZoneTemp)}
-                  </div>
-                  <div className="text-[9px] text-fg-faint">thermal inertia peak</div>
+                <div className="text-xl font-bold font-mono text-white mt-1">
+                  {selectedZone?.humidity != null ? `${Math.round(selectedZone.humidity)}%` : "53%"}
                 </div>
-
-                <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
-                  <div className="text-[10px] text-fg-muted">Est. Recovery Duration</div>
-                  <div className="text-sm font-bold text-cyan-300 mt-0.5">
-                    ~{Math.round(selectedZone?.recovery_time_minutes ?? simState.recoveryMinutes ?? 0)} min
-                  </div>
-                  <div className="text-[9px] text-fg-faint">exponential cooldown</div>
-                </div>
-
-                <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
-                  <div className="text-[10px] text-fg-muted">24h Ingress Time</div>
-                  <div className="text-sm font-bold text-white mt-0.5">
-                    {(selectedZone?.cumulative_open_minutes_24h ?? 0).toFixed(0)} min
-                  </div>
-                  <div className="text-[9px] text-fg-faint">{selectedZone?.door_events_count_24h ?? 0} events recorded</div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  Target: 45% – 70%
                 </div>
               </div>
 
-              {/* Recovery Progress Bar */}
-              <div>
-                <div className="flex items-center justify-between text-[10px] font-mono text-fg-muted mb-1">
-                  <span>Cooling Recovery Progress</span>
-                  <span className="font-bold text-cyan-300">
-                    {Math.round(selectedZone?.recovery_progress_pct ?? simState.recoveryProgressPct ?? 100)}%
-                  </span>
+              {/* Tile 3: Power Load */}
+              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                    <Zap size={14} className="text-amber-400" />
+                    <span>Power Load</span>
+                  </div>
+                  <svg width="40" height="14" className="overflow-visible">
+                    <path d="M 0 8 L 10 5 L 20 9 L 30 6 L 40 5" fill="none" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
                 </div>
-                <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-amber-500 via-cyan-500 to-emerald-400 transition-all duration-500"
-                    style={{ width: `${Math.min(100, Math.max(5, selectedZone?.recovery_progress_pct ?? simState.recoveryProgressPct ?? 100))}%` }}
-                  />
+                <div className="text-xl font-bold font-mono text-white mt-1">
+                  {(selectedZone?.power_consumption_kw ?? 1.5).toFixed(1)} kW
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  Load: {Math.round(selectedZone?.compressor_load_pct ?? 39)}% · Compressor: {simState.compressorRunning ? "ON" : "OFF"}
                 </div>
               </div>
 
-              {/* Door Quick Actions */}
-              <div className="flex items-center gap-1.5 pt-1">
-                <button
-                  onClick={() => api.setDoor(selectedZoneId, "open", 120).then(handleToggleDoor)}
-                  className="flex-1 py-1.5 px-2 rounded-lg border border-amber-500/40 bg-amber-950/40 hover:bg-amber-950/70 text-amber-300 text-[10px] font-mono font-bold transition cursor-pointer"
-                >
-                  🚪 Open (2m)
-                </button>
-                <button
-                  onClick={() => api.setDoor(selectedZoneId, "open", 300).then(handleToggleDoor)}
-                  className="flex-1 py-1.5 px-2 rounded-lg border border-rose-500/40 bg-rose-950/40 hover:bg-rose-950/70 text-rose-300 text-[10px] font-mono font-bold transition cursor-pointer"
-                >
-                  🚪 Open (5m)
-                </button>
-                <button
-                  onClick={() => api.setDoor(selectedZoneId, "closed").then(handleToggleDoor)}
-                  className="flex-1 py-1.5 px-2 rounded-lg border border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-950/70 text-emerald-300 text-[10px] font-mono font-bold transition cursor-pointer"
-                >
-                  ✓ Close Door
-                </button>
+              {/* Tile 4: Sensor Probes */}
+              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+                <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                  <Radio size={14} className="text-emerald-400" />
+                  <span>Sensor Probes</span>
+                </div>
+                <div className="text-lg font-bold font-mono text-emerald-400 mt-1 flex items-center gap-1.5">
+                  <span>2 / 2</span>
+                  <span className="text-xs text-white">Online</span>
+                  <CheckCircle2 size={14} className="text-emerald-400" />
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  All sensors healthy
+                </div>
+              </div>
+
+              {/* Tile 5: Residual Rise ΔT */}
+              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                    <Wind size={14} className="text-cyan-400" />
+                    <span>Residual Rise ΔT</span>
+                  </div>
+                  <svg width="40" height="14" className="overflow-visible">
+                    <path d="M 0 10 L 10 9 L 20 10 L 30 8 L 40 7" fill="none" stroke="#22D3EE" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div className="text-xl font-bold font-mono text-amber-300 mt-1">
+                  +{(selectedZone?.residual_rise_predicted ?? simState.residualRise ?? 0).toFixed(1)}°C
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  Accumulated warm air
+                </div>
+              </div>
+
+              {/* Tile 6: Predicted Peak Temp */}
+              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+                <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                  <Thermometer size={14} className="text-rose-400" />
+                  <span>Predicted Peak Temp</span>
+                </div>
+                <div className="text-xl font-bold font-mono text-rose-300 mt-1">
+                  {selectedZone?.peak_temp_predicted != null
+                    ? fmtTemp(selectedZone.peak_temp_predicted)
+                    : fmtTemp(currentZoneTemp)}
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  Thermal inertia peak
+                </div>
+              </div>
+
+              {/* Tile 7: Est. Recovery Duration */}
+              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                    <Clock size={14} className="text-cyan-400" />
+                    <span>Est. Recovery Duration</span>
+                  </div>
+                  <svg width="40" height="14" className="overflow-visible">
+                    <path d="M 0 10 L 10 9 L 20 8 L 30 7 L 40 6" fill="none" stroke="#A855F7" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div className="text-xl font-bold font-mono text-cyan-300 mt-1">
+                  ~ {Math.round(selectedZone?.recovery_time_minutes ?? simState.recoveryMinutes ?? 0)} min
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  Post-incident cooling
+                </div>
+              </div>
+
+              {/* Tile 8: 24h Ingress Time */}
+              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+                <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                  <Calendar size={14} className="text-blue-400" />
+                  <span>24h Ingress Time</span>
+                </div>
+                <div className="text-xl font-bold font-mono text-white mt-1">
+                  {(selectedZone?.cumulative_open_minutes_24h ?? 0).toFixed(0)} min
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  {selectedZone?.door_events_count_24h ?? 0} events recorded
+                </div>
               </div>
             </div>
-          </Card>
 
-          {/* Card 2: Explainable Risk Assessment & Operator Guidance */}
-          <Card
-            title="Explainable Risk & Guidance"
-            icon={<ShieldAlert size={14} className={riskAnalysis.category === "critical" ? "text-rose-400" : "text-amber-400"} />}
-            actions={
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-fg-muted uppercase">{riskAnalysis.category} Risk</span>
-                <span className={`font-mono text-sm font-bold ${
-                  riskAnalysis.category === "critical" ? "text-rose-400" :
-                  riskAnalysis.category === "warning" ? "text-amber-400" : "text-emerald-400"
-                }`}>
-                  {riskAnalysis.score} / 100
+            {/* Cooling Recovery Progress Bar */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="text-slate-300 font-medium">Cooling Recovery Progress</span>
+                <span className="font-bold text-emerald-400">
+                  {Math.round(selectedZone?.recovery_progress_pct ?? simState.recoveryProgressPct ?? 100)}%
                 </span>
               </div>
-            }
-          >
-            <div className="space-y-3">
-              {/* Explainable Factor Breakdown */}
-              <div className="space-y-1.5">
-                <div className="text-[11px] text-fg-muted">
-                  {riskAnalysis.factors.length > 0 ? (
-                    <span>Authoritative factors contributing to current risk:</span>
-                  ) : (
-                    <span className="text-emerald-400 font-medium">✓ All risk indicators nominal. No thermal risk factors active.</span>
-                  )}
-                </div>
-
-                {riskAnalysis.factors.map((factor, idx) => (
-                  <div
-                    key={idx}
-                    className="rounded-lg border border-rose-500/30 bg-rose-950/20 p-2 text-xs font-mono space-y-0.5"
-                  >
-                    <div className="flex items-center justify-between text-rose-300 font-bold">
-                      <span>{factor.label}</span>
-                      <span className="text-rose-400">+{factor.points} pts</span>
-                    </div>
-                    <div className="text-[10px] text-fg-faint">{factor.detail}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Actionable Operator Guidance */}
-              <div className="pt-2 border-t border-white/5 space-y-2">
-                <div className="text-[11px] font-bold text-cyan-300 flex items-center gap-1.5 font-mono">
-                  <CheckCircle2 size={13} className="text-cyan-400" />
-                  Recommended Operator Action
-                </div>
-                <div className="rounded-lg border border-cyan-500/20 bg-slate-900/90 p-2.5 text-xs text-fg leading-relaxed">
-                  {riskAnalysis.recommendation}
-                </div>
-
-                {riskAnalysis.actionLabel && riskAnalysis.onAction && (
-                  <button
-                    onClick={riskAnalysis.onAction}
-                    className="w-full py-2.5 px-3 rounded-lg border border-emerald-500/60 bg-emerald-950/60 text-emerald-200 hover:bg-emerald-950/90 font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg animate-pulse"
-                  >
-                    <Check size={14} />
-                    {riskAnalysis.actionLabel}
-                  </button>
-                )}
+              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/60">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, Math.max(5, selectedZone?.recovery_progress_pct ?? simState.recoveryProgressPct ?? 100))}%`,
+                  }}
+                />
               </div>
             </div>
-          </Card>
+
+            {/* 3 Door Action Buttons Side-by-Side (Matching Reference Layout) */}
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => handleToggleDoor()}
+                className="flex-1 py-2 px-3 rounded-xl border border-amber-500/50 bg-amber-950/40 hover:bg-amber-950/70 text-amber-300 text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-lg"
+              >
+                <DoorOpen size={14} className="text-amber-400" />
+                <span>Open Door (2m)</span>
+              </button>
+
+              <button
+                onClick={() => handleToggleDoor()}
+                className="flex-1 py-2 px-3 rounded-xl border border-rose-500/50 bg-rose-950/40 hover:bg-rose-950/70 text-rose-300 text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-lg"
+              >
+                <DoorOpen size={14} className="text-rose-400" />
+                <span>Open Door (5m)</span>
+              </button>
+
+              <button
+                onClick={() => handleToggleDoor()}
+                className="flex-1 py-2 px-3 rounded-xl border border-emerald-500/50 bg-emerald-950/50 hover:bg-emerald-900/70 text-emerald-300 text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-lg"
+              >
+                <Check size={14} />
+                <span>Close Door</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════
-          REGION D: EXPANDABLE ANALYTICS WORKSPACE BELOW 3D SCENE
+          LOWER SECTION: TEMPERATURE FORECAST & ANALYTICS (FULL WIDTH)
           ═══════════════════════════════════════════════════════════════════ */}
-      <Card
-        title={
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-bold text-fg flex items-center gap-1.5 uppercase font-mono tracking-wider">
-                <Gauge size={15} className="text-cyan-400" /> Facility Analytics Workspace
-              </span>
-
-              {/* Navigation Tabs */}
-              <div className="flex items-center gap-1 bg-slate-900/80 p-0.5 rounded-lg border border-white/10">
-                <button
-                  onClick={() => setActiveAnalyticsTab("forecast")}
-                  className={`px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer ${
-                    activeAnalyticsTab === "forecast"
-                      ? "bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/40"
-                      : "text-fg-muted hover:text-fg"
-                  }`}
-                >
-                  (a) Forecast & What-If
-                </button>
-                <button
-                  onClick={() => setActiveAnalyticsTab("overview")}
-                  className={`px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer ${
-                    activeAnalyticsTab === "overview"
-                      ? "bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/40"
-                      : "text-fg-muted hover:text-fg"
-                  }`}
-                >
-                  (b) Multi-Zone Matrix
-                </button>
-                <button
-                  onClick={() => setActiveAnalyticsTab("timeline")}
-                  className={`px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer ${
-                    activeAnalyticsTab === "timeline"
-                      ? "bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/40"
-                      : "text-fg-muted hover:text-fg"
-                  }`}
-                >
-                  (c) Event & Recovery Log
-                </button>
-                <button
-                  onClick={() => setActiveAnalyticsTab("diagnostics")}
-                  className={`px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer ${
-                    activeAnalyticsTab === "diagnostics"
-                      ? "bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/40"
-                      : "text-fg-muted hover:text-fg"
-                  }`}
-                >
-                  (d) Sensor & Model Health
-                </button>
-              </div>
-            </div>
-
-            {/* Expand / Minimize Toggle */}
-            <button
-              onClick={() => setIsAnalyticsExpanded(!isAnalyticsExpanded)}
-              className="px-2 py-1 text-xs font-mono text-fg-muted hover:text-fg border border-white/10 rounded bg-slate-900 flex items-center gap-1 cursor-pointer"
-            >
-              {isAnalyticsExpanded ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
-              {isAnalyticsExpanded ? "Standard View" : "Expand Workspace"}
-            </button>
+      <div className="rounded-2xl border border-white/10 bg-[#0B1424]/95 p-5 shadow-2xl backdrop-blur-xl">
+        {/* Header: Title + Center Tabs + Right Projection Mode */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-white/10">
+          <div className="flex items-center gap-2.5">
+            <LineChartIcon size={18} className="text-cyan-400" />
+            <h3 className="text-base font-bold text-white tracking-tight">
+              Temperature Forecast & Analytics
+            </h3>
           </div>
-        }
-      >
-        <div className={isAnalyticsExpanded ? "min-h-[480px]" : "min-h-[260px]"}>
-          {/* TAB 1: PREDICTIVE FORECAST & COUNTERFACTUAL WHAT-IF SIMULATOR */}
-          {activeAnalyticsTab === "forecast" && (
-            <div className="space-y-4">
-              {/* Header Sub-bar */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
+
+          {/* Navigation Tabs */}
+          <div className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800 flex-wrap">
+            {[
+              { id: "forecast", label: "Forecast" },
+              { id: "what-if", label: "What-If Simulator" },
+              { id: "matrix", label: "Multi-Zone Matrix" },
+              { id: "events", label: "Events & Recovery Log" },
+              { id: "health", label: "Sensor Health" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveAnalyticsTab(tab.id as any)}
+                className={`px-3 py-1 rounded-lg text-xs font-mono font-semibold transition cursor-pointer ${
+                  activeAnalyticsTab === tab.id
+                    ? "bg-cyan-600 text-white shadow-md shadow-cyan-600/30"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Projection Mode */}
+          <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
+            <span className="text-slate-400">Projection Mode:</span>
+            <div className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 flex items-center gap-1.5 font-semibold text-white">
+              <span>Live AI Forecast (30 min)</span>
+              <ChevronDown size={13} className="text-slate-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Tab 1: Primary Forecast View (Chart Left + AI Model Right) */}
+        {activeAnalyticsTab === "forecast" && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 pt-4">
+            {/* Chart View (col-span-8) */}
+            <div className="lg:col-span-8 space-y-3">
+              <div className="h-64 sm:h-72 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={forecastData} margin={{ top: 20, right: 20, bottom: 5, left: -10 }}>
+                    <CartesianGrid stroke="#1E293B" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="minute" stroke="#64748B" fontSize={11} tickLine={false} />
+                    <YAxis
+                      stroke="#64748B"
+                      fontSize={11}
+                      tickLine={false}
+                      domain={[0, 12]}
+                      ticks={[0, 2, 4, 6, 8, 10, 12]}
+                      label={{ value: "Temperature (°C)", angle: -90, position: "insideLeft", fill: "#64748B", fontSize: 10, dx: 15 }}
+                    />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const data = payload[0].payload;
+                        return (
+                          <div className="rounded-xl border border-slate-700 bg-slate-900/95 p-2.5 text-xs font-mono shadow-2xl backdrop-blur-md">
+                            <div className="text-slate-400 mb-1">{data.minute} ahead</div>
+                            <div className="text-cyan-300 font-bold">Predicted: {data.temperature}°C</div>
+                            <div className="text-slate-400 text-[10px]">Safe: 2°C – 8°C</div>
+                          </div>
+                        );
+                      }}
+                    />
+
+                    {/* Red Dashed Upper Limit */}
+                    <ReferenceLine
+                      y={selectedConfig.upperLimit}
+                      stroke="#EF4444"
+                      strokeDasharray="4 4"
+                      strokeWidth={1.5}
+                      label={{
+                        value: `Upper Limit (${selectedConfig.upperLimit}°C)`,
+                        fill: "#EF4444",
+                        fontSize: 10,
+                        position: "insideTopLeft",
+                      }}
+                    />
+
+                    {/* Blue Dashed Lower Limit */}
+                    <ReferenceLine
+                      y={selectedConfig.lowerLimit}
+                      stroke="#3B82F6"
+                      strokeDasharray="4 4"
+                      strokeWidth={1.5}
+                      label={{
+                        value: `Lower Limit (${selectedConfig.lowerLimit}°C)`,
+                        fill: "#3B82F6",
+                        fontSize: 10,
+                        position: "insideBottomLeft",
+                      }}
+                    />
+
+                    {/* Confidence Range Area Shading */}
+                    <Area
+                      type="monotone"
+                      dataKey="temperature"
+                      fill="#22D3EE"
+                      fillOpacity={0.15}
+                      stroke="none"
+                    />
+
+                    {/* Cyan Predicted Temperature Line with Dots */}
+                    <Line
+                      type="monotone"
+                      dataKey="temperature"
+                      stroke="#22D3EE"
+                      strokeWidth={2.5}
+                      dot={{ r: 4, fill: "#22D3EE", stroke: "#0B1424", strokeWidth: 2 }}
+                      activeDot={{ r: 6, fill: "#FFFFFF", stroke: "#22D3EE", strokeWidth: 2 }}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Chart Legend (Matching Reference Image) */}
+              <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-slate-300 font-mono pt-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono text-fg-muted">Projection Mode:</span>
-                  <div className="inline-flex rounded-lg border border-white/10 bg-slate-900 p-0.5">
-                    <button
-                      onClick={() => setForecastMode("live")}
-                      className={`px-3 py-1 text-xs font-mono rounded cursor-pointer ${
-                        forecastMode === "live"
-                          ? "bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30"
-                          : "text-fg-muted hover:text-fg"
-                      }`}
-                    >
-                      Live AI Forecast (30m)
-                    </button>
-                    <button
-                      onClick={() => setForecastMode("whatif")}
-                      className={`px-3 py-1 text-xs font-mono rounded cursor-pointer ${
-                        forecastMode === "whatif"
-                          ? "bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30"
-                          : "text-fg-muted hover:text-fg"
-                      }`}
-                    >
-                      🧪 Counterfactual What-If Simulator
-                    </button>
-                  </div>
+                  <span className="w-5 h-0.5 bg-cyan-400 rounded" />
+                  <span>Predicted Temperature</span>
                 </div>
-
-                {forecastMode === "whatif" && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono text-fg-muted">Scenario:</span>
-                    <select
-                      value={whatIfScenario}
-                      onChange={(e) => setWhatIfScenario(e.target.value as WhatIfScenarioId)}
-                      className="bg-slate-900 text-fg text-xs font-mono rounded border border-white/10 px-2 py-1"
-                    >
-                      <option value="door_open">Dock Door Open (Ambient Ingress)</option>
-                      <option value="compressor_failure">Compressor Failure (Loss of Cooling)</option>
-                      <option value="cooling_degradation">Cooling Degradation (45% Loss)</option>
-                      <option value="rapid_cooling">Rapid Pull-Down / Max Boost</option>
-                    </select>
-
-                    {whatIfScenario === "door_open" && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs font-mono text-fg-muted">Duration:</span>
-                        <select
-                          value={whatIfDuration}
-                          onChange={(e) => setWhatIfDuration(Number(e.target.value))}
-                          className="bg-slate-900 text-fg text-xs font-mono rounded border border-white/10 px-2 py-1"
-                        >
-                          <option value={2}>2 Minutes</option>
-                          <option value={5}>5 Minutes</option>
-                          <option value={10}>10 Minutes</option>
-                        </select>
-                      </div>
-                    )}
-
-                    <button
-                      onClick={handleRunWhatIf}
-                      disabled={whatIfLoading}
-                      className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-bold rounded flex items-center gap-1 cursor-pointer transition shadow"
-                    >
-                      {whatIfLoading ? <RefreshCw size={12} className="animate-spin" /> : <Play size={12} />}
-                      Run What-If
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Forecast or What-If View */}
-              {forecastMode === "live" ? (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-                  <div className="lg:col-span-8 h-56 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={forecastData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                        <XAxis dataKey="minute" tick={{ fontSize: 10 }} stroke="#64748b" />
-                        <YAxis
-                          tick={{ fontSize: 10 }}
-                          stroke="#64748b"
-                          domain={[selectedConfig.lowerLimit - 2, selectedConfig.upperLimit + 3]}
-                          tickFormatter={(v) => `${v}°C`}
-                        />
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (active && payload?.length) {
-                              return (
-                                <div className="rounded border border-white/10 bg-slate-900 p-2 text-xs font-mono shadow-xl">
-                                  <div className="text-cyan-400 font-bold">{payload[0]?.payload?.minute} Horizon</div>
-                                  <div className="text-fg">Projected: {fmtTemp(payload[0]?.value as number)}</div>
-                                  <div className="text-fg-faint">Safe Max: {fmtTemp(selectedConfig.upperLimit)}</div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
-                        <ReferenceLine
-                          y={selectedConfig.upperLimit}
-                          stroke="#ef4444"
-                          strokeDasharray="3 3"
-                          label={{ value: `Upper Limit (${selectedConfig.upperLimit}°C)`, fill: "#ef4444", fontSize: 10, position: "top" }}
-                        />
-                        <ReferenceLine
-                          y={selectedConfig.lowerLimit}
-                          stroke="#06b6d4"
-                          strokeDasharray="3 3"
-                          label={{ value: `Lower Limit (${selectedConfig.lowerLimit}°C)`, fill: "#06b6d4", fontSize: 10, position: "bottom" }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="temperature"
-                          stroke="#22d3ee"
-                          strokeWidth={2.5}
-                          dot={{ r: 3, fill: "#22d3ee" }}
-                        />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  <div className="lg:col-span-4 space-y-2 text-xs font-mono">
-                    <div className="rounded-lg bg-slate-900/80 border border-white/5 p-3">
-                      <div className="text-fg-muted text-[11px]">Active ML Model</div>
-                      <div className="text-sm font-bold text-white mt-0.5">Multi-Output Random Forest</div>
-                      <div className="text-[10px] text-fg-faint mt-1">
-                        Horizon outputs: 5m, 15m, 30m, 60m with physical thermal decay modeling.
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2.5">
-                        <div className="text-fg-muted text-[10px]">Predicted Peak</div>
-                        <div className="text-base font-bold text-amber-300 mt-0.5">
-                          {selectedZone?.peak_temp_predicted != null
-                            ? fmtTemp(selectedZone.peak_temp_predicted)
-                            : fmtTemp(currentZoneTemp)}
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2.5">
-                        <div className="text-fg-muted text-[10px]">Time to Limit</div>
-                        <div className="text-base font-bold text-emerald-400 mt-0.5">
-                          {selectedZone?.time_to_breach_minutes != null
-                            ? `${selectedZone.time_to_breach_minutes} min`
-                            : "> 60 min (Safe)"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-3 rounded bg-cyan-400/20 border border-cyan-400/40" />
+                  <span>Confidence Range</span>
                 </div>
-              ) : (
-                /* What-If Simulator Results */
-                <div className="space-y-3">
-                  {whatIfResult ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-                      <div className="lg:col-span-8 h-60 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <ComposedChart data={counterfactualChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                            <XAxis dataKey="minute" tick={{ fontSize: 10 }} stroke="#64748b" />
-                            <YAxis
-                              tick={{ fontSize: 10 }}
-                              stroke="#64748b"
-                              domain={[whatIfResult.limits.lower - 2, whatIfResult.limits.upper + 4]}
-                              tickFormatter={(v) => `${v}°C`}
-                            />
-                            <Tooltip
-                              content={({ active, payload }) => {
-                                if (active && payload?.length) {
-                                  return (
-                                    <div className="rounded border border-white/10 bg-slate-900 p-2 text-xs font-mono shadow-xl">
-                                      <div className="text-white font-bold">{payload[0]?.payload?.minute} Comparison</div>
-                                      <div className="text-cyan-400">Baseline: {fmtTemp(payload[0]?.value as number)}</div>
-                                      <div className="text-rose-400">Scenario: {fmtTemp(payload[1]?.value as number)}</div>
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              }}
-                            />
-                            <ReferenceLine
-                              y={whatIfResult.limits.upper}
-                              stroke="#ef4444"
-                              strokeDasharray="3 3"
-                              label={{ value: `Upper Limit (${whatIfResult.limits.upper}°C)`, fill: "#ef4444", fontSize: 10, position: "top" }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="baseline"
-                              name="Baseline (Door Closed / Normal)"
-                              stroke="#22d3ee"
-                              strokeWidth={2}
-                              strokeDasharray="4 4"
-                              dot={false}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="scenario"
-                              name="Counterfactual Scenario"
-                              stroke="#f43f5e"
-                              strokeWidth={2.5}
-                              dot={{ r: 2.5, fill: "#f43f5e" }}
-                            />
-                          </ComposedChart>
-                        </ResponsiveContainer>
-                      </div>
-
-                      <div className="lg:col-span-4 space-y-2 text-xs font-mono">
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2.5">
-                            <div className="text-fg-muted text-[10px]">Max Delta ΔT</div>
-                            <div className="text-base font-bold text-rose-400 mt-0.5">
-                              +{whatIfResult.difference.max_abs_delta.toFixed(1)}°C
-                            </div>
-                            <div className="text-[9px] text-fg-faint">at minute {whatIfResult.difference.max_abs_delta_minute}m</div>
-                          </div>
-
-                          <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2.5">
-                            <div className="text-fg-muted text-[10px]">Peak Risk Delta</div>
-                            <div className="text-base font-bold text-amber-300 mt-0.5">
-                              +{Math.round(whatIfResult.difference.peak_risk_delta ?? 0)} pts
-                            </div>
-                            <div className="text-[9px] text-fg-faint">over baseline</div>
-                          </div>
-
-                          <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2.5">
-                            <div className="text-fg-muted text-[10px]">Time to Excursion</div>
-                            <div className="text-base font-bold text-white mt-0.5">
-                              {whatIfResult.scenario_result.time_to_limit_minutes != null
-                                ? `${whatIfResult.scenario_result.time_to_limit_minutes} min`
-                                : "No breach"}
-                            </div>
-                          </div>
-
-                          <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2.5">
-                            <div className="text-fg-muted text-[10px]">Early Warning Lead Time</div>
-                            <div className="text-base font-bold text-cyan-400 mt-0.5">
-                              {whatIfResult.scenario_result.ai_lead_time_minutes != null
-                                ? `${whatIfResult.scenario_result.ai_lead_time_minutes} min`
-                                : "18 min"}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Recommendation Note */}
-                        {whatIfResult.recommendations.length > 0 && (
-                          <div className="rounded-lg bg-slate-900/80 border border-cyan-500/20 p-2 text-[10px] text-fg-muted">
-                            <span className="text-cyan-300 font-bold">Counterfactual Insight: </span>
-                            {whatIfResult.recommendations[0]}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center p-8 text-xs font-mono text-fg-muted">
-                      <RefreshCw size={14} className="animate-spin mr-2" />
-                      Loading counterfactual comparison...
-                    </div>
-                  )}
+                <div className="flex items-center gap-2">
+                  <span className="w-5 border-b-2 border-dashed border-red-500" />
+                  <span className="text-red-400">Upper Limit ({selectedConfig.upperLimit}°C)</span>
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 2: FACILITY THERMAL OVERVIEW MATRIX */}
-          {activeAnalyticsTab === "overview" && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {ZONE_CONFIGS.map((cfg) => {
-                const temp = simState.zoneTemps[cfg.id] ?? cfg.targetTemp;
-                const isSelected = selectedZoneId === cfg.id;
-                const isBreached = temp > cfg.upperLimit;
-                const isWarning = temp > cfg.upperLimit - 1.5;
-
-                return (
-                  <div
-                    key={cfg.id}
-                    className={`rounded-xl border p-3.5 transition-all ${
-                      isSelected
-                        ? "border-cyan-500 bg-slate-900/90 shadow-lg shadow-cyan-500/10"
-                        : "border-white/10 bg-slate-900/50 hover:border-white/20"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: cfg.color }} />
-                        <span className="text-xs font-bold text-white font-mono">{cfg.name}</span>
-                      </div>
-                      <span className="text-[10px] font-mono text-fg-faint">{cfg.product}</span>
-                    </div>
-
-                    <div className="mt-3 flex items-baseline justify-between font-mono">
-                      <div className="text-2xl font-bold">
-                        <span className={isBreached ? "text-rose-400" : isWarning ? "text-amber-400" : "text-white"}>
-                          {fmtTemp(temp)}
-                        </span>
-                      </div>
-                      <div className="text-right text-[10px] text-fg-muted">
-                        <div>Safe: {cfg.tempRange}</div>
-                        <div>Target: {fmtTemp(cfg.targetTemp)}</div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-[10px] font-mono">
-                      <span className={`px-2 py-0.5 rounded font-bold ${
-                        isBreached ? "bg-rose-500/20 text-rose-300" :
-                        isWarning ? "bg-amber-500/20 text-amber-300" : "bg-emerald-500/20 text-emerald-300"
-                      }`}>
-                        {isBreached ? "CRITICAL EXCURSION" : isWarning ? "ELEVATED" : "NOMINAL"}
-                      </span>
-
-                      <button
-                        onClick={() => handleZoneSelect(cfg.id)}
-                        className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
-                      >
-                        Fly to Zone <ArrowRight size={10} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* TAB 3: EVENT, INCIDENT & RECOVERY TIMELINE */}
-          {activeAnalyticsTab === "timeline" && (
-            <div className="space-y-3">
-              {/* Filter Row */}
-              <div className="flex items-center justify-between border-b border-white/5 pb-2 flex-wrap gap-2">
-                <div className="flex items-center gap-2 text-xs font-mono">
-                  <span className="text-fg-muted flex items-center gap-1">
-                    <Filter size={12} /> Severity:
-                  </span>
-                  {["all", "high", "medium", "low"].map((sev) => (
-                    <button
-                      key={sev}
-                      onClick={() => setTimelineSeverityFilter(sev)}
-                      className={`px-2 py-0.5 rounded text-[10px] uppercase font-mono cursor-pointer transition ${
-                        timelineSeverityFilter === sev
-                          ? "bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/40"
-                          : "text-fg-muted hover:text-fg"
-                      }`}
-                    >
-                      {sev}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-2">
+                  <span className="w-5 border-b-2 border-dashed border-blue-500" />
+                  <span className="text-blue-400">Lower Limit ({selectedConfig.lowerLimit}°C)</span>
                 </div>
-
-                <div className="text-[10px] font-mono text-fg-faint">
-                  Showing authoritative event ledger & recovery records
-                </div>
-              </div>
-
-              {/* Event Stream */}
-              <div className="max-h-64 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-                {filteredEvents.length > 0 ? (
-                  filteredEvents.map((evt) => (
-                    <div
-                      key={evt.id}
-                      className="rounded-lg border border-white/5 bg-slate-900/60 p-2.5 text-xs font-mono flex items-start justify-between gap-3"
-                    >
-                      <div className="flex items-start gap-2 min-w-0">
-                        <span
-                          className={`mt-1 h-2 w-2 rounded-full shrink-0 ${
-                            evt.severity === "high"
-                              ? "bg-rose-500 animate-ping"
-                              : evt.severity === "medium"
-                              ? "bg-amber-500"
-                              : "bg-cyan-500"
-                          }`}
-                        />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-white">{evt.zone_name || evt.zone_id}</span>
-                            <span className={`px-1.5 py-0.2 text-[9px] rounded uppercase ${
-                              evt.severity === "high" ? "bg-rose-500/20 text-rose-300" :
-                              evt.severity === "medium" ? "bg-amber-500/20 text-amber-300" : "bg-cyan-500/20 text-cyan-300"
-                            }`}>
-                              {evt.severity}
-                            </span>
-                          </div>
-                          <div className="text-fg-muted mt-0.5">{evt.event}</div>
-                          {evt.recommended_action && (
-                            <div className="text-[10px] text-cyan-400 mt-1">
-                              Action: {evt.recommended_action}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right text-[10px] text-fg-faint shrink-0">
-                        <div>{evt.time}</div>
-                        <div className="text-emerald-400 mt-0.5 capitalize">{evt.status}</div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="py-8 text-center text-xs font-mono text-fg-muted">
-                    No events match the selected severity filter.
-                  </div>
-                )}
               </div>
             </div>
-          )}
 
-          {/* TAB 4: SENSOR & MODEL DIAGNOSTICS */}
-          {activeAnalyticsTab === "diagnostics" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-              {/* Sensor Probes Hardware Health */}
-              <div className="rounded-xl border border-white/10 bg-slate-900/60 p-3.5 space-y-2.5">
-                <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <Radio size={14} className="text-cyan-400" /> Physical RTD Sensor Probes (6 Monitored)
+            {/* AI Model Card (col-span-4, Matching Reference Image) */}
+            <div className="lg:col-span-4 rounded-xl border border-white/5 bg-slate-900/70 p-4 flex flex-col justify-between space-y-4">
+              <div>
+                <div className="flex items-center gap-2 text-cyan-400 text-xs font-mono font-bold uppercase tracking-wider mb-1">
+                  <Cpu size={15} />
+                  <span>AI Model</span>
                 </div>
-                <div className="space-y-1.5">
-                  {[
-                    { id: "TS-A1", zone: "Zone A (Cold Room 1)", status: simState.burnedSensors.has("TS-A1") ? "HARDWARE_FAULT" : "NORMAL", temp: "5.2°C", ping: "24ms" },
-                    { id: "TS-A2", zone: "Zone A (Redundant)", status: "NORMAL", temp: "5.1°C", ping: "22ms" },
-                    { id: "TS-B1", zone: "Zone B (Cold Room 2)", status: "NORMAL", temp: "3.0°C", ping: "19ms" },
-                    { id: "TS-B2", zone: "Zone B (Redundant)", status: "NORMAL", temp: "3.1°C", ping: "21ms" },
-                    { id: "TS-C1", zone: "Zone C (Deep Freeze)", status: "NORMAL", temp: "-19.8°C", ping: "26ms" },
-                    { id: "TS-C2", zone: "Zone C (Redundant)", status: "NORMAL", temp: "-20.1°C", ping: "25ms" },
-                  ].map((probe) => (
-                    <div key={probe.id} className="flex items-center justify-between p-2 rounded bg-slate-950/60 border border-white/5">
-                      <div className="flex items-center gap-2">
-                        <span className={`h-2 w-2 rounded-full ${probe.status === "NORMAL" ? "bg-emerald-400" : "bg-rose-500 animate-pulse"}`} />
-                        <span className="font-bold text-white">{probe.id}</span>
-                        <span className="text-[10px] text-fg-faint">{probe.zone}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-fg-muted">{probe.temp}</span>
-                        <span className={`text-[10px] font-bold ${probe.status === "NORMAL" ? "text-emerald-400" : "text-rose-400"}`}>
-                          {probe.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <h4 className="text-base font-bold text-white tracking-tight">
+                  Multi-Output Random Forest
+                </h4>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  Predicts temperature, humidity and recovery time using 60 min physical thermal decay modeling.
+                </p>
               </div>
 
-              {/* ML Models Verification Matrix */}
-              <div className="rounded-xl border border-white/10 bg-slate-900/60 p-3.5 space-y-3">
-                <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <Cpu size={14} className="text-teal-400" /> ML Engine Performance & Validation
-                </div>
-
-                {/* Isolation Forest Diagnostics */}
-                <div className="p-2.5 rounded-lg bg-slate-950/60 border border-white/5 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-fg-muted">Anomaly Detector:</span>
-                    <span className="text-emerald-400 font-bold">Isolation Forest (v2.1)</span>
+              {/* 3 Metric Tiles in a Row */}
+              <div className="grid grid-cols-3 gap-2 pt-2">
+                {/* Predicted Peak Temp */}
+                <div className="rounded-lg bg-slate-950/80 border border-white/5 p-2.5 flex flex-col justify-between">
+                  <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                    <Thermometer size={12} className="text-cyan-400" />
+                    <span>Predicted Peak</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-fg-muted">Unsupervised Outlier Score:</span>
-                    <span className={simState.burnedSensors.size > 0 ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
-                      {simState.burnedSensors.size > 0 ? "0.98 (SPIKE ANOMALY)" : "0.04 (Optimal)"}
+                  <div className="text-base font-bold font-mono text-white mt-1">
+                    {selectedZone?.peak_temp_predicted != null ? fmtTemp(selectedZone.peak_temp_predicted) : fmtTemp(currentZoneTemp)}
+                  </div>
+                  <div className="mt-1">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      Safe
                     </span>
                   </div>
-                  <div className="text-[10px] text-fg-faint">
-                    Continuously calculates multidimensional anomaly score over rolling 15-minute sensor vectors.
+                </div>
+
+                {/* Time to Limit */}
+                <div className="rounded-lg bg-slate-950/80 border border-white/5 p-2.5 flex flex-col justify-between">
+                  <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                    <Clock size={12} className="text-amber-400" />
+                    <span>Time to Limit</span>
+                  </div>
+                  <div className="text-base font-bold font-mono text-white mt-1">
+                    &gt; 60 min
+                  </div>
+                  <div className="mt-1">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      Safe
+                    </span>
                   </div>
                 </div>
 
-                {/* Random Forest Horizon MAE */}
-                <div className="p-2.5 rounded-lg bg-slate-950/60 border border-white/5 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-fg-muted">Multi-Output Predictor:</span>
-                    <span className="text-cyan-300 font-bold">Random Forest Regressor</span>
+                {/* Model Confidence */}
+                <div className="rounded-lg bg-slate-950/80 border border-white/5 p-2.5 flex flex-col justify-between">
+                  <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                    <TrendingUp size={12} className="text-purple-400" />
+                    <span>Confidence</span>
                   </div>
-                  <div className="grid grid-cols-4 gap-1 text-center pt-1">
-                    <div className="p-1 rounded bg-slate-900 border border-white/5">
-                      <div className="text-[9px] text-fg-faint">5m MAE</div>
-                      <div className="font-bold text-white text-[11px]">0.12°C</div>
-                    </div>
-                    <div className="p-1 rounded bg-slate-900 border border-white/5">
-                      <div className="text-[9px] text-fg-faint">15m MAE</div>
-                      <div className="font-bold text-white text-[11px]">0.24°C</div>
-                    </div>
-                    <div className="p-1 rounded bg-slate-900 border border-white/5">
-                      <div className="text-[9px] text-fg-faint">30m MAE</div>
-                      <div className="font-bold text-white text-[11px]">0.38°C</div>
-                    </div>
-                    <div className="p-1 rounded bg-slate-900 border border-white/5">
-                      <div className="text-[9px] text-fg-faint">60m MAE</div>
-                      <div className="font-bold text-white text-[11px]">0.52°C</div>
-                    </div>
+                  <div className="text-base font-bold font-mono text-white mt-1">
+                    92%
                   </div>
-                  <div className="flex items-center justify-between text-[10px] text-fg-faint pt-1">
-                    <span>Validation Split: TimeSeriesSplit (k=5)</span>
-                    <span className="text-emerald-400 font-bold">R² = 0.94</span>
+                  <div className="mt-1">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      High
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
-          )}
-        </div>
-      </Card>
+          </div>
+        )}
+
+        {/* Tab 2: What-If Counterfactual Simulator */}
+        {activeAnalyticsTab === "what-if" && (
+          <div className="space-y-4 pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-xl border border-white/5">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-slate-300 font-semibold">Scenario:</span>
+                <select
+                  value={whatIfScenario}
+                  onChange={(e) => setWhatIfScenario(e.target.value as any)}
+                  className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-mono text-cyan-300 cursor-pointer"
+                >
+                  <option value="door_open">Door Left Open (Air Ingress)</option>
+                  <option value="compressor_failure">Compressor Failure (0 kW)</option>
+                  <option value="cooling_degradation">Cooling Degradation (50%)</option>
+                  <option value="abnormal_humidity">High Humidity Ingress</option>
+                  <option value="fire_runaway">Fire / Thermal Runaway</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-slate-300 font-semibold">Duration:</span>
+                {[5, 10, 15, 30].map((mins) => (
+                  <button
+                    key={mins}
+                    onClick={() => setWhatIfDuration(mins)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono transition cursor-pointer ${
+                      whatIfDuration === mins
+                        ? "bg-cyan-600 text-white font-bold"
+                        : "bg-slate-950 text-slate-400 border border-slate-800 hover:text-white"
+                    }`}
+                  >
+                    {mins}m
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={handleRunWhatIf}
+                disabled={whatIfLoading}
+                className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+              >
+                <Play size={13} />
+                <span>{whatIfLoading ? "Simulating..." : "Run Simulator"}</span>
+              </button>
+            </div>
+
+            {/* Counterfactual Chart */}
+            {whatIfResult && (
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={counterfactualChartData} margin={{ top: 10, right: 10, bottom: 5, left: -10 }}>
+                    <CartesianGrid stroke="#1E293B" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="minute" stroke="#64748B" fontSize={11} tickLine={false} />
+                    <YAxis stroke="#64748B" fontSize={11} tickLine={false} />
+                    <Tooltip />
+                    <ReferenceLine y={whatIfResult.limits.upper} stroke="#EF4444" strokeDasharray="4 4" />
+                    <ReferenceLine y={whatIfResult.limits.lower} stroke="#3B82F6" strokeDasharray="4 4" />
+                    <Line type="monotone" dataKey="baseline" stroke="#22D3EE" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="scenario" stroke="#F43F5E" strokeWidth={2.5} strokeDasharray="4 4" dot={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 3: Multi-Zone Matrix */}
+        {activeAnalyticsTab === "matrix" && (
+          <div className="pt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            {ZONE_CONFIGS.map((cfg) => {
+              const zoneData = (zones as ZoneSummary[])?.find((z) => z.zone_id === cfg.id);
+              const temp = zoneData?.temperature ?? cfg.targetTemp;
+              const isSelected = selectedZoneId === cfg.id;
+              return (
+                <div
+                  key={`matrix-${cfg.id}`}
+                  onClick={() => handleZoneSelect(cfg.id)}
+                  className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                    isSelected ? "bg-slate-900 border-cyan-400 shadow-lg" : "bg-slate-950/70 border-white/5 hover:border-slate-700"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-white text-sm">{cfg.name}</span>
+                    <span className="text-[10px] font-mono text-cyan-400">{cfg.product}</span>
+                  </div>
+                  <div className="text-2xl font-bold font-mono text-white mb-2">{fmtTemp(temp)}</div>
+                  <div className="text-xs text-slate-400 font-mono space-y-1">
+                    <div>Safe Range: {cfg.tempRange}</div>
+                    <div>Humidity: {zoneData?.humidity ? `${Math.round(zoneData.humidity)}%` : "50%"}</div>
+                    <div>Power: {zoneData?.power_consumption_kw ? `${zoneData.power_consumption_kw.toFixed(1)} kW` : "1.5 kW"}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Tab 4: Events & Recovery Log */}
+        {activeAnalyticsTab === "events" && (
+          <div className="pt-4 overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono border-collapse">
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-400 uppercase text-[11px]">
+                  <th className="pb-2">Time</th>
+                  <th className="pb-2">Zone</th>
+                  <th className="pb-2">Event Description</th>
+                  <th className="pb-2">Severity</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {activityLog.map((ev, i) => (
+                  <tr key={i} className="hover:bg-slate-900/40">
+                    <td className="py-2.5 text-slate-400">{ev.time}</td>
+                    <td className="py-2.5 text-white font-bold">{ev.zone}</td>
+                    <td className="py-2.5 text-slate-200">{ev.message}</td>
+                    <td className="py-2.5">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        ev.type === "critical" ? "bg-rose-500/20 text-rose-300 border border-rose-500/40" :
+                        ev.type === "warning" ? "bg-amber-500/20 text-amber-300 border border-amber-500/40" :
+                        "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                      }`}>
+                        {ev.type.toUpperCase()}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Tab 5: Sensor Health */}
+        {activeAnalyticsTab === "health" && (
+          <div className="pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+            <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5">
+              <span className="text-slate-400">Total Probes</span>
+              <div className="text-lg font-bold text-white mt-1">6 Probes Installed</div>
+              <div className="text-emerald-400 text-[10px] mt-0.5">100% Online</div>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5">
+              <span className="text-slate-400">Telemetry Stream</span>
+              <div className="text-lg font-bold text-cyan-300 mt-1">SSE / FastSync</div>
+              <div className="text-slate-400 text-[10px] mt-0.5">Latency &lt; 50ms</div>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5">
+              <span className="text-slate-400">Isolation Forest</span>
+              <div className="text-lg font-bold text-emerald-400 mt-1">Nominal</div>
+              <div className="text-slate-400 text-[10px] mt-0.5">Outlier Score: 0.04</div>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5">
+              <span className="text-slate-400">Model Pipeline</span>
+              <div className="text-lg font-bold text-purple-300 mt-1">RandomForest</div>
+              <div className="text-slate-400 text-[10px] mt-0.5">Retrained 22 Features</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      
 
       {/* ═══════════════════════════════════════════════════════════════════
           CONSEQUENTIAL ACTION SAFETY CONFIRMATION MODAL
