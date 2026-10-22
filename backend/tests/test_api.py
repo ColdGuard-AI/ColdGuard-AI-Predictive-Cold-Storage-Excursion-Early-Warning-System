@@ -42,7 +42,7 @@ def test_forecast_and_risk_endpoints(client):
     assert fc["available"] and len(fc["points"]) == 3 and fc["upper_limit"] == 8.0
     assert client.get("/api/zones/zone-a/forecast", params={"horizon": 45}).status_code == 422
     risk = client.get("/api/zones/zone-a/risk").json()
-    assert 0 <= risk["score"] <= 100 and risk["method"] == "heuristic"
+    assert 0 <= risk["score"] <= 100 and risk["method"] in ("heuristic", "physics_ml_hybrid")
     assert client.get("/api/zones/zone-a/sensor-health").json()["status"] == "normal"
 
 

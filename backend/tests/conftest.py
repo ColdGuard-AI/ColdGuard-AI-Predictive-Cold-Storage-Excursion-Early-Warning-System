@@ -48,3 +48,13 @@ def monitor(test_settings, models) -> MonitoringService:
     m = MonitoringService(test_settings, models, Database(":memory:"))
     m.initialize(START)
     return m
+
+
+@pytest.fixture()
+def client(test_settings, models):
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    app = create_app(test_settings, models=models, autostart=False)
+    with TestClient(app) as c:
+        yield c
+

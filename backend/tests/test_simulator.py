@@ -110,7 +110,16 @@ def test_reset_to_normal_recovers_temperature():
 def test_invalid_scenario_rejected():
     with pytest.raises(ValueError):
         Scenario("meteor_strike")
-    assert set(SCENARIOS) == {"normal", "door_open", "compressor_failure", "ambient_increase", "sensor_anomaly", "cooling_degradation"}
+    assert set(SCENARIOS) == {
+        "normal",
+        "door_open",
+        "compressor_failure",
+        "ambient_increase",
+        "sensor_anomaly",
+        "cooling_degradation",
+        "abnormal_humidity",
+        "fire_runaway",
+    }
 
 
 def test_history_generator_contains_episodes():

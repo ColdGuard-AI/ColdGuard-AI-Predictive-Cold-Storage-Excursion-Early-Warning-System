@@ -110,7 +110,8 @@ class ZoneSimulator:
             s.time_since_closure_seconds = 0
             s.recovery_phase = "none"
         if duration_minutes is not None:
-            self.set_scenario(Scenario(kind="door_open", duration_minutes=duration_minutes))
+            s.scenario = Scenario(kind="door_open", duration_minutes=duration_minutes)
+            s.scenario_minutes = 0
 
     def close_door(self) -> dict[str, Any]:
         """Transition door from open to closed without resetting risk.
@@ -178,7 +179,14 @@ class ZoneSimulator:
                 self.state.door_open = False
                 self.state.routine_door_remaining = 0
         elif scenario.kind == "door_open":
-            self.open_door(duration_minutes=scenario.duration_minutes)
+            s = self.state
+            if not s.door_open:
+                s.door_open = True
+                s.temp_at_open = round(s.temperature, 2)
+                s.ambient_at_open = round(s.ambient, 2)
+                s.door_open_seconds = 0
+                s.time_since_closure_seconds = 0
+                s.recovery_phase = "none"
 
     @property
     def scenario(self) -> str:
