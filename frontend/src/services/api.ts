@@ -14,6 +14,11 @@ import type {
   WhatIfResponse,
   ZoneSummary,
   ManagerOverview,
+  ZonePredictionOverview,
+  EventItem,
+  RecoveryStatus,
+  DoorEventItem,
+  ModelEvaluationResponse,
 } from "../types/api";
 
 let authToken: string | null = null;
@@ -53,6 +58,9 @@ export function describeErrorBody(body: unknown, status: number): string {
         })
         .join("; ");
     }
+  }
+  if (status === 500) {
+    return "Backend service unavailable or internal error (500). Please ensure the backend is running on port 8000.";
   }
   return `Request failed with status ${status}`;
 }
@@ -125,4 +133,13 @@ export const api = {
   modelMetrics: () => request<ModelMetricsResponse>("/api/model/metrics"),
   managerOverview: (windowMinutes = 240) =>
     request<ManagerOverview>(`/api/manager/overview${qs({ window_minutes: windowMinutes })}`),
+  predictionOverview: (zoneId: string, horizon: number = 30) =>
+    request<ZonePredictionOverview>(`/api/zones/${zoneId}/prediction-overview${qs({ horizon })}`),
+  events: (limit: number = 20) => request<EventItem[]>(`/api/events${qs({ limit })}`),
+  controlDoor: (zoneId: string, action: "open" | "close", durationMinutes?: number) =>
+    post<RecoveryStatus>(`/api/zones/${zoneId}/door`, { action, duration_minutes: durationMinutes ?? null }),
+  recoveryStatus: (zoneId: string) => request<RecoveryStatus>(`/api/zones/${zoneId}/recovery-status`),
+  doorEvents: (zoneId: string, limit: number = 50) => request<DoorEventItem[]>(`/api/zones/${zoneId}/door-events${qs({ limit })}`),
+  modelEvaluation: () => request<ModelEvaluationResponse>("/api/model/evaluation"),
 };
+

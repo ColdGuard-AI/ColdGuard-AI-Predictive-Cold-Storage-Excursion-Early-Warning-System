@@ -54,16 +54,15 @@ export default function Manager() {
 
   const { totals, zones, action_items } = overview.data;
   const selected = zones.find((z) => z.zone_id === selectedZoneId) ?? zones[0];
-  const singleStoreZones = [selected];
   const zoneName = (id: string) => zones.find((z) => z.zone_id === id)?.name ?? liveZones?.find((z) => z.zone_id === id)?.name;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-white tracking-tight"><Building2 size={20} className="text-cyan-400" /> Store Overview & Governance</h1>
+          <h1 className="flex items-center gap-2 text-xl font-bold text-white tracking-tight"><Building2 size={20} className="text-cyan-400" /> Facility Overview & Governance</h1>
           <p className="text-sm text-slate-400">
-            Good {greeting()}. Here is your active cold storage facility profile. <SimulatedBadge />
+            Good {greeting()}. Multi-zone facility telemetry, cold-chain regulatory compliance, and early warnings. <SimulatedBadge />
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -74,22 +73,48 @@ export default function Manager() {
       <StaleBanner error={overview.error} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Kpi icon={<CheckCircle2 size={13} />} label="Store Status" value={selected.temperature_status === "normal" ? "1 / 1 OK" : "0 / 1 Excursion"} tone={selected.temperature_status === "normal" ? "ok" : "crit"}
-          sub={selected.temperature_status === "normal" ? "temperature within range" : "attention required"} />
-        <Kpi icon={<BellRing size={13} />} label="Active alerts" value={String(selected.active_alert_count)} tone={selected.active_alert_count ? "crit" : "ok"}
-          sub={`${selected.active_alert_count} active excursion flags`} />
-        <Kpi icon={<ClipboardCheck size={13} />} label="Time in range" value={selected.time_in_range_pct != null ? `${selected.time_in_range_pct}%` : "—"}
-          tone={pctTone(selected.time_in_range_pct)} sub={`last ${fmtMinutes(windowMin)}`}
-          tip="Share of readings inside the safe temperature range during the selected compliance window." />
-        <Kpi icon={<Gauge size={13} />} label="Store Risk Score" value={`${selected.risk_score ?? "—"}`}
-          tone={selected.risk_category === "low" ? "ok" : selected.risk_category === "medium" ? "warn" : "crit"} sub={selected.name} tip={TIPS.risk} />
-        <Kpi icon={<Activity size={13} />} label="Sim clock" value={fmtTime(overview.data.sim_time)} sub="1 s = 1 simulated min" />
+        <Kpi
+          icon={<CheckCircle2 size={13} />}
+          label="Facility Status"
+          value={`${totals.zones_ok} / ${totals.zones} Nominal`}
+          tone={totals.zones_attention === 0 ? "ok" : "crit"}
+          sub={totals.zones_attention === 0 ? "all 3 stores within safe range" : `${totals.zones_attention} store(s) require attention`}
+        />
+        <Kpi
+          icon={<BellRing size={13} />}
+          label="Active Alerts"
+          value={String(totals.active_alerts)}
+          tone={totals.active_alerts ? "crit" : "ok"}
+          sub={totals.unacknowledged_alerts ? `${totals.unacknowledged_alerts} unacknowledged` : "no active alarms"}
+        />
+        <Kpi
+          icon={<ClipboardCheck size={13} />}
+          label="Time in Range"
+          value={totals.facility_time_in_range_pct != null ? `${totals.facility_time_in_range_pct}%` : "—"}
+          tone={pctTone(totals.facility_time_in_range_pct)}
+          sub={`facility avg, last ${fmtMinutes(windowMin)}`}
+          tip="Share of readings inside the safe temperature range during the selected compliance window across all 3 stores."
+        />
+        <Kpi
+          icon={<Gauge size={13} />}
+          label="Active Store Risk"
+          value={`${selected.risk_score ?? "—"} / 100`}
+          tone={selected.risk_category === "low" ? "ok" : selected.risk_category === "medium" ? "warn" : "crit"}
+          sub={`${selected.name} (${selected.risk_category.toUpperCase()})`}
+          tip={TIPS.risk}
+        />
+        <Kpi
+          icon={<Activity size={13} />}
+          label="Sim Clock"
+          value={fmtTime(overview.data.sim_time)}
+          sub="1 s = 1 simulated min"
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <Card className="xl:col-span-2" title="Storage room — live floor plan" icon={<Building2 size={15} />}
-          tip="Shows live temperature, cooling unit on the wall, door seal status, and telemetry.">
-          <FacilityMap zones={singleStoreZones} selectedId={selected?.zone_id ?? ""} onSelect={setSelectedZoneId} />
+        <Card className="xl:col-span-2" title="Storage facility — live floor plan" icon={<Building2 size={15} />}
+          tip="Shows live temperature, cooling unit on the wall, door seal status, and telemetry across all 3 storage zones.">
+          <FacilityMap zones={zones} selectedId={selected?.zone_id ?? ""} onSelect={setSelectedZoneId} />
           <Legend />
         </Card>
         {selected && <RoomDetail z={selected} risk={risk.data} canWhatIf onOpen={(path) => { setSelectedZoneId(selected.zone_id); navigate(path); }} />}
@@ -108,9 +133,9 @@ export default function Manager() {
             </ul>
           )}
         </Card>
-        <Card title="Store compliance" icon={<ClipboardCheck size={15} />} tip="How long this store stayed inside its safe range during the selected window.">
+        <Card title="Store compliance" icon={<ClipboardCheck size={15} />} tip="How long each store stayed inside its safe range during the selected window.">
           <ul className="space-y-4">
-            {singleStoreZones.map((z) => <ComplianceRow key={z.zone_id} z={z} />)}
+            {zones.map((z) => <ComplianceRow key={z.zone_id} z={z} />)}
           </ul>
         </Card>
       </div>

@@ -1,0 +1,137 @@
+{
+  "dataset_name": "ColdGuard-AI Physics-Informed Synthetic Cold Storage Dataset",
+  "version": "2.0.0",
+  "generation_timestamp": "2026-10-22T17:05:50.029143",
+  "is_synthetic": true,
+  "disclaimer": "NOTICE: All data in this dataset is SYNTHETIC and generated via a calibrated lumped-capacitance thermodynamic ODE model. It is intended for algorithm development, excursion forecasting benchmarks, and digital twin visualization.",
+  "total_records": 60480,
+  "zones": [
+    "zone-a",
+    "zone-b",
+    "zone-c"
+  ],
+  "time_interval_minutes": 1,
+  "duration_days": 14,
+  "scenarios_included": [
+    "normal",
+    "door_open",
+    "compressor_failure",
+    "cooling_degradation",
+    "ambient_heatwave",
+    "sensor_anomaly"
+  ],
+  "splits": {
+    "train": {
+      "records": 42336,
+      "ratio": 0.7,
+      "start": "2026-01-01T00:00:00",
+      "end": "2026-01-10T19:11:00",
+      "excursion_positive_rate_30m": 0.0657
+    },
+    "validation": {
+      "records": 9072,
+      "ratio": 0.15,
+      "start": "2026-01-10T19:12:00",
+      "end": "2026-01-12T21:35:00",
+      "excursion_positive_rate_30m": 0.0572
+    },
+    "test": {
+      "records": 8892,
+      "ratio": 0.15,
+      "start": "2026-01-12T21:36:00",
+      "end": "2026-01-14T22:59:00",
+      "excursion_positive_rate_30m": 0.0819
+    }
+  },
+  "target_variables": {
+    "temp_forecast_15m": "Continuous ground-truth temperature in \u00b0C at t + 15 minutes",
+    "temp_forecast_30m": "Continuous ground-truth temperature in \u00b0C at t + 30 minutes",
+    "temp_forecast_60m": "Continuous ground-truth temperature in \u00b0C at t + 60 minutes",
+    "excursion_risk_30m": "Binary flag (1 = safety limits breached within [t+1, t+30], 0 = safe)",
+    "excursion_severity_30m": "Multiclass (0 = Safe, 1 = Warning proximity, 2 = Critical Breach)"
+  },
+  "feature_variables": {
+    "temperature": "Sensor observed air temperature in \u00b0C (includes noise and anomaly corruptions)",
+    "true_temperature": "Ground-truth physical air temperature in \u00b0C",
+    "humidity": "Relative humidity in %RH",
+    "ambient_temperature": "External surrounding ambient temperature in \u00b0C",
+    "door_activity": "Door status mode: closed, open_routine, open_extended",
+    "door_status": "Binary door state (open / closed)",
+    "compressor_status": "Refrigeration state: running, idle, failed, degraded",
+    "compressor_load_pct": "Instantaneous cooling demand load percentage (0-100%)",
+    "power_consumption_kw": "Total instantaneous electrical power draw in kW",
+    "sensor_health": "Sensor health status: healthy, degraded_drift, stuck_frozen, spike_anomaly, missing",
+    "scenario": "Active operational scenario"
+  },
+  "zone_configurations": {
+    "zone-a": {
+      "zone_id": "zone-a",
+      "name": "Vaccine Storage A",
+      "product_category": "Critical Biologics & Vaccines",
+      "sensor_id": "TS-A01",
+      "setpoint": 5.0,
+      "lower_limit": 2.0,
+      "upper_limit": 8.0,
+      "warning_margin": 0.5,
+      "ambient_base": 24.0,
+      "ambient_diurnal_amp": 3.5,
+      "k_leak": 0.0038,
+      "k_door": 0.0115,
+      "cooling_rate_max": 0.2,
+      "kp_thermostat": 0.5,
+      "humidity_base": 50.0,
+      "humidity_door": 78.0,
+      "humidity_response_rate": 0.12,
+      "fan_power_kw": 0.35,
+      "rated_comp_power_kw": 2.8,
+      "power_ambient_derate": 0.025,
+      "calibration_standard": "ASHRAE 10-2022 / FDA 21 CFR Part 211 Cold Chain Standards"
+    },
+    "zone-b": {
+      "zone_id": "zone-b",
+      "name": "Dairy & Produce Chiller B",
+      "product_category": "Perishable Dairy & Produce",
+      "sensor_id": "TS-B01",
+      "setpoint": 3.5,
+      "lower_limit": 0.5,
+      "upper_limit": 6.5,
+      "warning_margin": 0.5,
+      "ambient_base": 25.0,
+      "ambient_diurnal_amp": 3.5,
+      "k_leak": 0.0034,
+      "k_door": 0.0095,
+      "cooling_rate_max": 0.22,
+      "kp_thermostat": 0.52,
+      "humidity_base": 78.0,
+      "humidity_door": 90.0,
+      "humidity_response_rate": 0.12,
+      "fan_power_kw": 0.55,
+      "rated_comp_power_kw": 4.5,
+      "power_ambient_derate": 0.025,
+      "calibration_standard": "ASHRAE 10-2022 / FDA 21 CFR Part 211 Cold Chain Standards"
+    },
+    "zone-c": {
+      "zone_id": "zone-c",
+      "name": "Deep Freeze Vault C",
+      "product_category": "Ultra-Cold Frozen Inventory",
+      "sensor_id": "TS-C01",
+      "setpoint": -20.0,
+      "lower_limit": -25.0,
+      "upper_limit": -15.0,
+      "warning_margin": 0.5,
+      "ambient_base": 23.0,
+      "ambient_diurnal_amp": 3.5,
+      "k_leak": 0.0022,
+      "k_door": 0.007,
+      "cooling_rate_max": 0.28,
+      "kp_thermostat": 0.58,
+      "humidity_base": 42.0,
+      "humidity_door": 70.0,
+      "humidity_response_rate": 0.12,
+      "fan_power_kw": 0.75,
+      "rated_comp_power_kw": 7.2,
+      "power_ambient_derate": 0.025,
+      "calibration_standard": "ASHRAE 10-2022 / FDA 21 CFR Part 211 Cold Chain Standards"
+    }
+  }
+}

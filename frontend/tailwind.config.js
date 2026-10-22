@@ -40,6 +40,7 @@ export default {
         glow: "0 0 0 1px rgba(34,211,238,0.25), 0 0 20px -4px rgba(34,211,238,0.35)",
         "glow-cyan": "0 0 25px rgba(34, 211, 238, 0.22), inset 0 0 15px rgba(34, 211, 238, 0.08)",
         "glow-crit": "0 0 0 1px rgba(244,63,94,0.35), 0 0 20px -4px rgba(244,63,94,0.5)",
+        "glow-amber": "0 0 0 1px rgba(245,158,11,0.3), 0 0 20px -4px rgba(245,158,11,0.4)",
       },
     },
   },

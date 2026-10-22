@@ -40,6 +40,12 @@ RECOMMENDATIONS = {
         "Reduce door openings while ambient temperature is elevated.",
         "Inspect refrigeration performance and prepare corrective action.",
     ],
+    "cooling_degradation": [
+        "Inspect condenser coils for dust/debris fouling and clean immediately.",
+        "Check refrigerant pressure levels for possible slow leakage.",
+        "Verify evaporator fan speed and defrost cycle health.",
+        "Restrict non-essential door openings to reduce thermal load.",
+    ],
     "normal": [
         "Continue routine monitoring; confirm the temperature returns to setpoint.",
     ],

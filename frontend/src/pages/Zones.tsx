@@ -2,7 +2,7 @@ import { ArrowRight, BellRing, Boxes, DoorOpen, Power, ScanLine } from "lucide-r
 import { useNavigate } from "react-router-dom";
 import { SeverityBadge } from "../components/alerts";
 import { Badge, ErrorState, InfoTip, LoadingState, StaleBanner } from "../components/ui";
-import { RiskGauge, RiskLabel, TempStatusLabel, TIPS } from "../components/zone";
+import { RiskGauge, RiskLabel, TempStatusLabel, TIPS, ZoneTabs } from "../components/zone";
 import { useApp } from "../hooks/AppContext";
 import { fmtDateTime, fmtTemp } from "../lib/format";
 
@@ -18,11 +18,14 @@ export default function Zones() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="flex items-center gap-2.5 text-xl font-bold text-white tracking-tight">
-          <Boxes size={22} className="text-cyan-400" /> Cold Storage Store Profile
-        </h1>
-        <p className="text-sm text-slate-400 mt-1">Operational limits, regulatory compliance band, and real-time equipment status for this single store.</p>
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <h1 className="flex items-center gap-2.5 text-xl font-bold text-white tracking-tight">
+            <Boxes size={22} className="text-cyan-400" /> Cold Storage Store Profile
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">Operational limits, regulatory compliance band, and real-time equipment status per storage zone.</p>
+        </div>
+        <ZoneTabs />
       </div>
       <StaleBanner error={zonesError} />
 

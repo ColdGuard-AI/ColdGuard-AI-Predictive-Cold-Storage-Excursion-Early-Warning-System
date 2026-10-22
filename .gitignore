@@ -5,6 +5,10 @@ __pycache__/
 .pytest_cache/
 backend/data/*.db
 backend/data/*.db-journal
+Backend/data/*.db
+Backend/data/*.db-journal
+*.db
+*.db-journal
 
 # Generated model artifacts (re-created automatically on first start)
 backend/artifacts/

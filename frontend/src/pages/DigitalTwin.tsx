@@ -3,856 +3,3229 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowRight,
+  ArrowUp,
+  Battery,
   Boxes,
+  Camera,
+  Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Cloud,
+  Compass,
   Cpu,
+  DoorOpen,
+  Droplets,
+  ExternalLink,
+  Eye,
+  EyeOff,
   Fan,
+  Flame,
+  Footprints,
   Gauge,
+  Grid,
+  Info,
   Layers,
+  Lightbulb,
+  MapPin,
   Maximize2,
-  Play,
+  Minimize2,
+  Minus,
+  Move,
+  Navigation,
+  Plus,
   Power,
+  Radio,
   RefreshCw,
   RotateCcw,
   ShieldAlert,
   ShieldCheck,
-  Sliders,
+  Signal,
   Snowflake,
+  Sparkles,
   Sun,
   Thermometer,
+  ToggleLeft,
+  ToggleRight,
+  TrendingDown,
+  TrendingUp,
+  Truck,
   Waves,
+  Wifi,
   Wind,
+  X,
   Zap,
+  ZapOff,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Area,
   CartesianGrid,
   ComposedChart,
   Line,
-  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { Badge, Card, EmptyState, InfoTip, LoadingState, StaleBanner } from "../components/ui";
-import { ZoneTabs } from "../components/zone";
+import { Badge, Card, EmptyState, LoadingState, StaleBanner } from "../components/ui";
 import { useApp } from "../hooks/AppContext";
 import { usePolling } from "../hooks/usePolling";
 import { CHART, fmtNum, fmtTemp, POLL_MS } from "../lib/format";
 import { api } from "../services/api";
+import type { Alert, ZoneSummary } from "../types/api";
 
-export default function DigitalTwin() {
-  const { zones, selectedZone, selectedZoneId, zonesError, zonesLoading, refreshZones } = useApp();
+// Three.js & React Three Fiber imports
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Html, OrbitControls } from "@react-three/drei";
+import * as THREE from "three";
 
-  // Polling live readings & forecast for the selected zone
-  const readings = usePolling(() => api.readings(selectedZoneId, 60), POLL_MS, [selectedZoneId]);
-  const forecast = usePolling(() => api.forecast(selectedZoneId, 30), POLL_MS, [selectedZoneId]);
+/* ═══════════════════════════════════════════════════════════════════
+   TYPES & CONFIGURATIONS
+   ═══════════════════════════════════════════════════════════════════ */
 
-  // Sandbox simulation state for Hardware-in-the-Loop Twin testing
-  const [sandboxMode, setSandboxMode] = useState<"sync" | "sandbox">("sync");
-  const [compressorOverride, setCompressorOverride] = useState<"auto" | "forced_on" | "forced_off">("auto");
-  const [doorOverride, setDoorOverride] = useState<"auto" | "sealed" | "open">("auto");
-  const [ambientStress, setAmbientStress] = useState<number>(0); // +0°C to +20°C
-  const [thermalMassLoad, setThermalMassLoad] = useState<number>(75); // 20% to 100% capacity
-  const [fanSpeedRpm, setFanSpeedRpm] = useState<number>(1450);
+export type CameraPreset =
+  | "isometric"
+  | "top"
+  | "side-right"
+  | "side-left"
+  | "front"
+  | "aisle-walk"
+  | "zone-a"
+  | "zone-b"
+  | "zone-c";
 
-  const zone = selectedZone;
+export type ViewDisplayMode = "standard" | "thermal" | "airflow" | "blueprint";
 
-  // Extract latest reading or use zone summary
-  const latestReading = useMemo(() => {
-    const list = readings.data?.readings;
-    if (list && list.length > 0) {
-      return list[list.length - 1];
-    }
-    return null;
-  }, [readings.data]);
+export type SimulationScenario = "normal" | "door_open" | "compressor_failure" | "sensor_burn" | "cooling_degradation";
 
-  const currentTemp = latestReading?.temperature ?? zone?.temperature ?? 5.0;
-  const currentTrueTemp = latestReading?.true_temperature ?? currentTemp;
-  const currentAmbient = (latestReading?.ambient_temperature ?? zone?.ambient_temperature ?? 24.0) + (sandboxMode === "sandbox" ? ambientStress : 0);
-  const currentHumidity = latestReading?.humidity ?? zone?.humidity ?? 52.0;
+interface SensorEvent {
+  time: string;
+  message: string;
+  type: "info" | "warning" | "critical";
+  zone: string;
+}
 
-  // Effective status considering sandbox overrides
-  const isCompressorRunning = useMemo(() => {
-    if (sandboxMode === "sandbox") {
-      if (compressorOverride === "forced_on") return true;
-      if (compressorOverride === "forced_off") return false;
-    }
-    return (latestReading?.compressor_status ?? zone?.compressor_status) === "running";
-  }, [sandboxMode, compressorOverride, latestReading, zone]);
+interface SensorMetadata {
+  id: string;
+  model: string;
+  location: string;
+  type: string;
+  calibrationDate: string;
+}
 
-  const isDoorOpen = useMemo(() => {
-    if (sandboxMode === "sandbox") {
-      if (doorOverride === "open") return true;
-      if (doorOverride === "sealed") return false;
-    }
-    return (latestReading?.door_status ?? zone?.door_status) === "open";
-  }, [sandboxMode, doorOverride, latestReading, zone]);
+interface ZoneConfig {
+  id: string;
+  name: string;
+  product: string;
+  image: string;
+  description: string;
+  tempRange: string;
+  targetTemp: number;
+  lowerLimit: number;
+  upperLimit: number;
+  color: string;
+  glowColor: string;
+  position: [number, number, number];
+  size: [number, number, number];
+  sensorPositions: [number, number, number][];
+  sensors: SensorMetadata[];
+}
 
-  // Dynamic fan speed simulation
+const ZONE_CONFIGS: ZoneConfig[] = [
+  {
+    id: "zone-a",
+    name: "Zone A",
+    product: "Vaccines & Biologics",
+    image: "/zones/zone-a.jpg",
+    description:
+      "High-density pharmaceutical cold room storing sensitive vaccines, insulin, and biologics on industrial steel racks. Equipped with dual-redundant PT100 RTD sensor nodes.",
+    tempRange: "+2.0°C to +8.0°C",
+    targetTemp: 5.0,
+    lowerLimit: 2.0,
+    upperLimit: 8.0,
+    color: "#22D3EE",
+    glowColor: "#06B6D4",
+    position: [-6, 0, -2],
+    size: [5.2, 3.5, 6.2],
+    sensorPositions: [
+      [-7.5, 1.8, -3.8],
+      [-4.5, 1.8, -0.6],
+    ],
+    sensors: [
+      {
+        id: "TS-A1",
+        model: "Sensirion SHT45-PT100 Pro",
+        location: "Rack Tier 2 • North Upright",
+        type: "Precision RTD & Humidity",
+        calibrationDate: "12-Oct-2026",
+      },
+      {
+        id: "TS-A2",
+        model: "Sensirion SHT45-PT100 Pro",
+        location: "Rack Tier 3 • South Upright (Redundant)",
+        type: "Precision RTD & Airflow",
+        calibrationDate: "12-Oct-2026",
+      },
+    ],
+  },
+  {
+    id: "zone-b",
+    name: "Zone B",
+    product: "Dairy & Fresh Produce",
+    image: "/zones/zone-b.jpg",
+    description:
+      "Commercial dairy and perishable produce chiller room storing milk, cheese crates, and fresh produce. Monitored for high-humidity mold prevention and shelf-life compliance.",
+    tempRange: "0.0°C to +6.0°C",
+    targetTemp: 3.0,
+    lowerLimit: 0.0,
+    upperLimit: 6.0,
+    color: "#10B981",
+    glowColor: "#059669",
+    position: [0, 0, -2],
+    size: [5.2, 3.5, 6.2],
+    sensorPositions: [
+      [-1.5, 1.8, -3.8],
+      [1.5, 1.8, -0.6],
+    ],
+    sensors: [
+      {
+        id: "TS-B1",
+        model: "Sensirion SHT45-PT100 Pro",
+        location: "Aisle 2 • Produce Stacking Stanchion",
+        type: "Industrial Thermistor & RH",
+        calibrationDate: "14-Oct-2026",
+      },
+      {
+        id: "TS-B2",
+        model: "Sensirion SHT45-PT100 Pro",
+        location: "Aisle 3 • Dairy Chiller Stanchion",
+        type: "Industrial Thermistor & Airflow",
+        calibrationDate: "14-Oct-2026",
+      },
+    ],
+  },
+  {
+    id: "zone-c",
+    name: "Zone C",
+    product: "Frozen Goods & Loading Bay",
+    image: "/zones/zone-c.jpg",
+    description:
+      "Deep freezer storage and active loading dock airlock with rapid-roll insulated sliding door. Highly susceptible to warm air ingress and temperature spikes during door operations.",
+    tempRange: "-25.0°C to -15.0°C",
+    targetTemp: -20.0,
+    lowerLimit: -25.0,
+    upperLimit: -15.0,
+    color: "#3B82F6",
+    glowColor: "#2563EB",
+    position: [6, 0, -2],
+    size: [5.2, 3.5, 6.2],
+    sensorPositions: [
+      [4.5, 1.8, -3.8],
+      [7.5, 1.8, -0.6],
+    ],
+    sensors: [
+      {
+        id: "TS-C1",
+        model: "Sensirion Cryo-Ultra SHT40",
+        location: "Loading Dock Airlock • Portal Wall",
+        type: "Cryogenic Sub-Zero RTD",
+        calibrationDate: "10-Oct-2026",
+      },
+      {
+        id: "TS-C2",
+        model: "Sensirion Cryo-Ultra SHT40",
+        location: "Deep Freeze Pallet Row • Rear Wall",
+        type: "Cryogenic Sub-Zero RTD",
+        calibrationDate: "10-Oct-2026",
+      },
+    ],
+  },
+];
+
+/* Google Maps / Earth Camera Flight Coordinates */
+const CAMERA_PRESETS: Record<CameraPreset, { pos: [number, number, number]; target: [number, number, number] }> = {
+  isometric: { pos: [11, 12, 13], target: [0, 1.2, -2] },
+  top: { pos: [0, 21, -2.01], target: [0, 0, -2] },
+  "side-right": { pos: [19, 3.2, -2], target: [0, 1.6, -2] },
+  "side-left": { pos: [-19, 3.2, -2], target: [0, 1.6, -2] },
+  front: { pos: [0, 4.2, 14], target: [0, 1.5, -2] },
+  "aisle-walk": { pos: [0, 1.6, 2.2], target: [0, 1.6, -2.0] },
+  // Google Maps Fly-To Close-Up Coordinates (Intimate framing inside each zone)
+  "zone-a": { pos: [-6, 2.0, 2.4], target: [-6, 1.4, -2.0] },
+  "zone-b": { pos: [0, 2.0, 2.4], target: [0, 1.4, -2.0] },
+  "zone-c": { pos: [6, 2.0, 2.4], target: [6, 1.4, -2.0] },
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   GOOGLE MAPS 3D CAMERA RIG & CONTROLLER
+   ═══════════════════════════════════════════════════════════════════ */
+
+function CameraRig({
+  preset,
+  autoRotate,
+  userInteracting,
+  setUserInteracting,
+  onHeadingChange,
+  onNavigationProgress,
+  controlsRef,
+}: {
+  preset: CameraPreset;
+  autoRotate: boolean;
+  userInteracting: boolean;
+  setUserInteracting: (v: boolean) => void;
+  onHeadingChange?: (heading: number) => void;
+  onNavigationProgress?: (distanceMeters: number, isArrived: boolean) => void;
+  controlsRef: React.MutableRefObject<any>;
+}) {
+  const { camera } = useThree();
+  const targetConfig = CAMERA_PRESETS[preset] ?? CAMERA_PRESETS.isometric;
+
+  const desiredPos = useMemo(() => new THREE.Vector3(...targetConfig.pos), [targetConfig]);
+  const desiredTarget = useMemo(() => new THREE.Vector3(...targetConfig.target), [targetConfig]);
+
+  const isTransitioningRef = useRef(true);
+  const lastPresetRef = useRef(preset);
+
   useEffect(() => {
-    if (!isCompressorRunning) {
-      setFanSpeedRpm(0);
-    } else {
-      setFanSpeedRpm(1420 + Math.floor(Math.sin(Date.now() / 1000) * 40));
-    }
-  }, [isCompressorRunning]);
+    lastPresetRef.current = preset;
+    isTransitioningRef.current = true;
+  }, [preset]);
 
-  // Physics calculations for the Twin
-  const twinMetrics = useMemo(() => {
-    if (!zone) {
-      return {
-        deviation: 0.02,
-        holdoverMinutes: 45,
-        coolingKw: 4.8,
-        heatLeakWatts: 180,
-        cop: 3.2,
-        airflowCfm: 1250,
-      };
-    }
+  useFrame(() => {
+    if (!controlsRef.current) return;
 
-    const setpoint = zone.setpoint;
-    const upperLimit = zone.upper_limit;
-    const lowerLimit = zone.lower_limit;
-    const ambient = currentAmbient;
-    const temp = currentTemp;
+    // Smooth Google Maps flight interpolation
+    if (isTransitioningRef.current && !userInteracting) {
+      camera.position.lerp(desiredPos, 0.055);
+      controlsRef.current.target.lerp(desiredTarget, 0.055);
+      controlsRef.current.update();
 
-    // Sensor probe deviation from true physical lumped capacitance
-    const deviation = Math.abs(Number((currentTrueTemp - currentTemp).toFixed(3)));
+      const dist = camera.position.distanceTo(desiredPos);
+      const targetDist = controlsRef.current.target.distanceTo(desiredTarget);
 
-    // Thermal leak calculation: Q_leak = k_leak * (T_amb - T)
-    const deltaT = Math.max(0.1, ambient - temp);
-    const kLeakFactor = zone.zone_id === "zone-c" ? 0.0024 : zone.zone_id === "zone-b" ? 0.0036 : 0.004;
-    const heatLeakWatts = Math.round(deltaT * kLeakFactor * 42000 * (isDoorOpen ? 3.2 : 1.0));
-
-    // Instantaneous cooling extraction
-    const coolingKw = isCompressorRunning
-      ? Number((Math.max(1.2, 5.4 - (ambient - 25.0) * 0.08) * (temp > setpoint ? 1.0 : 0.65)).toFixed(1))
-      : 0.0;
-
-    // Thermal Holdover Time (how long until breach without power)
-    const thermalCapacitanceKj = (thermalMassLoad / 100) * 18500 + 4200;
-    const tempMargin = Math.max(0.1, upperLimit - temp);
-    const leakRateDegPerMin = (deltaT * kLeakFactor * (isDoorOpen ? 2.8 : 1.0));
-    const holdoverMinutes = Math.max(4, Math.round(tempMargin / (leakRateDegPerMin || 0.05)));
-
-    const cop = isCompressorRunning ? Number((3.6 - (ambient - 22.0) * 0.04).toFixed(1)) : 0;
-    const airflowCfm = isCompressorRunning ? Math.round(1350 * (fanSpeedRpm / 1450)) : 0;
-
-    return {
-      deviation,
-      holdoverMinutes,
-      coolingKw,
-      heatLeakWatts,
-      cop,
-      airflowCfm,
-    };
-  }, [zone, currentTemp, currentTrueTemp, currentAmbient, isCompressorRunning, isDoorOpen, thermalMassLoad, fanSpeedRpm]);
-
-  // Projected 60-minute trajectory simulation for the Digital Twin
-  const trajectoryData = useMemo(() => {
-    if (!zone) return [];
-    const points: { minute: number; timeLabel: string; twinTemp: number; baselineTemp: number; isBreach: boolean }[] = [];
-    let simTemp = currentTemp;
-    let baseTemp = currentTemp;
-
-    const kLeak = zone.zone_id === "zone-c" ? 0.0024 : zone.zone_id === "zone-b" ? 0.0036 : 0.004;
-    const kDoor = zone.zone_id === "zone-c" ? 0.0068 : zone.zone_id === "zone-b" ? 0.0094 : 0.011;
-    const coolMax = zone.zone_id === "zone-c" ? 0.26 : 0.2;
-
-    for (let m = 0; m <= 60; m += 2) {
-      if (m > 0) {
-        // Twin Sandbox Step
-        const amb = currentAmbient;
-        const leak = kLeak * (amb - simTemp);
-        const doorLeak = isDoorOpen ? kDoor * (amb - simTemp) : 0;
-        let cool = 0;
-        if (isCompressorRunning) {
-          const demand = kLeak * (25.0 - zone.setpoint) + 0.5 * (simTemp - zone.setpoint);
-          cool = Math.min(coolMax, Math.max(0, demand));
-        }
-        // Incorporate thermal mass dampening
-        const massDamping = 1.0 / (0.6 + (thermalMassLoad / 100) * 0.8);
-        simTemp += (leak + doorLeak - cool) * massDamping * 2;
-
-        // Baseline (normal steady state)
-        const baseLeak = kLeak * (24.0 - baseTemp);
-        const baseDemand = kLeak * (24.0 - zone.setpoint) + 0.5 * (baseTemp - zone.setpoint);
-        const baseCool = Math.min(coolMax, Math.max(0, baseDemand));
-        baseTemp += (baseLeak - baseCool) * 2;
+      if (onNavigationProgress) {
+        onNavigationProgress(dist * 2.2, dist < 0.15);
       }
 
+      if (dist < 0.1 && targetDist < 0.1) {
+        isTransitioningRef.current = false;
+        if (onNavigationProgress) {
+          onNavigationProgress(0, true);
+        }
+      }
+    }
+
+    // Report compass bearing
+    if (onHeadingChange && controlsRef.current) {
+      const angle = Math.atan2(
+        camera.position.x - controlsRef.current.target.x,
+        camera.position.z - controlsRef.current.target.z
+      );
+      onHeadingChange((angle * 180) / Math.PI);
+    }
+  });
+
+  return (
+    <OrbitControls
+      ref={controlsRef}
+      makeDefault
+      autoRotate={autoRotate}
+      autoRotateSpeed={0.8}
+      minPolarAngle={0.01}
+      maxPolarAngle={Math.PI / 2 - 0.03}
+      minDistance={1.2}
+      maxDistance={35}
+      dampingFactor={0.08}
+      enableDamping
+      onStart={() => {
+        setUserInteracting(true);
+        isTransitioningRef.current = false;
+      }}
+      onEnd={() => {
+        setUserInteracting(false);
+      }}
+    />
+  );
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   📍 GOOGLE MAPS 3D LOCATION PIN & WALKING ROUTE
+   ═══════════════════════════════════════════════════════════════════ */
+
+function MapLocationPin({
+  position,
+  zoneName,
+  color,
+}: {
+  position: [number, number, number];
+  zoneName: string;
+  color: string;
+}) {
+  const pinRef = useRef<THREE.Group>(null);
+  const ringRef = useRef<THREE.Mesh>(null);
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (pinRef.current) {
+      pinRef.current.position.y = 3.6 + Math.sin(t * 3.5) * 0.12;
+    }
+    if (ringRef.current) {
+      const s = 1 + (t % 1.5) * 0.6;
+      ringRef.current.scale.set(s, s, s);
+      const mat = ringRef.current.material as THREE.MeshBasicMaterial;
+      mat.opacity = Math.max(0, 0.6 - (t % 1.5) * 0.4);
+    }
+  });
+
+  return (
+    <group position={[position[0], 0, position[2]]}>
+      {/* Ground pulsing location ring */}
+      <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
+        <ringGeometry args={[0.5, 0.68, 32]} />
+        <meshBasicMaterial color={color} transparent opacity={0.6} side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* Vertical light beam pointing down */}
+      <mesh position={[0, 1.8, 0]}>
+        <cylinderGeometry args={[0.02, 0.05, 3.6, 16]} />
+        <meshBasicMaterial color={color} transparent opacity={0.3} />
+      </mesh>
+
+      {/* Floating Google Maps Pin Marker */}
+      <group ref={pinRef} position={[0, 3.6, 0]}>
+        <mesh castShadow>
+          <sphereGeometry args={[0.28, 24, 24]} />
+          <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={0.6}
+            metalness={0.4}
+            roughness={0.2}
+          />
+        </mesh>
+        <mesh position={[0, -0.22, 0]} rotation={[Math.PI, 0, 0]}>
+          <coneGeometry args={[0.22, 0.42, 24]} />
+          <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={0.6}
+            metalness={0.4}
+            roughness={0.2}
+          />
+        </mesh>
+        <mesh position={[0, 0, 0.22]}>
+          <circleGeometry args={[0.1, 16]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
+
+        <Html position={[0, 0.55, 0]} center distanceFactor={9} zIndexRange={[300, 0]}>
+          <div className="pointer-events-none select-none flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/95 border border-white/20 text-white font-mono text-[11px] font-bold shadow-2xl backdrop-blur-md whitespace-nowrap">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+            <span>📍 {zoneName}</span>
+          </div>
+        </Html>
+      </group>
+    </group>
+  );
+}
+
+/** Illuminated Navigation Walking Route on Warehouse Floor with Animated GPS Puck */
+function NavigationRoute({
+  targetZoneId,
+  isNavigating,
+}: {
+  targetZoneId: string | null;
+  isNavigating?: boolean;
+}) {
+  if (!targetZoneId) return null;
+  const cfg = ZONE_CONFIGS.find((c) => c.id === targetZoneId);
+  if (!cfg) return null;
+
+  const targetX = cfg.position[0];
+  const dockX = 9.5;
+  const aisleZ = 2.4;
+  const rackZ = -2.0;
+
+  const arrowPuckRef = useRef<THREE.Group>(null);
+  const chevronsRef = useRef<THREE.Group>(null);
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (arrowPuckRef.current) {
+      // Dynamic GPS arrow travels down the aisle toward the target zone
+      const cycle = (t * 0.45) % 1.0;
+      if (cycle < 0.6) {
+        const p = cycle / 0.6;
+        arrowPuckRef.current.position.x = dockX + (targetX - dockX) * p;
+        arrowPuckRef.current.position.z = aisleZ;
+        arrowPuckRef.current.rotation.y = targetX < dockX ? Math.PI : 0;
+      } else {
+        const p = (cycle - 0.6) / 0.4;
+        arrowPuckRef.current.position.x = targetX;
+        arrowPuckRef.current.position.z = aisleZ + (rackZ - aisleZ) * p;
+        arrowPuckRef.current.rotation.y = -Math.PI / 2;
+      }
+    }
+
+    if (chevronsRef.current) {
+      chevronsRef.current.children.forEach((child, i) => {
+        const mesh = child as THREE.Mesh;
+        if (mesh && mesh.material) {
+          const mat = mesh.material as THREE.MeshBasicMaterial;
+          mat.opacity = 0.3 + Math.sin(t * 4 + i * 0.8) * 0.35;
+        }
+      });
+    }
+  });
+
+  return (
+    <group position={[0, 0.035, 0]}>
+      {/* Walkway corridor line */}
+      <mesh
+        position={[(dockX + targetX) / 2, 0, aisleZ]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <planeGeometry args={[Math.abs(dockX - targetX), 0.35]} />
+        <meshBasicMaterial color="#0284c7" transparent opacity={0.65} />
+      </mesh>
+
+      {/* Corridor glowing border rails */}
+      {[-0.18, 0.18].map((offsetZ, idx) => (
+        <mesh
+          key={`rail-h-${idx}`}
+          position={[(dockX + targetX) / 2, 0.005, aisleZ + offsetZ]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <planeGeometry args={[Math.abs(dockX - targetX), 0.04]} />
+          <meshBasicMaterial color="#38bdf8" transparent opacity={0.9} />
+        </mesh>
+      ))}
+
+      {/* Aisle Turn line into zone */}
+      <mesh
+        position={[targetX, 0, (aisleZ + rackZ) / 2]}
+        rotation={[-Math.PI / 2, 0, Math.PI / 2]}
+      >
+        <planeGeometry args={[Math.abs(aisleZ - rackZ), 0.35]} />
+        <meshBasicMaterial color="#0284c7" transparent opacity={0.65} />
+      </mesh>
+
+      {/* Aisle glowing border rails */}
+      {[-0.18, 0.18].map((offsetX, idx) => (
+        <mesh
+          key={`rail-v-${idx}`}
+          position={[targetX + offsetX, 0.005, (aisleZ + rackZ) / 2]}
+          rotation={[-Math.PI / 2, 0, Math.PI / 2]}
+        >
+          <planeGeometry args={[Math.abs(aisleZ - rackZ), 0.04]} />
+          <meshBasicMaterial color="#38bdf8" transparent opacity={0.9} />
+        </mesh>
+      ))}
+
+      {/* Pulsing Chevrons group */}
+      <group ref={chevronsRef}>
+        {[-4, -2.5, -1, 0.5, 2, 3.5].map((off, idx) => {
+          const posX = (dockX + targetX) / 2 + off;
+          if (posX > Math.min(dockX, targetX) && posX < Math.max(dockX, targetX)) {
+            return (
+              <mesh
+                key={`chv-${idx}`}
+                position={[posX, 0.01, aisleZ]}
+                rotation={[-Math.PI / 2, 0, 0]}
+              >
+                <planeGeometry args={[0.26, 0.14]} />
+                <meshBasicMaterial color="#67e8f9" transparent opacity={0.6} />
+              </mesh>
+            );
+          }
+          return null;
+        })}
+      </group>
+
+      {/* 🚀 Iconic Google Maps Blue GPS Navigation Puck */}
+      <group ref={arrowPuckRef} position={[dockX, 0.05, aisleZ]}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.28, 0.42, 24]} />
+          <meshBasicMaterial color="#38bdf8" transparent opacity={0.6} />
+        </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[0.24, 24]} />
+          <meshBasicMaterial color="#0284c7" />
+        </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, -Math.PI / 2]} position={[0, 0.01, 0]}>
+          <coneGeometry args={[0.14, 0.28, 3]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ARCHITECTURAL & STRUCTURAL 3D COMPONENTS
+   ═══════════════════════════════════════════════════════════════════ */
+
+function WarehouseFloor() {
+  return (
+    <group position={[0, 0, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
+        <planeGeometry args={[32, 22]} />
+        <meshStandardMaterial color="#08101c" roughness={0.3} metalness={0.2} />
+      </mesh>
+
+      <lineSegments position={[0, 0.01, -2]}>
+        <edgesGeometry args={[new THREE.BoxGeometry(20.4, 0.01, 7.6)]} />
+        <lineBasicMaterial color="#334155" transparent opacity={0.6} />
+      </lineSegments>
+
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 2.4]}>
+        <planeGeometry args={[20, 1.2]} />
+        <meshBasicMaterial color="#0f172a" transparent opacity={0.7} />
+      </mesh>
+
+      {[-9, -6, -3, 0, 3, 6, 9].map((x) => (
+        <mesh key={`walkway-${x}`} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.02, 2.4]}>
+          <planeGeometry args={[0.3, 1.1]} />
+          <meshBasicMaterial color="#eab308" transparent opacity={0.25} />
+        </mesh>
+      ))}
+
+      <gridHelper args={[32, 32, "#1e293b", "#091322"]} position={[0, 0.01, 0]} />
+    </group>
+  );
+}
+
+function BuildingShell({ viewMode }: { viewMode: ViewDisplayMode }) {
+  const wallOpacity = viewMode === "blueprint" ? 0.15 : 0.4;
+
+  return (
+    <group>
+      <mesh position={[0, 1.75, -5.6]} receiveShadow>
+        <boxGeometry args={[20.4, 3.5, 0.2]} />
+        <meshStandardMaterial color="#1e293b" roughness={0.5} metalness={0.4} transparent opacity={wallOpacity} />
+      </mesh>
+
+      <mesh position={[-10.2, 1.75, -2]} receiveShadow>
+        <boxGeometry args={[0.2, 3.5, 7.4]} />
+        <meshStandardMaterial color="#1e293b" roughness={0.5} metalness={0.4} transparent opacity={wallOpacity} />
+      </mesh>
+
+      <mesh position={[10.2, 1.75, -3.8]} receiveShadow>
+        <boxGeometry args={[0.2, 3.5, 3.8]} />
+        <meshStandardMaterial color="#1e293b" roughness={0.5} metalness={0.4} transparent opacity={wallOpacity} />
+      </mesh>
+
+      {[-3, 3].map((x, i) => (
+        <group key={`divider-${i}`} position={[x, 1.75, -2]}>
+          <mesh>
+            <boxGeometry args={[0.15, 3.5, 6.8]} />
+            <meshStandardMaterial color="#0f172a" transparent opacity={0.3} roughness={0.7} />
+          </mesh>
+          <mesh position={[0, 0, 3.4]}>
+            <boxGeometry args={[0.25, 3.5, 0.25]} />
+            <meshStandardMaterial color="#475569" metalness={0.7} roughness={0.3} />
+          </mesh>
+        </group>
+      ))}
+
+      {[-9, -6, -3, 0, 3, 6, 9].map((x, i) => (
+        <group key={`truss-${i}`} position={[x, 3.5, -2]}>
+          <mesh>
+            <boxGeometry args={[0.12, 0.16, 7.2]} />
+            <meshStandardMaterial color="#475569" metalness={0.8} roughness={0.2} />
+          </mesh>
+        </group>
+      ))}
+
+      <group position={[0, 3.35, -4]}>
+        <mesh rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.04, 0.04, 19.5, 16]} />
+          <meshStandardMaterial color="#06b6d4" roughness={0.4} metalness={0.5} />
+        </mesh>
+        <mesh rotation={[0, 0, Math.PI / 2]} position={[0, 0.12, 0.1]}>
+          <cylinderGeometry args={[0.04, 0.04, 19.5, 16]} />
+          <meshStandardMaterial color="#3b82f6" roughness={0.4} metalness={0.5} />
+        </mesh>
+      </group>
+
+      {[-6, 0, 6].map((x, i) => (
+        <group key={`bay-light-${i}`} position={[x, 3.3, -2]}>
+          <mesh>
+            <cylinderGeometry args={[0.3, 0.2, 0.1, 16]} />
+            <meshStandardMaterial color="#64748b" metalness={0.8} roughness={0.2} />
+          </mesh>
+          <mesh position={[0, -0.06, 0]}>
+            <cylinderGeometry args={[0.26, 0.26, 0.02, 16]} />
+            <meshBasicMaterial color="#e0f2fe" />
+          </mesh>
+          <spotLight
+            position={[0, -0.1, 0]}
+            target-position={[x, 0, -2]}
+            color="#bae6fd"
+            intensity={0.4}
+            angle={0.7}
+            penumbra={0.6}
+            distance={7}
+          />
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function ArchitecturalGuides({
+  cameraPreset,
+  viewMode,
+}: {
+  cameraPreset: CameraPreset;
+  viewMode: ViewDisplayMode;
+}) {
+  const showGuides =
+    viewMode === "blueprint" ||
+    cameraPreset === "top" ||
+    cameraPreset === "side-right" ||
+    cameraPreset === "side-left";
+
+  if (!showGuides) return null;
+
+  return (
+    <group>
+      {(cameraPreset === "top" || viewMode === "blueprint") && (
+        <>
+          <group position={[0, 0.1, 2.8]}>
+            <lineSegments>
+              <bufferGeometry
+                attach="geometry"
+                onUpdate={(self) => {
+                  self.setFromPoints([new THREE.Vector3(-10, 0, 0), new THREE.Vector3(10, 0, 0)]);
+                }}
+              />
+              <lineBasicMaterial attach="material" color="#22D3EE" opacity={0.7} transparent />
+            </lineSegments>
+            <Html position={[0, 0.1, 0]} center distanceFactor={14}>
+              <span className="bg-slate-950/90 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded text-[9px] font-mono shadow-md">
+                Facility Width: 20.0 m
+              </span>
+            </Html>
+          </group>
+
+          <group position={[-11, 0.1, -2]}>
+            <lineSegments>
+              <bufferGeometry
+                attach="geometry"
+                onUpdate={(self) => {
+                  self.setFromPoints([new THREE.Vector3(0, 0, -3.1), new THREE.Vector3(0, 0, 3.1)]);
+                }}
+              />
+              <lineBasicMaterial attach="material" color="#22D3EE" opacity={0.7} transparent />
+            </lineSegments>
+            <Html position={[-0.3, 0.1, 0]} center distanceFactor={14}>
+              <span className="bg-slate-950/90 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded text-[9px] font-mono shadow-md whitespace-nowrap">
+                Depth: 6.2 m
+              </span>
+            </Html>
+          </group>
+        </>
+      )}
+
+      {(cameraPreset === "side-right" || cameraPreset === "side-left" || viewMode === "blueprint") && (
+        <group position={[0, 0, 2]}>
+          <lineSegments>
+            <bufferGeometry
+              attach="geometry"
+              onUpdate={(self) => {
+                self.setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 3.5, 0)]);
+              }}
+            />
+            <lineBasicMaterial attach="material" color="#F59E0B" opacity={0.8} transparent />
+          </lineSegments>
+          <Html position={[0, 1.75, 0]} center distanceFactor={12}>
+            <span className="bg-slate-950/90 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded text-[9px] font-mono shadow-md whitespace-nowrap">
+              Ceiling: 3.5 m
+            </span>
+          </Html>
+        </group>
+      )}
+    </group>
+  );
+}
+
+function ZoneFloor({
+  config,
+  status,
+  selected,
+  temp,
+  viewMode,
+  onClick,
+}: {
+  config: ZoneConfig;
+  status: "normal" | "warning" | "critical";
+  selected: boolean;
+  temp: number;
+  viewMode: ViewDisplayMode;
+  onClick: () => void;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const borderRef = useRef<THREE.Mesh>(null);
+
+  const floorColor = useMemo(() => {
+    if (viewMode === "thermal") {
+      if (temp < -15) return "#3B82F6";
+      if (temp < 0) return "#06B6D4";
+      if (temp <= 5) return "#10B981";
+      if (temp <= 7) return "#F59E0B";
+      return "#EF4444";
+    }
+    return status === "critical" ? "#F43F5E" : status === "warning" ? "#F59E0B" : config.color;
+  }, [viewMode, temp, status, config.color]);
+
+  useFrame(({ clock }) => {
+    if (borderRef.current) {
+      const mat = borderRef.current.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.25 + Math.sin(clock.getElapsedTime() * 2) * 0.12;
+    }
+  });
+
+  return (
+    <group onClick={(e) => { e.stopPropagation(); onClick(); }}>
+      <mesh
+        ref={meshRef}
+        position={[config.position[0], 0.02, config.position[2]]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        receiveShadow
+      >
+        <planeGeometry args={[config.size[0] - 0.2, config.size[2] - 0.2]} />
+        <meshStandardMaterial
+          color={floorColor}
+          transparent
+          opacity={viewMode === "thermal" ? 0.35 : selected ? 0.32 : 0.16}
+          emissive={floorColor}
+          emissiveIntensity={selected ? 0.7 : 0.2}
+          roughness={0.3}
+        />
+      </mesh>
+
+      <mesh
+        ref={borderRef}
+        position={[config.position[0], 0.025, config.position[2]]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <ringGeometry
+          args={[
+            Math.min(config.size[0], config.size[2]) * 0.44,
+            Math.min(config.size[0], config.size[2]) * 0.47,
+            4,
+          ]}
+        />
+        <meshBasicMaterial color={floorColor} transparent opacity={selected ? 0.7 : 0.3} side={THREE.DoubleSide} />
+      </mesh>
+
+      <lineSegments position={[config.position[0], 0.03, config.position[2]]}>
+        <edgesGeometry args={[new THREE.BoxGeometry(config.size[0] - 0.1, 0.01, config.size[2] - 0.1)]} />
+        <lineBasicMaterial color={selected ? "#FFFFFF" : floorColor} transparent opacity={selected ? 0.95 : 0.4} />
+      </lineSegments>
+
+    </group>
+  );
+}
+
+function StorageRacks({
+  config,
+  hasAccident,
+  onSelectZone,
+}: {
+  config: ZoneConfig;
+  hasAccident: boolean;
+  onSelectZone: () => void;
+}) {
+  const rackUprightBlue = "#1e40af";
+  const rackBeamOrange = "#ea580c";
+  const palletWood = "#854d0e";
+  const rows = [-1.3, 1.3];
+
+  return (
+    <group
+      position={[config.position[0], 0, config.position[2]]}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelectZone();
+      }}
+    >
+      {rows.map((rowX, rIdx) => {
+        const isDisrupted = hasAccident && rIdx === 1;
+
+        return (
+          <group
+            key={`rack-row-${rIdx}`}
+            position={[rowX, 0, 0]}
+            rotation={[isDisrupted ? 0.08 : 0, 0, isDisrupted ? 0.06 : 0]}
+          >
+            {[-1.8, 1.8].map((zPos, zIdx) =>
+              [-0.45, 0.45].map((xOffset, xIdx) => (
+                <mesh key={`upright-${zIdx}-${xIdx}`} position={[xOffset, 1.3, zPos]} castShadow>
+                  <boxGeometry args={[0.06, 2.6, 0.06]} />
+                  <meshStandardMaterial color={rackUprightBlue} metalness={0.7} roughness={0.3} />
+                </mesh>
+              ))
+            )}
+
+            {[-1.8, 1.8].map((zPos, zIdx) => (
+              <mesh key={`bollard-${zIdx}`} position={[rowX > 0 ? 0.6 : -0.6, 0.25, zPos]}>
+                <cylinderGeometry args={[0.07, 0.07, 0.5, 12]} />
+                <meshStandardMaterial color="#eab308" roughness={0.4} />
+              </mesh>
+            ))}
+
+            {[0.5, 1.3, 2.1].map((tierY, tierIdx) => (
+              <group key={`tier-${tierIdx}`} position={[0, tierY, 0]}>
+                {[-0.45, 0.45].map((xOffset, xIdx) => (
+                  <mesh key={`beam-${xIdx}`} position={[xOffset, 0, 0]} castShadow>
+                    <boxGeometry args={[0.04, 0.08, 3.6]} />
+                    <meshStandardMaterial color={rackBeamOrange} metalness={0.5} roughness={0.4} />
+                  </mesh>
+                ))}
+
+                <mesh position={[0, -0.02, 0]}>
+                  <boxGeometry args={[0.88, 0.02, 3.55]} />
+                  <meshStandardMaterial color="#475569" metalness={0.8} roughness={0.2} />
+                </mesh>
+
+                {[-0.9, 0.9].map((palZ, palIdx) => (
+                  <group key={`pallet-${tierIdx}-${palIdx}`} position={[0, 0.05, palZ]}>
+                    <mesh castShadow>
+                      <boxGeometry args={[0.8, 0.08, 1.2]} />
+                      <meshStandardMaterial color={palletWood} roughness={0.9} />
+                    </mesh>
+
+                    {config.id === "zone-a" ? (
+                      <group position={[0, 0.22, 0]}>
+                        {[-0.18, 0.18].map((bx, bxi) =>
+                          [-0.3, 0.3].map((bz, bzi) => (
+                            <group key={`vac-${bxi}-${bzi}`} position={[bx, 0, bz]}>
+                              <mesh castShadow>
+                                <boxGeometry args={[0.32, 0.35, 0.5]} />
+                                <meshStandardMaterial color="#f8fafc" roughness={0.5} />
+                              </mesh>
+                              <mesh position={[0, 0.18, 0]}>
+                                <boxGeometry args={[0.33, 0.04, 0.51]} />
+                                <meshStandardMaterial color="#0284c7" roughness={0.4} />
+                              </mesh>
+                            </group>
+                          ))
+                        )}
+                      </group>
+                    ) : config.id === "zone-b" ? (
+                      <group position={[0, 0.22, 0]}>
+                        {[-0.18, 0.18].map((bx, bxi) =>
+                          [-0.3, 0.3].map((bz, bzi) => (
+                            <mesh key={`crate-${bxi}-${bzi}`} position={[bx, 0, bz]} castShadow>
+                              <boxGeometry args={[0.34, 0.32, 0.52]} />
+                              <meshStandardMaterial color={bxi === 0 ? "#15803d" : "#c2410c"} roughness={0.7} />
+                            </mesh>
+                          ))
+                        )}
+                      </group>
+                    ) : (
+                      <group position={[0, 0.3, 0]}>
+                        <mesh castShadow>
+                          <boxGeometry args={[0.75, 0.52, 1.1]} />
+                          <meshStandardMaterial color="#b45309" roughness={0.9} />
+                        </mesh>
+                        <mesh>
+                          <boxGeometry args={[0.77, 0.54, 1.12]} />
+                          <meshStandardMaterial color="#94a3b8" transparent opacity={0.2} roughness={0.1} />
+                        </mesh>
+                      </group>
+                    )}
+                  </group>
+                ))}
+              </group>
+            ))}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   INCIDENT & VISUAL EFFECTS
+   ═══════════════════════════════════════════════════════════════════ */
+
+function FireSmokeParticles({ position }: { position: [number, number, number] }) {
+  const fireRef = useRef<THREE.Points>(null);
+  const smokeRef = useRef<THREE.Points>(null);
+  const lightRef = useRef<THREE.PointLight>(null);
+
+  const fireCount = 75;
+  const fireGeo = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(fireCount * 3);
+    const col = new Float32Array(fireCount * 3);
+    for (let i = 0; i < fireCount; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * 0.4;
+      pos[i * 3 + 1] = Math.random() * 0.8;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 0.4;
+      col[i * 3] = 1.0;
+      col[i * 3 + 1] = Math.random() * 0.6;
+      col[i * 3 + 2] = 0.0;
+    }
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    return geo;
+  }, []);
+
+  const smokeCount = 50;
+  const smokeGeo = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(smokeCount * 3);
+    for (let i = 0; i < smokeCount; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * 0.6;
+      pos[i * 3 + 1] = 0.6 + Math.random() * 1.6;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 0.6;
+    }
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    return geo;
+  }, []);
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+
+    if (fireRef.current) {
+      const positions = fireRef.current.geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < fireCount; i++) {
+        positions[i * 3 + 1] += 0.02 + Math.random() * 0.015;
+        positions[i * 3] += Math.sin(t * 10 + i) * 0.005;
+        if (positions[i * 3 + 1] > 1.0) {
+          positions[i * 3 + 1] = 0;
+          positions[i * 3] = (Math.random() - 0.5) * 0.3;
+          positions[i * 3 + 2] = (Math.random() - 0.5) * 0.3;
+        }
+      }
+      fireRef.current.geometry.attributes.position.needsUpdate = true;
+    }
+
+    if (smokeRef.current) {
+      const pos = smokeRef.current.geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < smokeCount; i++) {
+        pos[i * 3 + 1] += 0.012;
+        pos[i * 3] += Math.sin(t * 2 + i) * 0.003;
+        if (pos[i * 3 + 1] > 2.2) {
+          pos[i * 3 + 1] = 0.6;
+          pos[i * 3] = (Math.random() - 0.5) * 0.4;
+          pos[i * 3 + 2] = (Math.random() - 0.5) * 0.4;
+        }
+      }
+      smokeRef.current.geometry.attributes.position.needsUpdate = true;
+    }
+
+    if (lightRef.current) {
+      lightRef.current.intensity = 2.5 + Math.sin(t * 15) * 1.2 + (Math.random() - 0.5) * 0.6;
+    }
+  });
+
+  return (
+    <group position={position}>
+      <pointLight ref={lightRef} color="#ff4500" distance={6} />
+      <points ref={fireRef} geometry={fireGeo}>
+        <pointsMaterial size={0.08} vertexColors transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </points>
+      <points ref={smokeRef} geometry={smokeGeo}>
+        <pointsMaterial size={0.12} color="#1e293b" transparent opacity={0.4} depthWrite={false} />
+      </points>
+      <mesh position={[0, -position[1] + 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.4, 16]} />
+        <meshBasicMaterial color="#09090b" transparent opacity={0.8} />
+      </mesh>
+    </group>
+  );
+}
+
+function ElectricalSparks({ position }: { position: [number, number, number] }) {
+  const sparkRef = useRef<THREE.Points>(null);
+  const sparkCount = 30;
+
+  const sparkGeo = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(sparkCount * 3);
+    for (let i = 0; i < sparkCount; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * 0.4;
+      pos[i * 3 + 1] = (Math.random() - 0.5) * 0.4;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 0.4;
+    }
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    return geo;
+  }, []);
+
+  useFrame(() => {
+    if (sparkRef.current) {
+      const pos = sparkRef.current.geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < sparkCount; i++) {
+        pos[i * 3] += (Math.random() - 0.5) * 0.04;
+        pos[i * 3 + 1] += (Math.random() - 0.5) * 0.04 - 0.01;
+        pos[i * 3 + 2] += (Math.random() - 0.5) * 0.04;
+        if (Math.abs(pos[i * 3]) > 0.4 || Math.abs(pos[i * 3 + 1]) > 0.4) {
+          pos[i * 3] = (Math.random() - 0.5) * 0.1;
+          pos[i * 3 + 1] = 0;
+          pos[i * 3 + 2] = (Math.random() - 0.5) * 0.1;
+        }
+      }
+      sparkRef.current.geometry.attributes.position.needsUpdate = true;
+    }
+  });
+
+  return (
+    <group position={position}>
+      <points ref={sparkRef} geometry={sparkGeo}>
+        <pointsMaterial size={0.05} color="#38bdf8" transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </points>
+      <pointLight color="#38bdf8" intensity={1.5} distance={3} />
+    </group>
+  );
+}
+
+function WarmAirIngress({ isOpen }: { isOpen: boolean }) {
+  const pointsRef = useRef<THREE.Points>(null);
+  const count = 140;
+
+  const geo = useMemo(() => {
+    const buffer = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    const col = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = 10.1 + (Math.random() - 0.5) * 0.4;
+      pos[i * 3 + 1] = 0.5 + Math.random() * 2.2;
+      pos[i * 3 + 2] = -1.8 + (Math.random() - 0.5) * 1.4;
+      col[i * 3] = 1.0;
+      col[i * 3 + 1] = 0.35 + Math.random() * 0.4;
+      col[i * 3 + 2] = 0.05;
+    }
+    buffer.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    buffer.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    return buffer;
+  }, []);
+
+  useFrame(() => {
+    if (pointsRef.current && isOpen) {
+      const pos = pointsRef.current.geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < count; i++) {
+        pos[i * 3] -= 0.045;
+        pos[i * 3 + 1] += 0.006;
+        pos[i * 3 + 2] += (Math.random() - 0.5) * 0.02;
+
+        if (pos[i * 3] < 5.0) {
+          pos[i * 3] = 10.1;
+          pos[i * 3 + 1] = 0.5 + Math.random() * 2.0;
+          pos[i * 3 + 2] = -1.8 + (Math.random() - 0.5) * 1.4;
+        }
+      }
+      pointsRef.current.geometry.attributes.position.needsUpdate = true;
+    }
+  });
+
+  if (!isOpen) return null;
+
+  return (
+    <points ref={pointsRef} geometry={geo}>
+      <pointsMaterial size={0.08} vertexColors transparent opacity={0.8} blending={THREE.AdditiveBlending} depthWrite={false} />
+    </points>
+  );
+}
+
+function AccidentScene({ zoneId }: { zoneId: string }) {
+  const config = ZONE_CONFIGS.find((c) => c.id === zoneId);
+  if (!config) return null;
+
+  const beaconLightRef = useRef<THREE.PointLight>(null);
+
+  useFrame(({ clock }) => {
+    if (beaconLightRef.current) {
+      const t = clock.getElapsedTime();
+      beaconLightRef.current.intensity = 2.5 + Math.sin(t * 8) * 2;
+    }
+  });
+
+  return (
+    <group position={[config.position[0], 0, config.position[2]]}>
+      <group position={[0, 3.4, 0]}>
+        <mesh>
+          <cylinderGeometry args={[0.15, 0.12, 0.2, 16]} />
+          <meshStandardMaterial color="#dc2626" emissive="#ef4444" emissiveIntensity={1} />
+        </mesh>
+        <pointLight ref={beaconLightRef} color="#ef4444" distance={9} />
+      </group>
+
+      <group position={[0.2, 0.15, 0.8]} rotation={[0.2, 0.4, 0.35]}>
+        <mesh castShadow>
+          <boxGeometry args={[0.6, 0.3, 1.4]} />
+          <meshStandardMaterial color="#f59e0b" roughness={0.4} />
+        </mesh>
+        <mesh position={[0, 0.5, 0.6]} rotation={[-0.4, 0, 0]}>
+          <cylinderGeometry args={[0.03, 0.03, 0.8, 8]} />
+          <meshStandardMaterial color="#1e293b" />
+        </mesh>
+      </group>
+
+      {[
+        { x: -0.6, z: 0.5, rot: 0.6, col: "#ea580c" },
+        { x: 0.8, z: 1.2, rot: -0.4, col: "#f8fafc" },
+        { x: -0.2, z: 1.5, rot: 1.1, col: "#15803d" },
+        { x: 0.5, z: 0.2, rot: -0.8, col: "#b45309" },
+      ].map((box, i) => (
+        <mesh key={`spilled-${i}`} position={[box.x, 0.12, box.z]} rotation={[0.3, box.rot, 0.5]} castShadow>
+          <boxGeometry args={[0.35, 0.25, 0.35]} />
+          <meshStandardMaterial color={box.col} roughness={0.7} />
+        </mesh>
+      ))}
+
+      {[-1.6, 1.6].map((x, i) => (
+        <group key={`tape-post-${i}`} position={[x, 0.45, 1.8]}>
+          <mesh>
+            <cylinderGeometry args={[0.04, 0.04, 0.9, 8]} />
+            <meshStandardMaterial color="#eab308" metalness={0.6} roughness={0.3} />
+          </mesh>
+          <mesh position={[0, 0.45, 0]}>
+            <sphereGeometry args={[0.06, 8, 8]} />
+            <meshBasicMaterial color="#ef4444" />
+          </mesh>
+        </group>
+      ))}
+
+      <Html position={[0, 2.2, 0.8]} center distanceFactor={9}>
+        <div className="bg-red-950/95 border-2 border-red-500 text-red-200 px-3 py-1.5 rounded-lg shadow-2xl backdrop-blur-md flex items-center gap-2 animate-pulse whitespace-nowrap">
+          <AlertTriangle size={14} className="text-red-400" />
+          <span className="font-mono font-bold text-xs uppercase tracking-wider">
+            Critical Accident Zone • Forklift Impact
+          </span>
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SENSOR NODE WITH CLOSE-UP INSPECTION TELEMETRY
+   ═══════════════════════════════════════════════════════════════════ */
+
+function SensorNode({
+  position,
+  sensorId,
+  zoneId,
+  zoneConfig,
+  temperature,
+  humidity,
+  airflow,
+  status,
+  isFailed,
+  isBurned,
+  hasAccident,
+  isZoneFocused,
+  showLabel,
+  showCoverage,
+  onSelect,
+}: {
+  position: [number, number, number];
+  sensorId: string;
+  zoneId: string;
+  zoneConfig: ZoneConfig;
+  temperature: number;
+  humidity: number;
+  airflow: number;
+  status: "normal" | "warning" | "critical";
+  isFailed: boolean;
+  isBurned: boolean;
+  hasAccident: boolean;
+  isZoneFocused: boolean;
+  showLabel: boolean;
+  showCoverage: boolean;
+  onSelect: () => void;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const beaconRef = useRef<THREE.Mesh>(null);
+
+  const statusColor = isBurned
+    ? "#FF4500"
+    : isFailed
+    ? "#F43F5E"
+    : hasAccident
+    ? "#FF6B00"
+    : status === "critical"
+    ? "#F43F5E"
+    : status === "warning"
+    ? "#F59E0B"
+    : "#22D3EE";
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (meshRef.current) {
+      meshRef.current.rotation.y = t * 0.8;
+      const pulse = 1 + Math.sin(t * 3) * 0.06;
+      meshRef.current.scale.setScalar(pulse);
+    }
+    if (beaconRef.current) {
+      const mat = beaconRef.current.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.2 + Math.sin(t * 4) * 0.2;
+      beaconRef.current.scale.setScalar(1 + Math.sin(t * 2) * 0.15);
+    }
+  });
+
+  return (
+    <group position={position} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+      <mesh ref={meshRef} castShadow>
+        <octahedronGeometry args={[0.2, 0]} />
+        <meshStandardMaterial
+          color={isBurned ? "#18181b" : statusColor}
+          emissive={isBurned ? "#ef4444" : statusColor}
+          emissiveIntensity={isFailed || isBurned ? 1.5 : 0.6}
+          metalness={0.4}
+          roughness={0.3}
+        />
+      </mesh>
+
+      <mesh ref={beaconRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]}>
+        <ringGeometry args={[0.26, 0.38, 32]} />
+        <meshBasicMaterial color={statusColor} transparent opacity={0.35} side={THREE.DoubleSide} />
+      </mesh>
+
+      <mesh position={[0, -0.9, 0]}>
+        <cylinderGeometry args={[0.03, 0.03, 1.8, 12]} />
+        <meshStandardMaterial color="#64748b" metalness={0.8} roughness={0.2} />
+      </mesh>
+
+      <mesh position={[0, -1.8, 0]}>
+        <cylinderGeometry args={[0.12, 0.12, 0.04, 16]} />
+        <meshStandardMaterial color="#475569" metalness={0.7} roughness={0.3} />
+      </mesh>
+
+      {showCoverage && (
+        <mesh>
+          <sphereGeometry args={[2.2, 16, 16]} />
+          <meshBasicMaterial color={statusColor} transparent opacity={0.06} wireframe />
+        </mesh>
+      )}
+
+      {isBurned && <FireSmokeParticles position={[0, 0.1, 0]} />}
+      {isFailed && !isBurned && <ElectricalSparks position={[0, 0.1, 0]} />}
+
+      {showLabel && (
+        <Html position={[0, 0.6, 0]} center distanceFactor={8} zIndexRange={[100, 0]}>
+          <div
+            className={`pointer-events-auto cursor-pointer select-none rounded-xl border p-2 font-mono backdrop-blur-md shadow-2xl transition-all whitespace-nowrap ${
+              isBurned
+                ? "bg-red-950/95 border-red-500 text-red-200 animate-pulse shadow-red-500/40"
+                : isFailed
+                ? "bg-rose-950/95 border-rose-500 text-rose-200 animate-pulse shadow-rose-500/40"
+                : hasAccident
+                ? "bg-orange-950/95 border-orange-500 text-orange-200 animate-pulse shadow-orange-500/40"
+                : status === "critical"
+                ? "bg-rose-950/90 border-rose-500/70 text-rose-100"
+                : status === "warning"
+                ? "bg-amber-950/90 border-amber-500/70 text-amber-100"
+                : "bg-slate-900/90 border-cyan-500/50 text-cyan-100"
+            } ${isZoneFocused ? "ring-2 ring-cyan-400/80 scale-105" : ""}`}
+            onClick={onSelect}
+          >
+            <div className="flex items-center justify-between gap-3 mb-1 border-b border-white/10 pb-0.5">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`inline-block h-2 w-2 rounded-full ${
+                    isBurned
+                      ? "bg-red-500 animate-ping"
+                      : isFailed
+                      ? "bg-rose-500 animate-ping"
+                      : hasAccident
+                      ? "bg-orange-500 animate-pulse"
+                      : status === "critical"
+                      ? "bg-rose-400"
+                      : status === "warning"
+                      ? "bg-amber-400"
+                      : "bg-cyan-400"
+                  }`}
+                />
+                <span className="font-bold text-xs tracking-wide text-white">{sensorId}</span>
+              </div>
+              <span className="text-[8px] px-1.5 py-0.2 rounded bg-white/10 text-fg-muted font-bold">
+                {zoneConfig.name}
+              </span>
+            </div>
+
+            {isBurned ? (
+              <div className="text-[10px] font-bold text-red-400 flex items-center gap-1">
+                <Flame size={12} /> HARDWARE THERMAL RUNAWAY
+              </div>
+            ) : isFailed ? (
+              <div className="text-[10px] font-bold text-rose-400 flex items-center gap-1">
+                <ZapOff size={12} /> TELEMETRY SIGNAL TIMEOUT
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[9px] text-fg-muted flex items-center gap-1">
+                    <Thermometer size={10} className="text-cyan-400" /> Temp:
+                  </span>
+                  <span className="text-xs font-bold text-white">{fmtTemp(temperature)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[9px] text-fg-muted flex items-center gap-1">
+                    <Droplets size={10} className="text-blue-400" /> Humidity:
+                  </span>
+                  <span className="text-[10px] font-bold text-blue-200">{humidity.toFixed(0)}% RH</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EQUIPMENT & REFRIGERATION UNITS
+   ═══════════════════════════════════════════════════════════════════ */
+
+function Compressor({
+  position,
+  isRunning,
+  isFailed,
+}: {
+  position: [number, number, number];
+  isRunning: boolean;
+  isFailed: boolean;
+}) {
+  const fanRef = useRef<THREE.Mesh>(null);
+
+  useFrame((_, delta) => {
+    if (fanRef.current && isRunning) {
+      fanRef.current.rotation.z += delta * 12;
+    }
+  });
+
+  return (
+    <group position={position}>
+      <mesh position={[0, 0.1, 0]} castShadow>
+        <boxGeometry args={[1.8, 0.2, 1.2]} />
+        <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.3} />
+      </mesh>
+
+      {[-0.45, 0.45].map((x, i) => (
+        <group key={`comp-cyl-${i}`} position={[x, 0.55, 0]}>
+          <mesh castShadow>
+            <cylinderGeometry args={[0.3, 0.3, 0.7, 24]} />
+            <meshStandardMaterial
+              color={isFailed ? "#991b1b" : isRunning ? "#0284c7" : "#475569"}
+              metalness={0.7}
+              roughness={0.3}
+            />
+          </mesh>
+          <mesh position={[0, 0.4, 0]}>
+            <boxGeometry args={[0.2, 0.12, 0.2]} />
+            <meshStandardMaterial color="#1e293b" />
+          </mesh>
+        </group>
+      ))}
+
+      <mesh position={[0, 0.7, 0.65]}>
+        <cylinderGeometry args={[0.35, 0.35, 0.1, 16]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.6} roughness={0.4} />
+      </mesh>
+
+      <mesh ref={fanRef} position={[0, 0.7, 0.72]}>
+        <torusGeometry args={[0.2, 0.04, 4, 4]} />
+        <meshStandardMaterial color={isRunning ? "#38bdf8" : "#64748b"} metalness={0.6} />
+      </mesh>
+
+      <Html position={[0, 1.3, 0]} center distanceFactor={10}>
+        <div
+          className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[9px] font-mono backdrop-blur-md shadow-lg whitespace-nowrap ${
+            isFailed
+              ? "bg-red-950/90 border-red-500 text-red-300 animate-pulse"
+              : isRunning
+              ? "bg-emerald-950/80 border-emerald-500/40 text-emerald-300"
+              : "bg-slate-900/80 border-slate-600/40 text-slate-400"
+          }`}
+        >
+          <Cpu size={10} />
+          <span className="font-bold">Compressor:</span>
+          <span className={`font-bold ${isFailed ? "text-red-400" : isRunning ? "text-emerald-400" : "text-amber-400"}`}>
+            {isFailed ? "TRIPPED / OFFLINE" : isRunning ? "Running (78% Load)" : "Standby"}
+          </span>
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+function EvaporatorUnit({
+  position,
+  isRunning,
+}: {
+  position: [number, number, number];
+  isRunning: boolean;
+}) {
+  const fan1Ref = useRef<THREE.Mesh>(null);
+  const fan2Ref = useRef<THREE.Mesh>(null);
+
+  useFrame((_, delta) => {
+    if (isRunning) {
+      if (fan1Ref.current) fan1Ref.current.rotation.z += delta * 15;
+      if (fan2Ref.current) fan2Ref.current.rotation.z += delta * 15;
+    }
+  });
+
+  return (
+    <group position={position}>
+      <mesh castShadow>
+        <boxGeometry args={[1.8, 0.5, 0.9]} />
+        <meshStandardMaterial color="#334155" metalness={0.7} roughness={0.3} />
+      </mesh>
+
+      {[-0.5, 0.5].map((fx, i) => (
+        <group key={`evap-fan-${i}`} position={[fx, -0.26, 0]}>
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.3, 0.3, 0.05, 24]} />
+            <meshStandardMaterial color="#0f172a" />
+          </mesh>
+          <mesh
+            ref={i === 0 ? fan1Ref : fan2Ref}
+            rotation={[Math.PI / 2, 0, 0]}
+            position={[0, -0.03, 0]}
+          >
+            <torusGeometry args={[0.2, 0.035, 4, 4]} />
+            <meshStandardMaterial
+              color={isRunning ? "#22d3ee" : "#64748b"}
+              emissive={isRunning ? "#06b6d4" : "#000000"}
+              emissiveIntensity={isRunning ? 0.4 : 0}
+            />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function ColdRoomDoor({
+  position,
+  isOpen,
+  onClick,
+}: {
+  position: [number, number, number];
+  isOpen: boolean;
+  onClick: () => void;
+}) {
+  const doorPanelRef = useRef<THREE.Mesh>(null);
+  const targetX = isOpen ? position[0] + 1.2 : position[0];
+
+  useFrame(() => {
+    if (doorPanelRef.current) {
+      doorPanelRef.current.position.x += (targetX - doorPanelRef.current.position.x) * 0.08;
+    }
+  });
+
+  return (
+    <group onClick={(e) => { e.stopPropagation(); onClick(); }}>
+      <mesh position={[position[0] + 0.6, position[1] + 1.45, position[2]]}>
+        <boxGeometry args={[2.6, 0.12, 0.15]} />
+        <meshStandardMaterial color="#64748b" metalness={0.8} roughness={0.2} />
+      </mesh>
+
+      <mesh position={[position[0], position[1], position[2]]}>
+        <boxGeometry args={[1.4, 2.7, 0.12]} />
+        <meshStandardMaterial color="#0f172a" />
+      </mesh>
+
+      <mesh
+        ref={doorPanelRef}
+        position={[position[0], position[1], position[2] + 0.1]}
+        castShadow
+      >
+        <boxGeometry args={[1.35, 2.65, 0.14]} />
+        <meshStandardMaterial color={isOpen ? "#475569" : "#1e293b"} metalness={0.5} roughness={0.4} />
+      </mesh>
+
+      <Html position={[position[0], position[1] + 1.8, position[2]]} center distanceFactor={10}>
+        <div
+          onClick={onClick}
+          className={`pointer-events-auto cursor-pointer font-mono text-[9px] px-2.5 py-1 rounded-lg border shadow-xl flex items-center gap-1.5 transition-all ${
+            isOpen
+              ? "bg-rose-950/95 border-rose-500 text-rose-300 animate-pulse shadow-rose-500/30"
+              : "bg-slate-900/90 border-cyan-500/40 text-cyan-300 hover:border-cyan-400"
+          }`}
+        >
+          <DoorOpen size={11} />
+          <span className="font-bold">{isOpen ? "DOOR OPEN (Click to Seal)" : "Door Sealed (Click to Open)"}</span>
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+function DeliveryDockBay() {
+  return (
+    <group position={[11.5, 0, 1.2]}>
+      <mesh position={[-0.8, 0.35, 0]} rotation={[0, 0, -0.06]}>
+        <boxGeometry args={[1.2, 0.1, 1.8]} />
+        <meshStandardMaterial color="#475569" metalness={0.7} roughness={0.4} />
+      </mesh>
+
+      {[-1, 1].map((bz, i) => (
+        <mesh key={`dock-bumper-${i}`} position={[-0.3, 0.5, bz]}>
+          <boxGeometry args={[0.15, 0.4, 0.15]} />
+          <meshStandardMaterial color="#0f172a" />
+        </mesh>
+      ))}
+
+      <mesh position={[2.2, 1.1, 0]} castShadow>
+        <boxGeometry args={[3.2, 1.7, 2.0]} />
+        <meshStandardMaterial color="#f8fafc" roughness={0.4} />
+      </mesh>
+
+      <mesh position={[4.4, 0.75, 0]} castShadow>
+        <boxGeometry args={[1.4, 1.2, 1.9]} />
+        <meshStandardMaterial color="#38bdf8" roughness={0.3} />
+      </mesh>
+
+      <mesh position={[4.6, 0.95, 0]}>
+        <boxGeometry args={[0.5, 0.5, 1.7]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.1} />
+      </mesh>
+
+      {[-0.6, 0.8, 2.8, 4.4].map((wx, wi) =>
+        [-1.02, 1.02].map((wz, zi) => (
+          <mesh key={`truck-wheel-${wi}-${zi}`} position={[wx, 0.3, wz]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.28, 0.28, 0.18, 16]} />
+            <meshStandardMaterial color="#1e293b" roughness={0.9} />
+          </mesh>
+        ))
+      )}
+    </group>
+  );
+}
+
+function AirflowStreamlines({ isActive }: { isActive: boolean }) {
+  const particlesRef = useRef<THREE.Points>(null);
+  const count = 250;
+
+  const geo = useMemo(() => {
+    const buffer = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * 19;
+      pos[i * 3 + 1] = 0.2 + Math.random() * 3.1;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 6.5 - 2;
+    }
+    buffer.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    return buffer;
+  }, []);
+
+  useFrame(() => {
+    if (particlesRef.current && isActive) {
+      const pos = particlesRef.current.geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < count; i++) {
+        pos[i * 3 + 1] -= 0.015;
+        pos[i * 3 + 2] += 0.008;
+
+        if (pos[i * 3 + 1] < 0.1) {
+          pos[i * 3 + 1] = 3.3;
+          pos[i * 3] = (Math.random() - 0.5) * 19;
+          pos[i * 3 + 2] = (Math.random() - 0.5) * 6.5 - 2;
+        }
+      }
+      particlesRef.current.geometry.attributes.position.needsUpdate = true;
+    }
+  });
+
+  if (!isActive) return null;
+
+  return (
+    <points ref={particlesRef} geometry={geo}>
+      <pointsMaterial color="#38bdf8" size={0.04} transparent opacity={0.45} blending={THREE.AdditiveBlending} depthWrite={false} />
+    </points>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAIN 3D COLD STORAGE SCENE
+   ═══════════════════════════════════════════════════════════════════ */
+
+function ColdStorageScene({
+  zones,
+  selectedZoneId,
+  onSelectZone,
+  simulationState,
+  cameraPreset,
+  viewMode,
+  showLabels,
+  showCoverage,
+  autoRotate,
+  userInteracting,
+  setUserInteracting,
+  onToggleDoor,
+  onHeadingChange,
+  onNavigationProgress,
+  isNavigating,
+  controlsRef,
+}: {
+  zones: ZoneSummary[];
+  selectedZoneId: string;
+  onSelectZone: (id: string) => void;
+  simulationState: {
+    failedSensors: Set<string>;
+    burnedSensors: Set<string>;
+    accidentZones: Set<string>;
+    fansActive: boolean;
+    compressorRunning: boolean;
+    doorOpen: boolean;
+    zoneTemps: Record<string, number>;
+  };
+  cameraPreset: CameraPreset;
+  viewMode: ViewDisplayMode;
+  showLabels: boolean;
+  showCoverage: boolean;
+  autoRotate: boolean;
+  userInteracting: boolean;
+  setUserInteracting: (v: boolean) => void;
+  onToggleDoor: () => void;
+  onHeadingChange?: (heading: number) => void;
+  onNavigationProgress?: (distanceMeters: number, isArrived: boolean) => void;
+  isNavigating: boolean;
+  controlsRef: React.MutableRefObject<any>;
+}) {
+  const getZoneTemp = (zoneId: string, defaultTemp: number) => {
+    const live = (zones as ZoneSummary[])?.find((z) => z.zone_id === zoneId);
+    return live?.temperature ?? simulationState.zoneTemps[zoneId] ?? defaultTemp;
+  };
+
+  const getStatus = (zoneId: string, temp: number, cfg: ZoneConfig): "normal" | "warning" | "critical" => {
+    if (simulationState.accidentZones.has(zoneId)) return "critical";
+    if (temp > cfg.upperLimit || temp < cfg.lowerLimit) return "critical";
+    if (temp > cfg.upperLimit - 1.2 || temp < cfg.lowerLimit + 0.8) return "warning";
+    return "normal";
+  };
+
+  const selectedZoneConfig = ZONE_CONFIGS.find((c) => c.id === selectedZoneId);
+
+  return (
+    <>
+      <ambientLight intensity={0.4} color="#bae6fd" />
+      <directionalLight
+        position={[14, 18, 12]}
+        intensity={0.8}
+        color="#f0f9ff"
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+      />
+      <directionalLight position={[-12, 10, -10]} intensity={0.3} color="#93c5fd" />
+
+      {/* Google Maps Smooth Camera Flight Controller */}
+      <CameraRig
+        preset={cameraPreset}
+        autoRotate={autoRotate}
+        userInteracting={userInteracting}
+        setUserInteracting={setUserInteracting}
+        onHeadingChange={onHeadingChange}
+        onNavigationProgress={onNavigationProgress}
+        controlsRef={controlsRef}
+      />
+
+      <WarehouseFloor />
+      <BuildingShell viewMode={viewMode} />
+      <ArchitecturalGuides cameraPreset={cameraPreset} viewMode={viewMode} />
+
+      {/* Google Maps Animated Pin Marker over selected destination */}
+      {selectedZoneConfig && (
+        <MapLocationPin
+          position={selectedZoneConfig.position}
+          zoneName={selectedZoneConfig.name}
+          color={selectedZoneConfig.color}
+        />
+      )}
+
+      {/* Google Maps In-Floor Walking Direction Route */}
+      <NavigationRoute targetZoneId={selectedZoneId} isNavigating={isNavigating} />
+
+      {/* 3 Storage Zones */}
+      {ZONE_CONFIGS.map((config) => {
+        const temp = getZoneTemp(config.id, config.targetTemp);
+        const status = getStatus(config.id, temp, config);
+        const isFocused = selectedZoneId === config.id;
+
+        return (
+          <group key={config.id}>
+            <ZoneFloor
+              config={config}
+              status={status}
+              selected={isFocused}
+              temp={temp}
+              viewMode={viewMode}
+              onClick={() => onSelectZone(config.id)}
+            />
+            <StorageRacks
+              config={config}
+              hasAccident={simulationState.accidentZones.has(config.id)}
+              onSelectZone={() => onSelectZone(config.id)}
+            />
+            {simulationState.accidentZones.has(config.id) && <AccidentScene zoneId={config.id} />}
+          </group>
+        );
+      })}
+
+      {/* Sensor Nodes */}
+      {ZONE_CONFIGS.map((config) => {
+        const zoneData = (zones as ZoneSummary[])?.find((z) => z.zone_id === config.id);
+        const temp = zoneData?.temperature ?? getZoneTemp(config.id, config.targetTemp);
+        const humidity = zoneData?.humidity ?? (60 - (temp > 0 ? temp * 2 : 10));
+
+        return config.sensorPositions.map((pos, idx) => {
+          const sensorId = `${config.id.replace("zone-", "TS-").toUpperCase()}${idx + 1}`;
+          const isFailed = simulationState.failedSensors.has(sensorId);
+          const isBurned = simulationState.burnedSensors.has(sensorId);
+          const hasAccident = simulationState.accidentZones.has(config.id);
+          const isFocused = selectedZoneId === config.id;
+
+          return (
+            <SensorNode
+              key={`${config.id}-sensor-${idx}`}
+              position={pos}
+              sensorId={sensorId}
+              zoneId={config.id}
+              zoneConfig={config}
+              temperature={temp}
+              humidity={humidity}
+              airflow={1.4 + (zoneData?.compressor_load_pct ? (zoneData.compressor_load_pct / 100) * 0.8 : 0.2)}
+              status={getStatus(config.id, temp, config)}
+              isFailed={isFailed}
+              isBurned={isBurned}
+              hasAccident={hasAccident}
+              isZoneFocused={isFocused}
+              showLabel={showLabels}
+              showCoverage={showCoverage}
+              onSelect={() => onSelectZone(config.id)}
+            />
+          );
+        });
+      })}
+
+      <Compressor
+        position={[-8.8, 0, 2.2]}
+        isRunning={simulationState.compressorRunning}
+        isFailed={!simulationState.compressorRunning && simulationState.accidentZones.size > 0}
+      />
+
+      {ZONE_CONFIGS.map((config, i) => (
+        <EvaporatorUnit
+          key={`evap-${i}`}
+          position={[config.position[0], 3.25, config.position[2]]}
+          isRunning={simulationState.fansActive && simulationState.compressorRunning}
+        />
+      ))}
+
+      <ColdRoomDoor
+        position={[10.1, 1.35, -1.8]}
+        isOpen={simulationState.doorOpen}
+        onClick={onToggleDoor}
+      />
+
+      <WarmAirIngress isOpen={simulationState.doorOpen} />
+      <DeliveryDockBay />
+
+      <AirflowStreamlines isActive={simulationState.fansActive && simulationState.compressorRunning} />
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   🗺️ GOOGLE MAPS 2D RADAR MINIMAP WIDGET
+   ═══════════════════════════════════════════════════════════════════ */
+
+function RadarMinimap({
+  selectedZoneId,
+  onSelectZone,
+  simulationState,
+}: {
+  selectedZoneId: string;
+  onSelectZone: (id: string) => void;
+  simulationState: {
+    failedSensors: Set<string>;
+    burnedSensors: Set<string>;
+    accidentZones: Set<string>;
+  };
+}) {
+  return (
+    <div className="absolute bottom-3 right-3 z-20 w-44 rounded-xl border border-white/20 bg-slate-950/90 p-2 shadow-2xl backdrop-blur-md pointer-events-auto">
+      <div className="flex items-center justify-between text-[10px] font-mono text-cyan-400 mb-1 pb-1 border-b border-white/10">
+        <span className="flex items-center gap-1 font-bold">
+          <Navigation size={10} className="animate-pulse" /> RADAR MINIMAP
+        </span>
+        <span className="text-[9px] text-fg-faint">2D GPS</span>
+      </div>
+      <div className="relative h-16 w-full rounded-lg bg-slate-900 border border-white/10 overflow-hidden flex items-center justify-center">
+        {/* Radar concentric range circles */}
+        <div className="absolute inset-2 rounded-full border border-cyan-500/20 pointer-events-none" />
+        <div className="absolute inset-4 rounded-full border border-cyan-500/15 pointer-events-none" />
+        {/* Radar sweep beam */}
+        <div
+          className="absolute inset-0 bg-gradient-to-tr from-transparent via-cyan-500/15 to-transparent animate-spin origin-center pointer-events-none"
+          style={{ animationDuration: "3.5s" }}
+        />
+
+        {/* Loading Dock Indicator */}
+        <div className="absolute top-1/2 right-1.5 -translate-y-1/2 flex flex-col items-center">
+          <div className="h-2 w-1 bg-amber-400/80 rounded" title="Loading Dock Bay" />
+          <span className="text-[7px] text-amber-300/80 font-mono mt-0.5">DOCK</span>
+        </div>
+
+        {/* Zone Nodes */}
+        <div className="absolute inset-x-2 inset-y-1 flex items-center justify-around">
+          {ZONE_CONFIGS.map((cfg) => {
+            const isSelected = selectedZoneId === cfg.id;
+            const hasBurn = simulationState.burnedSensors.size > 0 && cfg.id === "zone-a";
+            const hasFault = simulationState.accidentZones.has(cfg.id);
+
+            return (
+              <button
+                key={`radar-${cfg.id}`}
+                onClick={() => onSelectZone(cfg.id)}
+                className="relative flex flex-col items-center group transition-transform hover:scale-110 cursor-pointer"
+                title={`Fly to ${cfg.name}`}
+              >
+                <div
+                  className={`h-4 w-4 rounded-full flex items-center justify-center transition-all ${
+                    isSelected
+                      ? "ring-2 ring-cyan-400 bg-cyan-400/40 shadow-[0_0_10px_#22d3ee]"
+                      : "bg-slate-800 border border-white/30 hover:border-cyan-400"
+                  } ${hasBurn ? "bg-red-500 animate-ping" : hasFault ? "bg-amber-500 animate-pulse" : ""}`}
+                >
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: cfg.color }}
+                  />
+                </div>
+                <span className={`text-[8px] font-mono mt-0.5 font-bold ${isSelected ? "text-cyan-300" : "text-fg-faint"}`}>
+                  {cfg.name.replace("Zone ", "")}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   🧭 GOOGLE MAPS TURN-BY-TURN TOP NAVIGATION BANNER
+   ═══════════════════════════════════════════════════════════════════ */
+
+function GoogleMapsTopNavBanner({
+  zoneConfig,
+  distanceMeters,
+  isArrived,
+  onExit,
+  onRecenter,
+  onWalkInside,
+}: {
+  zoneConfig: ZoneConfig;
+  distanceMeters: number;
+  isArrived: boolean;
+  onExit: () => void;
+  onRecenter: () => void;
+  onWalkInside: () => void;
+}) {
+  const getManeuver = () => {
+    if (zoneConfig.id === "zone-a") {
+      return {
+        icon: <ChevronLeft size={22} className="text-emerald-300 stroke-[3]" />,
+        text: isArrived ? "Arrived at Zone A (Vaccines & Biologics)" : "Turn left into Aisle 1 • Vaccine Storage",
+        subtext: "Pharmaceutical Cryogenic Racks (Safe: +2°C to +8°C)",
+      };
+    } else if (zoneConfig.id === "zone-b") {
+      return {
+        icon: <ArrowUp size={22} className="text-emerald-300 stroke-[3]" />,
+        text: isArrived ? "Arrived at Zone B (Dairy & Fresh Produce)" : "Continue straight down Central Transit Aisle",
+        subtext: "Commercial Produce Chillers (Safe: 0°C to +6°C)",
+      };
+    } else {
+      return {
+        icon: <ChevronRight size={22} className="text-emerald-300 stroke-[3]" />,
+        text: isArrived ? "Arrived at Zone C (Deep Freeze & Airlock)" : "Turn right into Aisle 3 • Deep Freeze Bay",
+        subtext: "Rapid-Roll Insulated Airlock Dock (Safe: -25°C to -15°C)",
+      };
+    }
+  };
+
+  const maneuver = getManeuver();
+
+  return (
+    <div className="px-3 py-2 border-b border-emerald-500/30 bg-gradient-to-r from-emerald-950 via-slate-950 to-emerald-950 text-white flex items-center justify-between gap-3 shadow-xl backdrop-blur-md flex-wrap animate-in slide-in-from-top duration-300">
+      {/* Big Google Maps Maneuver Arrow & Direction */}
+      <div className="flex items-center gap-3">
+        <div className="h-10 w-10 rounded-xl bg-emerald-600/90 border border-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
+          {maneuver.icon}
+        </div>
+        <div>
+          <div className="text-sm font-bold flex items-center gap-2">
+            <span>{maneuver.text}</span>
+            {isArrived && (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-200 border border-emerald-400 font-bold uppercase animate-pulse">
+                ARRIVED
+              </span>
+            )}
+          </div>
+          <div className="text-[11px] text-emerald-300/80 font-mono">
+            {maneuver.subtext}
+          </div>
+        </div>
+      </div>
+
+      {/* Dynamic Distance & GPS Status Ticker */}
+      <div className="flex items-center gap-3 font-mono text-xs">
+        <div className="hidden sm:flex flex-col items-end">
+          <div className="text-emerald-300 font-bold text-sm">
+            {isArrived ? "0 m" : `${Math.max(1, Math.round(distanceMeters))} m`}
+          </div>
+          <div className="text-[9px] text-fg-faint">
+            {isArrived ? "Destination reached" : "Speed: 1.4 m/s • ETA: 3s"}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-[10px] text-emerald-300 font-bold">
+          <Signal size={11} className="text-emerald-400 animate-pulse" />
+          <span>GPS RTK LOCKED</span>
+        </div>
+
+        {/* Header Quick Actions */}
+        <div className="flex items-center gap-1 border-l border-emerald-500/30 pl-2">
+          <button
+            onClick={onRecenter}
+            className="p-1.5 rounded-lg bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-400/30 cursor-pointer transition-all"
+            title="Re-Center Camera"
+          >
+            <RotateCcw size={14} />
+          </button>
+          <button
+            onClick={onWalkInside}
+            className="p-1.5 rounded-lg bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-400/30 cursor-pointer transition-all"
+            title="Street View Inside Aisle"
+          >
+            <Footprints size={14} />
+          </button>
+          <button
+            onClick={onExit}
+            className="px-2 py-1 rounded-lg bg-red-950/70 hover:bg-red-900 text-red-200 border border-red-500/40 font-mono text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-md"
+            title="Exit Navigation"
+          >
+            <X size={13} />
+            <span>Exit</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   🧭 GOOGLE MAPS STYLE BOTTOM DOCKED PLACE BAR (NON-BLOCKING!)
+   ═══════════════════════════════════════════════════════════════════ */
+
+function GoogleMapsBottomDock({
+  zoneConfig,
+  currentTemp,
+  simulationState,
+  activeZone,
+  onExitNavigation,
+  onCycleNextZone,
+  onWalkInside,
+  onRecenter,
+}: {
+  zoneConfig: ZoneConfig;
+  currentTemp: number;
+  simulationState: {
+    failedSensors: Set<string>;
+    burnedSensors: Set<string>;
+    accidentZones: Set<string>;
+    doorOpen: boolean;
+    compressorRunning: boolean;
+  };
+  activeZone?: ZoneSummary | null;
+  onExitNavigation: () => void;
+  onCycleNextZone: () => void;
+  onWalkInside: () => void;
+  onRecenter: () => void;
+}) {
+  const [showProbeDetails, setShowProbeDetails] = useState(false);
+  const isOutOfBand = currentTemp > zoneConfig.upperLimit || currentTemp < zoneConfig.lowerLimit;
+  const isNearLimit = currentTemp > zoneConfig.upperLimit - 1.2 || currentTemp < zoneConfig.lowerLimit + 0.8;
+
+  const tempStatusBadge = isOutOfBand
+    ? "text-rose-400 bg-rose-500/20 border-rose-500/50"
+    : isNearLimit
+    ? "text-amber-400 bg-amber-500/20 border-amber-500/50"
+    : "text-emerald-400 bg-emerald-500/20 border-emerald-500/50";
+
+  return (
+    <div className="absolute bottom-3 left-3 right-16 sm:right-48 z-30 pointer-events-auto transition-all animate-in slide-in-from-bottom duration-300">
+      {/* Optional Expanded Probe Drawer (collapsible, doesn't block screen) */}
+      {showProbeDetails && (
+        <div className="mb-2 p-3 rounded-2xl bg-slate-950/95 border border-cyan-500/40 shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom duration-200">
+          <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
+            <span className="text-xs font-mono font-bold text-cyan-300 flex items-center gap-1.5">
+              <Radio size={13} className="text-cyan-400" />
+              {zoneConfig.name} Redundant RTD Sensor Array
+            </span>
+            <button
+              onClick={() => setShowProbeDetails(false)}
+              className="text-fg-faint hover:text-white p-1 rounded-full cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {zoneConfig.sensors.map((s) => {
+              const isBurned = simulationState.burnedSensors.has(s.id);
+              const isFailed = simulationState.failedSensors.has(s.id);
+              const sTemp = Number(currentTemp.toFixed(1));
+              return (
+                <div
+                  key={s.id}
+                  className={`p-2.5 rounded-xl border font-mono text-xs ${
+                    isBurned
+                      ? "border-red-500 bg-red-950/40 text-red-200"
+                      : isFailed
+                      ? "border-rose-500 bg-rose-950/40 text-rose-200"
+                      : "border-white/10 bg-slate-900/80 text-fg"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <span className={`h-2 w-2 rounded-full ${isBurned ? "bg-red-500 animate-ping" : isFailed ? "bg-rose-500" : "bg-emerald-400"}`} />
+                      {s.id}
+                    </span>
+                    <span className="text-[10px] text-fg-muted">{s.type}</span>
+                  </div>
+                  <div className="text-[10px] text-fg-faint mt-1">{s.location}</div>
+                  <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-white/5">
+                    <span className="text-[11px] font-bold text-white">Live: {fmtTemp(sTemp)}</span>
+                    <span className="text-[9px] text-fg-faint">Cal: {s.calibrationDate}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Sleek Docked Navigation Bottom Bar */}
+      <div className="rounded-2xl border border-cyan-500/40 bg-slate-950/90 shadow-2xl backdrop-blur-xl p-2.5 flex items-center justify-between gap-3 flex-wrap">
+        {/* Left: Zone Thumbnail & Title */}
+        <div className="flex items-center gap-2.5">
+          <div className="relative h-11 w-11 rounded-xl overflow-hidden border border-white/20 shrink-0 group">
+            <img
+              src={zoneConfig.image}
+              alt={zoneConfig.name}
+              className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
+            />
+            <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <Camera size={14} className="text-white" />
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <MapPin size={13} className="text-cyan-400 shrink-0" />
+              <span className="font-bold text-white text-xs sm:text-sm">{zoneConfig.name}</span>
+              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${tempStatusBadge}`}>
+                {fmtTemp(currentTemp)}
+              </span>
+            </div>
+            <div className="text-[10px] text-cyan-300 font-mono">{zoneConfig.product} • Safe: {zoneConfig.tempRange}</div>
+          </div>
+        </div>
+
+        {/* Center: Live Telemetry Chips */}
+        <div className="hidden lg:flex items-center gap-2 font-mono text-[11px]">
+          <div className="rounded-lg bg-slate-900/90 border border-white/10 px-2.5 py-1 flex items-center gap-1.5">
+            <Droplets size={12} className="text-blue-400" />
+            <span className="text-fg-faint">RH:</span>
+            <span className="font-bold text-white">{activeZone?.humidity != null ? `${activeZone.humidity.toFixed(0)}%` : "52%"}</span>
+          </div>
+          <div className="rounded-lg bg-slate-900/90 border border-white/10 px-2.5 py-1 flex items-center gap-1.5">
+            <Zap size={12} className="text-amber-400" />
+            <span className="text-fg-faint">Power:</span>
+            <span className="font-bold text-amber-300">{activeZone?.power_consumption_kw != null ? `${activeZone.power_consumption_kw.toFixed(1)} kW` : "— kW"}</span>
+          </div>
+          <div className="rounded-lg bg-slate-900/90 border border-white/10 px-2.5 py-1 flex items-center gap-1.5">
+            <Radio size={12} className="text-emerald-400" />
+            <span className="text-fg-faint">Status:</span>
+            <span className={`font-bold ${activeZone?.sensor_health && activeZone.sensor_health !== "healthy" ? "text-amber-400" : "text-emerald-300"}`}>
+              {activeZone?.sensor_health && activeZone.sensor_health !== "healthy" ? activeZone.sensor_health.replace("_", " ") : "Sensors OK"}
+            </span>
+          </div>
+        </div>
+
+        {/* Right: Quick Action Buttons */}
+        <div className="flex items-center gap-1.5 ml-auto">
+          <button
+            onClick={() => setShowProbeDetails(!showProbeDetails)}
+            className={`px-2.5 py-1.5 text-[11px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition-all ${
+              showProbeDetails
+                ? "bg-cyan-500/20 text-cyan-200 border-cyan-400 font-bold"
+                : "bg-slate-900 text-fg-muted border-white/10 hover:text-white"
+            }`}
+            title="Inspect individual sensor probes"
+          >
+            <Radio size={12} />
+            <span className="hidden sm:inline">Probes</span>
+          </button>
+
+          <button
+            onClick={onWalkInside}
+            className="px-2.5 py-1.5 text-[11px] font-mono rounded-lg border bg-slate-900 text-fg-muted border-white/10 hover:text-white hover:border-cyan-400/50 flex items-center gap-1 cursor-pointer transition-all"
+            title="Eye-level aisle street view"
+          >
+            <Footprints size={12} className="text-cyan-400" />
+            <span className="hidden sm:inline">Street View</span>
+          </button>
+
+          <button
+            onClick={onRecenter}
+            className="px-2.5 py-1.5 text-[11px] font-mono rounded-lg border bg-slate-900 text-fg-muted border-white/10 hover:text-white flex items-center gap-1 cursor-pointer transition-all"
+            title="Re-center navigation camera"
+          >
+            <RotateCcw size={12} className="text-amber-400" />
+            <span className="hidden sm:inline">Re-Center</span>
+          </button>
+
+          <button
+            onClick={onCycleNextZone}
+            className="px-2.5 py-1.5 text-[11px] font-mono rounded-lg border bg-cyan-500/20 text-cyan-200 border-cyan-400 hover:bg-cyan-500/30 font-bold flex items-center gap-1 cursor-pointer transition-all shadow-md"
+            title="Fly to next zone"
+          >
+            <Navigation size={12} />
+            <span>Next Zone</span>
+            <ChevronRight size={12} />
+          </button>
+
+          <button
+            onClick={onExitNavigation}
+            className="p-1.5 rounded-lg bg-red-950/40 text-red-300 hover:bg-red-950/80 border border-red-500/30 cursor-pointer transition-all"
+            title="Exit Navigation (Overview Map)"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAIN DIGITAL TWIN PAGE EXPORT
+   ═══════════════════════════════════════════════════════════════════ */
+
+export default function DigitalTwin() {
+  const { zones, selectedZone, selectedZoneId, setSelectedZoneId, zonesError } = useApp();
+
+  // Live shared zones from AppContext (SSE stream + fallback)
+  const allZones = zones ?? [];
+
+  const readings = usePolling(() => api.readings(selectedZoneId, 60), POLL_MS, [selectedZoneId]);
+  const forecast = usePolling(() => api.forecast(selectedZoneId, 30), POLL_MS, [selectedZoneId]);
+  const riskPoll = usePolling(() => api.risk(selectedZoneId, 30), POLL_MS, [selectedZoneId]);
+  const alertsPoll = usePolling(() => api.alerts({ active: true, limit: 10 }), POLL_MS);
+
+  // 3D Viewport Controls State
+  const [cameraPreset, setCameraPreset] = useState<CameraPreset>("isometric");
+  const [viewMode, setViewMode] = useState<ViewDisplayMode>("standard");
+  const [showLabels, setShowLabels] = useState(true);
+  const [showCoverage, setShowCoverage] = useState(false);
+  const [autoRotate, setAutoRotate] = useState(false);
+  const [userInteracting, setUserInteracting] = useState(false);
+  const [compassHeading, setCompassHeading] = useState(0);
+
+  const controlsRef = useRef<any>(null);
+
+  // Synchronized Simulation State (Directly driven by live backend telemetry)
+  const [simState, setSimState] = useState({
+    failedSensors: new Set<string>(),
+    burnedSensors: new Set<string>(),
+    accidentZones: new Set<string>(),
+    fansActive: true,
+    compressorRunning: true,
+    doorOpen: false,
+    zoneTemps: {
+      "zone-a": 5.0,
+      "zone-b": 3.0,
+      "zone-c": -20.0,
+    } as Record<string, number>,
+  });
+
+  const [activeScenario, setActiveScenario] = useState<SimulationScenario>("normal");
+  const [doorOpenSeconds, setDoorOpenSeconds] = useState(0);
+
+  // Activity Log
+  const [activityLog, setActivityLog] = useState<SensorEvent[]>([
+    { time: "14:30", message: "Cold storage facility nominal operation", type: "info", zone: "Facility" },
+    { time: "14:20", message: "Defrost cycle completed on schedule", type: "info", zone: "Zone A" },
+    { time: "14:05", message: "Dual compressor operating at 78% capacity", type: "info", zone: "System" },
+  ]);
+
+  const addEvent = useCallback((message: string, type: SensorEvent["type"], zone: string) => {
+    const now = new Date();
+    const time = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+    setActivityLog((prev) => [{ time, message, type, zone }, ...prev.slice(0, 9)]);
+  }, []);
+
+  // Sync DigitalTwin simState with the unified live backend stream (SSE / REST)
+  useEffect(() => {
+    if (allZones.length > 0) {
+      const zA = allZones.find((z) => z.zone_id === "zone-a");
+      const zB = allZones.find((z) => z.zone_id === "zone-b");
+      const zC = allZones.find((z) => z.zone_id === "zone-c");
+
+      const isDoorOpen = zC?.door_status === "open";
+      const isCompFailed = allZones.some((z) => z.compressor_status === "failed" || z.compressor_status === "stopped");
+      const isDegraded = allZones.some((z) => z.compressor_status === "degraded");
+      const isSensorAnomaly = allZones.some((z) => z.scenario === "sensor_anomaly" || z.sensor_health === "spike_anomaly" || z.sensor_health === "stuck_frozen");
+
+      if (isDoorOpen) {
+        setActiveScenario("door_open");
+        setDoorOpenSeconds((s) => s + 1);
+      } else if (isCompFailed) {
+        setActiveScenario("compressor_failure");
+      } else if (isDegraded) {
+        setActiveScenario("cooling_degradation");
+      } else if (isSensorAnomaly) {
+        setActiveScenario("sensor_burn");
+      } else {
+        setActiveScenario("normal");
+        setDoorOpenSeconds(0);
+      }
+
+      setSimState((prev) => ({
+        ...prev,
+        doorOpen: isDoorOpen,
+        compressorRunning: !isCompFailed,
+        fansActive: !isCompFailed,
+        zoneTemps: {
+          "zone-a": zA?.temperature ?? 5.0,
+          "zone-b": zB?.temperature ?? 3.0,
+          "zone-c": zC?.temperature ?? -20.0,
+        },
+      }));
+    }
+  }, [allZones]);
+
+  // 🧭 Google Maps Turn-by-Turn Navigation State
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [navDistance, setNavDistance] = useState(16);
+  const [navArrived, setNavArrived] = useState(false);
+
+  // 🚀 GOOGLE MAPS FLIGHT NAVIGATION TO ZONE (NO STATIC MODAL!)
+  const handleZoneSelect = useCallback(
+    (zoneId: string) => {
+      setSelectedZoneId(zoneId);
+      setIsNavigating(true);
+      setNavArrived(false);
+      // Smoothly fly camera to close-up view of this zone
+      setCameraPreset(zoneId as CameraPreset);
+      const cfg = ZONE_CONFIGS.find((c) => c.id === zoneId);
+      addEvent(`📍 Navigated camera to ${cfg?.name ?? zoneId} (${cfg?.product})`, "info", cfg?.name ?? zoneId);
+    },
+    [setSelectedZoneId, addEvent]
+  );
+
+  const handleNavigationProgress = useCallback((distanceMeters: number, arrived: boolean) => {
+    setNavDistance(distanceMeters);
+    setNavArrived(arrived);
+  }, []);
+
+  const handleExitNavigation = useCallback(() => {
+    setIsNavigating(false);
+    setNavArrived(false);
+    setCameraPreset("isometric");
+    addEvent("🌐 Returned camera to facility overview map", "info", "Overview");
+  }, [addEvent]);
+
+  const handleWalkInside = useCallback(() => {
+    setCameraPreset("aisle-walk");
+    addEvent("🚶 Stepped into eye-level aisle street view", "info", "Aisle");
+  }, [addEvent]);
+
+  const handleRecenter = useCallback(() => {
+    setCameraPreset(selectedZoneId as CameraPreset);
+    setNavArrived(false);
+  }, [selectedZoneId]);
+
+  // Cycle to next zone in sequence
+  const handleCycleNextZone = useCallback(() => {
+    const ids = ["zone-a", "zone-b", "zone-c"];
+    const currIdx = ids.indexOf(selectedZoneId);
+    const nextId = ids[(currIdx + 1) % ids.length];
+    handleZoneSelect(nextId);
+  }, [selectedZoneId, handleZoneSelect]);
+
+  // Toggle Door simulation
+  const handleToggleDoor = useCallback(() => {
+    setSimState((prev) => {
+      const willOpen = !prev.doorOpen;
+      if (willOpen) {
+        setActiveScenario("door_open");
+        setDoorOpenSeconds(0);
+        addEvent("🚪 LOADING DOCK DOOR OPENED: Ambient thermal ingress active", "warning", "Zone C");
+        handleZoneSelect("zone-c");
+        api.setScenario("zone-c", "door_open").catch(() => {});
+      } else {
+        setActiveScenario("normal");
+        addEvent("✓ Loading dock door sealed; temperature stabilizing", "info", "Zone C");
+        api.reset("scenario", "zone-c").catch(() => {});
+      }
+      return { ...prev, doorOpen: willOpen };
+    });
+  }, [addEvent, handleZoneSelect]);
+
+  // Trip / Restore Compressor
+  const handleToggleCompressor = useCallback(() => {
+    setSimState((prev) => {
+      const willRun = !prev.compressorRunning;
+      if (!willRun) {
+        setActiveScenario("compressor_failure");
+        addEvent("⚠ PRIMARY COMPRESSOR RACK TRIPPED: Facility cooling lost", "critical", "System");
+        api.setScenario("zone-a", "compressor_failure").catch(() => {});
+      } else {
+        setActiveScenario("normal");
+        addEvent("✓ Compressor rack restored; active refrigeration online", "info", "System");
+        api.reset("scenario").catch(() => {});
+      }
+      return { ...prev, compressorRunning: willRun };
+    });
+  }, [addEvent]);
+
+  // Burn Sensor
+  const handleBurnSensor = useCallback(() => {
+    setSimState((prev) => {
+      const nextBurned = new Set(prev.burnedSensors);
+      if (nextBurned.has("TS-A1")) {
+        nextBurned.delete("TS-A1");
+        setActiveScenario("normal");
+        addEvent("✓ Sensor TS-A1 replaced and recalibrated", "info", "Zone A");
+        api.reset("scenario", "zone-a").catch(() => {});
+      } else {
+        nextBurned.add("TS-A1");
+        setActiveScenario("sensor_burn");
+        addEvent("🔥 SENSOR BURN: TS-A1 hardware fault & smoke detected", "critical", "Zone A");
+        handleZoneSelect("zone-a");
+        api.setScenario("zone-a", "sensor_anomaly").catch(() => {});
+      }
+      return { ...prev, burnedSensors: nextBurned };
+    });
+  }, [addEvent, handleZoneSelect]);
+
+  // Degrade Cooling Capacity (Condenser Fouling / Refrigerant Leak)
+  const handleToggleDegradation = useCallback(() => {
+    if (activeScenario === "cooling_degradation") {
+      setActiveScenario("normal");
+      addEvent("✓ Cooling system restored to full nominal capacity", "info", "Zone A");
+      api.reset("scenario", "zone-a").catch(() => {});
+    } else {
+      setActiveScenario("cooling_degradation");
+      addEvent("📉 COOLING DEGRADATION: 45% capacity loss & compressor strain", "warning", "Zone A");
+      handleZoneSelect("zone-a");
+      api.setScenario("zone-a", "cooling_degradation").catch(() => {});
+    }
+  }, [activeScenario, addEvent, handleZoneSelect]);
+
+  // Reset Everything
+  const handleResetAll = useCallback(() => {
+    setActiveScenario("normal");
+    setDoorOpenSeconds(0);
+    setSimState({
+      failedSensors: new Set(),
+      burnedSensors: new Set(),
+      accidentZones: new Set(),
+      fansActive: true,
+      compressorRunning: true,
+      doorOpen: false,
+      zoneTemps: {
+        "zone-a": 5.0,
+        "zone-b": 3.0,
+        "zone-c": -20.0,
+      },
+    });
+    setCameraPreset("isometric");
+    addEvent("✓ All systems, sensors, and doors reset to nominal baseline", "info", "Facility");
+    api.reset("full").catch(() => {});
+  }, [addEvent]);
+
+  // Google Maps Zoom in/out handlers
+  const handleZoom = (delta: number) => {
+    if (controlsRef.current) {
+      const cam = controlsRef.current.object;
+      const target = controlsRef.current.target;
+      const dir = new THREE.Vector3().subVectors(cam.position, target);
+      const factor = delta > 0 ? 0.8 : 1.25;
+      dir.multiplyScalar(factor);
+      cam.position.copy(target).add(dir);
+      controlsRef.current.update();
+    }
+  };
+
+  const handleResetNorth = () => {
+    setCameraPreset("top");
+  };
+
+  const selectedConfig = useMemo(
+    () => ZONE_CONFIGS.find((c) => c.id === selectedZoneId) ?? ZONE_CONFIGS[0],
+    [selectedZoneId]
+  );
+
+  const currentZoneTemp = simState.zoneTemps[selectedZoneId] ?? selectedConfig.targetTemp;
+
+  // Explainable Risk Score (Synchronized with backend AI risk engine + real-time simulation)
+  const riskAnalysis = useMemo(() => {
+    let localScore = 2;
+    const localFactors: { label: string; detail: string; points: number }[] = [];
+
+    if (simState.doorOpen) {
+      const doorPts = Math.min(45, 20 + doorOpenSeconds * 2);
+      localScore += doorPts;
+      localFactors.push({
+        label: "Loading Door Ingress",
+        detail: `Dock door open for ${Math.floor(doorOpenSeconds / 60)}m ${doorOpenSeconds % 60}s allowing +26.0°C ambient heat rush`,
+        points: doorPts,
+      });
+    }
+
+    if (!simState.compressorRunning) {
+      localScore += 55;
+      localFactors.push({
+        label: "Refrigeration Unit Offline",
+        detail: "Primary compressor rack tripped; loss of active cooling across facility",
+        points: 55,
+      });
+    }
+
+    if (simState.burnedSensors.has("TS-A1") && selectedZoneId === "zone-a") {
+      localScore += 35;
+      localFactors.push({
+        label: "Sensor Hardware Failure",
+        detail: "Probe TS-A1 thermal runaway detected; telemetry untrusted",
+        points: 35,
+      });
+    }
+
+    if (currentZoneTemp > selectedConfig.upperLimit) {
+      const breachPts = 40;
+      localScore += breachPts;
+      localFactors.push({
+        label: "Critical Limit Exceeded",
+        detail: `Current temp (${fmtTemp(currentZoneTemp)}) exceeds upper limit (${fmtTemp(selectedConfig.upperLimit)})`,
+        points: breachPts,
+      });
+    } else if (currentZoneTemp > selectedConfig.upperLimit - 1.5) {
+      const warnPts = 25;
+      localScore += warnPts;
+      localFactors.push({
+        label: "Approaching Excursion Threshold",
+        detail: `Positive drift (+1.8°C/hr) nearing critical boundary of ${fmtTemp(selectedConfig.upperLimit)}`,
+        points: warnPts,
+      });
+    }
+
+    // Unify score: prioritize live backend risk score if active, fallback to simulation score
+    const backendScore = selectedZone?.risk_score ?? riskPoll.data?.score;
+    const score = backendScore != null && backendScore > 0
+      ? Math.max(backendScore, Math.min(100, localScore))
+      : Math.min(100, Math.max(0, localScore));
+
+    const category = selectedZone?.risk_category ?? riskPoll.data?.category ?? (score > 70 ? "critical" : score > 35 ? "warning" : "low");
+
+    // Unify factors: combine backend factors with local simulation events
+    const factors = [...localFactors];
+    if (riskPoll.data?.factors?.length) {
+      for (const bf of riskPoll.data.factors) {
+        if (!factors.some((f) => f.label === bf.label)) {
+          factors.push({
+            label: bf.label,
+            detail: bf.detail,
+            points: Math.round(bf.points),
+          });
+        }
+      }
+    }
+
+    let recommendation = "All systems operating within specifications. Routine monitoring active.";
+    let actionLabel: string | null = null;
+    let onAction: (() => void) | null = null;
+
+    if (simState.doorOpen) {
+      recommendation = "CRITICAL ACTION: Close Loading Dock Door C immediately. Seal magnetic gaskets and engage booster blower to stabilize frozen inventory.";
+      actionLabel = "⚡ Close Door & Seal Loading Dock";
+      onAction = handleToggleDoor;
+    } else if (!simState.compressorRunning) {
+      recommendation = "URGENT ACTION: Reset compressor breaker panel; switch to secondary backup condensing unit and notify HVAC technician.";
+      actionLabel = "⚡ Reset Compressor & Restore Cooling";
+      onAction = handleToggleCompressor;
+    } else if (simState.burnedSensors.has("TS-A1")) {
+      recommendation = "HARDWARE ACTION: Isolate sensor TS-A1 circuit breaker. Switch thermostat control feedback to redundant probe TS-A2.";
+      actionLabel = "⚡ Isolate TS-A1 & Recalibrate";
+      onAction = handleBurnSensor;
+    }
+
+    return { score, category, factors, recommendation, actionLabel, onAction };
+  }, [simState, doorOpenSeconds, currentZoneTemp, selectedConfig, selectedZoneId, selectedZone, riskPoll.data, handleToggleDoor, handleToggleCompressor, handleBurnSensor]);
+
+  // Forecast Points (Synchronized with backend ML Random Forest model)
+  const forecastData = useMemo(() => {
+    // If backend ML forecast is available, use exact model points
+    if (forecast.data?.points?.length) {
+      const baseTemp = forecast.data.base_temperature ?? currentZoneTemp;
+      const pts = [
+        {
+          minute: "0m",
+          temperature: baseTemp,
+          upperLimit: selectedConfig.upperLimit,
+          lowerLimit: selectedConfig.lowerLimit,
+        },
+      ];
+      for (const p of forecast.data.points) {
+        pts.push({
+          minute: `${p.minutes_ahead}m`,
+          temperature: p.temperature,
+          upperLimit: selectedConfig.upperLimit,
+          lowerLimit: selectedConfig.lowerLimit,
+        });
+      }
+      return pts;
+    }
+
+    // Fallback: projected drift based on current physical state
+    const points = [];
+    const driftRate = simState.doorOpen && selectedZoneId === "zone-c"
+      ? 0.7
+      : !simState.compressorRunning
+      ? 0.5
+      : 0.05;
+
+    for (let min = 0; min <= 30; min += 5) {
+      const projected = Number((currentZoneTemp + (min / 5) * driftRate).toFixed(2));
       points.push({
-        minute: m,
-        timeLabel: m === 0 ? "Now" : `+${m}m`,
-        twinTemp: Number(simTemp.toFixed(2)),
-        baselineTemp: Number(baseTemp.toFixed(2)),
-        isBreach: simTemp > zone.upper_limit || simTemp < zone.lower_limit,
+        minute: `${min}m`,
+        temperature: projected,
+        upperLimit: selectedConfig.upperLimit,
+        lowerLimit: selectedConfig.lowerLimit,
       });
     }
     return points;
-  }, [zone, currentTemp, currentAmbient, isCompressorRunning, isDoorOpen, thermalMassLoad]);
+  }, [currentZoneTemp, simState, selectedZoneId, selectedConfig, forecast.data]);
 
-  if (zonesLoading && !zones) return <LoadingState label="Synchronizing with ColdGuard Digital Twin Engine…" />;
-  if (!zones) return <EmptyState title="No zone telemetry available" />;
+  const hasAnyAlert =
+    !simState.compressorRunning ||
+    simState.failedSensors.size > 0 ||
+    simState.burnedSensors.size > 0 ||
+    simState.doorOpen;
 
-  const isWarningTemp = zone ? currentTemp > zone.upper_limit * 0.95 || currentTemp < zone.lower_limit * 1.05 : false;
-  const isCriticalTemp = zone ? currentTemp >= zone.upper_limit || currentTemp <= zone.lower_limit : false;
+  const isZoneFocused = cameraPreset.startsWith("zone-");
 
   return (
-    <div className="space-y-5">
-      {/* Top Header & Navigation */}
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-        <div>
+    <div className="space-y-4">
+      {/* 🏆 INTERACTIVE EVALUATION DEMO BAR */}
+      <div className="rounded-xl border border-cyan-500/40 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 p-3 shadow-xl backdrop-blur-md">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="grid h-7 w-7 place-items-center rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-400">
-              <Layers size={17} />
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+              <Sparkles size={15} />
             </span>
-            <h1 className="text-xl font-bold tracking-tight text-fg">
-              Chamber Digital Twin <span className="text-xs font-mono font-normal text-cyan-400 px-2 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-950/40">v2.4-SYNC</span>
-            </h1>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-fg">ColdGuard 3D Google Maps-Style Digital Twin</span>
+                <span className="rounded-full bg-cyan-500/20 text-cyan-300 px-2 py-0.2 text-[10px] font-mono border border-cyan-500/30 font-bold">
+                  Smooth Fly-To Navigation Active
+                </span>
+              </div>
+              <p className="text-[11px] text-fg-muted">
+                Click any zone to fly smoothly to that location. Explore the 3D facility with Google Maps controls and live sensor diagnostics.
+              </p>
+            </div>
           </div>
-          <p className="text-sm text-fg-muted mt-1">
-            Real-time thermodynamic virtual replica, airflow dynamics, and hardware-in-the-loop stress simulation.
-          </p>
-        </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-ink-800/80 px-3 py-1.5 text-xs text-fg-muted">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span>Sync Latency: <strong className="text-fg font-mono">14ms</strong></span>
-            <span className="text-white/20">|</span>
-            <span>Physics Model: <strong className="text-fg font-mono">Runge-Kutta 4</strong></span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleToggleDoor}
+              className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer shadow-md ${
+                simState.doorOpen
+                  ? "bg-rose-500/30 text-rose-200 border-rose-500 animate-pulse shadow-rose-500/20"
+                  : "bg-amber-950/40 text-amber-300 border-amber-500/50 hover:bg-amber-950/70"
+              }`}
+            >
+              <DoorOpen size={13} />
+              {simState.doorOpen ? "Seal Door (Stop Ingress)" : "🚪 Demo 1: Open Loading Door"}
+            </button>
+
+            <button
+              onClick={handleToggleCompressor}
+              className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer shadow-md ${
+                !simState.compressorRunning
+                  ? "bg-rose-500/30 text-rose-200 border-rose-500 animate-pulse shadow-rose-500/20"
+                  : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-slate-500"
+              }`}
+            >
+              <Cpu size={13} />
+              {!simState.compressorRunning ? "Reset Compressor" : "⚡ Demo 2: Trip Compressor"}
+            </button>
+
+            <button
+              onClick={handleBurnSensor}
+              className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer shadow-md ${
+                simState.burnedSensors.has("TS-A1")
+                  ? "bg-orange-500/30 text-orange-200 border-orange-500 animate-pulse shadow-orange-500/20"
+                  : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-slate-500"
+              }`}
+            >
+              <Flame size={13} />
+              {simState.burnedSensors.has("TS-A1") ? "Replace Sensor" : "🔥 Demo 3: Burn Sensor"}
+            </button>
+
+            <button
+              onClick={handleToggleDegradation}
+              className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer shadow-md ${
+                activeScenario === "cooling_degradation"
+                  ? "bg-amber-500/30 text-amber-200 border-amber-500 animate-pulse shadow-amber-500/20"
+                  : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-slate-500"
+              }`}
+            >
+              <Snowflake size={13} />
+              {activeScenario === "cooling_degradation" ? "Restore Cooling Unit" : "📉 Demo 4: Degrade Cooling (45%)"}
+            </button>
+
+            <button
+              onClick={handleResetAll}
+              className="px-3 py-1.5 text-xs font-mono font-bold rounded-lg border border-emerald-500/50 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/70 transition-all flex items-center gap-1 cursor-pointer"
+            >
+              <RotateCcw size={13} />
+              ✓ Reset All
+            </button>
           </div>
-          <ZoneTabs />
         </div>
       </div>
 
       <StaleBanner error={zonesError} />
 
-      {/* Top Telemetry & Twin Convergence Bar */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-cyan-500/20 bg-gradient-to-b from-cyan-950/20 to-ink-800/90">
-          <div className="flex items-center justify-between text-xs text-fg-muted">
-            <span className="flex items-center gap-1.5 font-medium uppercase tracking-wider">
-              <Cpu size={14} className="text-cyan-400" />
-              Twin Model Fidelity
-            </span>
-            <Badge tone="ok" dot>Synced</Badge>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-mono text-2xl font-bold text-fg">99.8%</span>
-            <span className="text-xs text-fg-muted font-mono">ΔT: ±{twinMetrics.deviation}°C</span>
-          </div>
-          <div className="mt-2 text-[11px] text-fg-faint flex items-center justify-between">
-            <span>Physical: <strong className="text-fg font-mono">{fmtTemp(currentTemp)}</strong></span>
-            <span>Twin Truth: <strong className="text-cyan-400 font-mono">{fmtTemp(currentTrueTemp)}</strong></span>
-          </div>
-        </Card>
+      {/* 3D CENTERPIECE VIEWPORT & SIDEBAR */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        {/* Left Column: 3D Canvas */}
+        <div className="xl:col-span-8">
+          <Card className="p-0 overflow-hidden" bodyClassName="p-0">
+            {/* Google Maps Top Navigation Bar: Turn-by-Turn GPS or Facility Bar */}
+            {isNavigating && selectedConfig ? (
+              <GoogleMapsTopNavBanner
+                zoneConfig={selectedConfig}
+                distanceMeters={navDistance}
+                isArrived={navArrived}
+                onExit={handleExitNavigation}
+                onRecenter={handleRecenter}
+                onWalkInside={handleWalkInside}
+              />
+            ) : (
+              <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-white/10 bg-slate-900/90 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold flex items-center gap-1 mr-1">
+                    <Navigation size={12} className="animate-pulse" /> Google Maps Nav:
+                  </span>
 
-        <Card className={`border-emerald-500/20 bg-gradient-to-b ${twinMetrics.holdoverMinutes < 15 ? "from-rose-950/30 border-rose-500/30" : "from-emerald-950/20"} to-ink-800/90`}>
-          <div className="flex items-center justify-between text-xs text-fg-muted">
-            <span className="flex items-center gap-1.5 font-medium uppercase tracking-wider">
-              <Thermometer size={14} className="text-emerald-400" />
-              Thermal Holdover Buffer
-            </span>
-            <InfoTip text="Estimated time until regulatory temperature breach if all refrigeration power ceases immediately." />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-mono text-2xl font-bold text-fg">{twinMetrics.holdoverMinutes} <span className="text-sm font-normal text-fg-muted">min</span></span>
-            <span className={`text-xs font-mono ${twinMetrics.holdoverMinutes < 20 ? "text-rose-400" : "text-emerald-400"}`}>
-              {twinMetrics.holdoverMinutes < 20 ? "Critical Buffer" : "Safe Inertia"}
-            </span>
-          </div>
-          <div className="mt-2 text-[11px] text-fg-faint flex items-center justify-between">
-            <span>Thermal Mass Load:</span>
-            <strong className="text-fg font-mono">{thermalMassLoad}% Loaded</strong>
-          </div>
-        </Card>
+                  <button
+                    onClick={() => {
+                      setIsNavigating(false);
+                      setCameraPreset("isometric");
+                    }}
+                    className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer ${
+                      cameraPreset === "isometric" && !isNavigating
+                        ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold"
+                        : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
+                    }`}
+                  >
+                    🌐 Overview
+                  </button>
 
-        <Card className="border-indigo-500/20 bg-gradient-to-b from-indigo-950/20 to-ink-800/90">
-          <div className="flex items-center justify-between text-xs text-fg-muted">
-            <span className="flex items-center gap-1.5 font-medium uppercase tracking-wider">
-              <Zap size={14} className="text-indigo-400" />
-              Thermal Duty & COP
-            </span>
-            <InfoTip text="Instantaneous heat extraction rate from storage chamber and coefficient of refrigeration performance." />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-mono text-2xl font-bold text-fg">{twinMetrics.coolingKw} <span className="text-sm font-normal text-fg-muted">kW</span></span>
-            <span className="text-xs text-indigo-400 font-mono">COP {twinMetrics.cop}</span>
-          </div>
-          <div className="mt-2 text-[11px] text-fg-faint flex items-center justify-between">
-            <span>Wall Heat Flux:</span>
-            <strong className="text-fg font-mono">{twinMetrics.heatLeakWatts} W</strong>
-          </div>
-        </Card>
+                  {ZONE_CONFIGS.map((cfg) => (
+                    <button
+                      key={`fly-${cfg.id}`}
+                      onClick={() => handleZoneSelect(cfg.id)}
+                      className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
+                        selectedZoneId === cfg.id && isNavigating
+                          ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold shadow-sm"
+                          : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-cyan-400"
+                      }`}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: cfg.color }} />
+                      <span>{cfg.name}</span>
+                      <span className="text-[9px] text-cyan-400 font-bold">
+                        {cfg.id === "zone-a" ? "16m" : cfg.id === "zone-b" ? "10m" : "8m"}
+                      </span>
+                    </button>
+                  ))}
 
-        <Card className="border-amber-500/20 bg-gradient-to-b from-amber-950/20 to-ink-800/90">
-          <div className="flex items-center justify-between text-xs text-fg-muted">
-            <span className="flex items-center gap-1.5 font-medium uppercase tracking-wider">
-              <Wind size={14} className="text-amber-400" />
-              Air Circulation & Blower
-            </span>
-            <InfoTip text="Active evaporator volumetric airflow and fan rotation velocity." />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-mono text-2xl font-bold text-fg">{twinMetrics.airflowCfm} <span className="text-sm font-normal text-fg-muted">CFM</span></span>
-            <span className={`text-xs font-mono ${isCompressorRunning ? "text-emerald-400" : "text-amber-400"}`}>
-              {fanSpeedRpm} RPM
-            </span>
-          </div>
-          <div className="mt-2 text-[11px] text-fg-faint flex items-center justify-between">
-            <span>Blower Status:</span>
-            <strong className={`font-mono ${isCompressorRunning ? "text-emerald-400" : "text-rose-400"}`}>
-              {isCompressorRunning ? "Forced Convection" : "Stagnant (Idle)"}
-            </strong>
-          </div>
-        </Card>
-      </div>
+                  <button
+                    onClick={() => handleToggleDoor()}
+                    className="px-2.5 py-1 text-[11px] font-mono rounded-lg border bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-amber-400 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <DoorOpen size={12} className="text-amber-400" />
+                    <span>Loading Bay</span>
+                    <span className="text-[9px] text-amber-400 font-bold">0m</span>
+                  </button>
+                </div>
 
-      {/* Main Digital Twin Interactive Visualization & Sandbox */}
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
-        {/* Left Column: Interactive 2.5D Chamber Schematic */}
-        <div className="xl:col-span-7 space-y-4">
+                {/* View Modes */}
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <button
+                    onClick={() => setViewMode(viewMode === "thermal" ? "standard" : "thermal")}
+                    className={`px-2 py-0.5 text-[10px] font-mono rounded border flex items-center gap-1 cursor-pointer ${
+                      viewMode === "thermal"
+                        ? "bg-amber-500/20 text-amber-300 border-amber-400 font-bold"
+                        : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
+                    }`}
+                  >
+                    <Thermometer size={10} /> Thermal
+                  </button>
+
+                  <button
+                    onClick={() => setShowLabels(!showLabels)}
+                    className={`px-2 py-0.5 text-[10px] font-mono rounded border flex items-center gap-1 cursor-pointer ${
+                      showLabels
+                        ? "bg-cyan-500/20 text-cyan-300 border-cyan-400"
+                        : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
+                    }`}
+                  >
+                    {showLabels ? <Eye size={10} /> : <EyeOff size={10} />} Labels
+                  </button>
+
+                  <button
+                    onClick={() => setAutoRotate(!autoRotate)}
+                    className={`px-2 py-0.5 text-[10px] font-mono rounded border flex items-center gap-1 cursor-pointer ${
+                      autoRotate
+                        ? "bg-purple-500/20 text-purple-300 border-purple-400"
+                        : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
+                    }`}
+                  >
+                    <RefreshCw size={10} className={autoRotate ? "animate-spin" : ""} /> Orbit
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 3D Canvas with Google Maps Navigation */}
+            <div className="relative" style={{ height: "570px" }}>
+              <Canvas shadows gl={{ antialias: true, alpha: true }} dpr={[1, 2]}>
+                <Suspense fallback={null}>
+                  <color attach="background" args={["#060d17"]} />
+                  <fog attach="fog" args={["#060d17", 18, 38]} />
+                  <ColdStorageScene
+                    zones={allZones.length > 0 ? allZones : zones ?? []}
+                    selectedZoneId={selectedZoneId}
+                    onSelectZone={handleZoneSelect}
+                    simulationState={simState}
+                    cameraPreset={cameraPreset}
+                    viewMode={viewMode}
+                    showLabels={showLabels}
+                    showCoverage={showCoverage}
+                    autoRotate={autoRotate}
+                    userInteracting={userInteracting}
+                    setUserInteracting={setUserInteracting}
+                    onToggleDoor={handleToggleDoor}
+                    onHeadingChange={setCompassHeading}
+                    onNavigationProgress={handleNavigationProgress}
+                    isNavigating={isNavigating}
+                    controlsRef={controlsRef}
+                  />
+                </Suspense>
+              </Canvas>
+
+              {/* 🧭 GOOGLE MAPS STYLE BOTTOM DOCKED PLACE BAR (NON-BLOCKING!) */}
+              {isNavigating && selectedConfig && (
+                <GoogleMapsBottomDock
+                  zoneConfig={selectedConfig}
+                  currentTemp={currentZoneTemp}
+                  simulationState={simState}
+                  activeZone={selectedZone}
+                  onExitNavigation={handleExitNavigation}
+                  onCycleNextZone={handleCycleNextZone}
+                  onWalkInside={handleWalkInside}
+                  onRecenter={handleRecenter}
+                />
+              )}
+
+              {/* 🗺️ GOOGLE MAPS FLOATING CONTROLS (Right Side of Map) */}
+              <div className="absolute top-3 right-3 z-30 flex flex-col items-center gap-1.5 pointer-events-auto">
+                {/* Compass Button */}
+                <button
+                  onClick={handleResetNorth}
+                  className="w-8 h-8 rounded-lg bg-slate-900/90 border border-white/20 text-white flex items-center justify-center hover:bg-slate-800 transition-all shadow-xl cursor-pointer"
+                  title="Reset North Orientation"
+                >
+                  <Compass
+                    size={16}
+                    className="text-cyan-400 transition-transform duration-200"
+                    style={{ transform: `rotate(${-compassHeading}deg)` }}
+                  />
+                </button>
+
+                {/* 3D / 2D Switcher */}
+                <button
+                  onClick={() => setCameraPreset(cameraPreset === "top" ? "isometric" : "top")}
+                  className={`w-8 h-8 rounded-lg border text-[10px] font-mono font-bold flex items-center justify-center transition-all shadow-xl cursor-pointer ${
+                    cameraPreset === "top"
+                      ? "bg-cyan-500/30 text-cyan-200 border-cyan-400"
+                      : "bg-slate-900/90 text-fg-muted border-white/20 hover:text-white"
+                  }`}
+                  title="Toggle 2D / 3D Mode"
+                >
+                  {cameraPreset === "top" ? "2D" : "3D"}
+                </button>
+
+                {/* Eye-level Aisle Walking View */}
+                <button
+                  onClick={() => setCameraPreset("aisle-walk")}
+                  className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all shadow-xl cursor-pointer ${
+                    cameraPreset === "aisle-walk"
+                      ? "bg-cyan-500/30 text-cyan-200 border-cyan-400"
+                      : "bg-slate-900/90 text-fg-muted border-white/20 hover:text-white"
+                  }`}
+                  title="Eye-Level Aisle View"
+                >
+                  <Footprints size={15} />
+                </button>
+
+                {/* Zoom In (+) */}
+                <button
+                  onClick={() => handleZoom(1)}
+                  className="w-8 h-8 rounded-t-lg bg-slate-900/90 border border-white/20 text-white flex items-center justify-center hover:bg-slate-800 transition-all shadow-xl cursor-pointer mt-1"
+                  title="Zoom In"
+                >
+                  <Plus size={15} />
+                </button>
+
+                {/* Zoom Out (-) */}
+                <button
+                  onClick={() => handleZoom(-1)}
+                  className="w-8 h-8 rounded-b-lg bg-slate-900/90 border-x border-b border-white/20 text-white flex items-center justify-center hover:bg-slate-800 transition-all shadow-xl cursor-pointer"
+                  title="Zoom Out"
+                >
+                  <Minus size={15} />
+                </button>
+              </div>
+
+              {/* Bottom Radar Minimap */}
+              <RadarMinimap
+                selectedZoneId={selectedZoneId}
+                onSelectZone={handleZoneSelect}
+                simulationState={simState}
+              />
+
+              {/* In-Canvas Notification Floater */}
+              {hasAnyAlert && (
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex flex-wrap gap-2 pointer-events-none z-20">
+                  {simState.doorOpen && (
+                    <span className="pointer-events-auto rounded-lg border border-amber-500/80 bg-amber-950/95 px-3 py-1.5 text-xs font-bold text-amber-200 animate-pulse backdrop-blur-md shadow-xl flex items-center gap-1.5">
+                      <DoorOpen size={14} /> DOCK DOOR OPEN: +26°C INGRESS ({Math.floor(doorOpenSeconds / 60)}m {doorOpenSeconds % 60}s)
+                    </span>
+                  )}
+                  {!simState.compressorRunning && (
+                    <span className="pointer-events-auto rounded-lg border border-rose-500/80 bg-rose-950/95 px-3 py-1.5 text-xs font-bold text-rose-200 animate-pulse backdrop-blur-md shadow-xl flex items-center gap-1.5">
+                      <ShieldAlert size={14} /> COMPRESSOR TRIP: ACTIVE COOLING CEASED
+                    </span>
+                  )}
+                  {simState.burnedSensors.size > 0 && (
+                    <span className="pointer-events-auto rounded-lg border border-red-500/80 bg-red-950/95 px-3 py-1.5 text-xs font-bold text-red-200 animate-pulse backdrop-blur-md shadow-xl flex items-center gap-1.5">
+                      <Flame size={14} /> SENSOR BURN: TS-A1 THERMAL RUNAWAY
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        {/* Right Column: Dynamic Reaction Inspector */}
+        <div className="xl:col-span-4 space-y-4">
+          <Card
+            title={
+              <div className="flex items-center justify-between w-full">
+                <span className="flex items-center gap-1.5">
+                  <Layers size={14} className="text-cyan-400" />
+                  {selectedConfig.name} Live Telemetry
+                </span>
+                <span className="text-[10px] font-mono text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/30">
+                  {selectedConfig.product}
+                </span>
+              </div>
+            }
+          >
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg border border-cyan-500/20 bg-slate-900/80 p-2.5">
+                  <div className="text-[10px] text-fg-muted flex items-center gap-1">
+                    <Thermometer size={12} className="text-cyan-400" /> Current Temp
+                  </div>
+                  <div className={`font-mono text-xl font-bold mt-0.5 ${
+                    currentZoneTemp > selectedConfig.upperLimit ? "text-rose-400" :
+                    currentZoneTemp > selectedConfig.upperLimit - 1.5 ? "text-amber-400" : "text-fg"
+                  }`}>
+                    {fmtTemp(currentZoneTemp)}
+                  </div>
+                  <div className="text-[9px] text-fg-faint font-mono">Safe: {selectedConfig.tempRange}</div>
+                </div>
+
+                <div className="rounded-lg border border-cyan-500/20 bg-slate-900/80 p-2.5">
+                  <div className="text-[10px] text-fg-muted flex items-center gap-1">
+                    <Droplets size={12} className="text-blue-400" /> Humidity
+                  </div>
+                  <div className="font-mono text-xl font-bold text-fg mt-0.5">
+                    {selectedZone?.humidity != null ? `${selectedZone.humidity.toFixed(0)}%` : "—%"}
+                  </div>
+                  <div className="text-[9px] text-fg-faint font-mono">Target: 45–70%</div>
+                </div>
+
+                <div className="rounded-lg border border-cyan-500/20 bg-slate-900/80 p-2.5">
+                  <div className="text-[10px] text-fg-muted flex items-center gap-1">
+                    <Zap size={12} className="text-amber-400" /> Power Load
+                  </div>
+                  <div className="font-mono text-xl font-bold text-fg mt-0.5">
+                    {selectedZone?.power_consumption_kw != null ? `${selectedZone.power_consumption_kw.toFixed(1)} kW` : "— kW"}
+                  </div>
+                  <div className="text-[9px] text-fg-faint font-mono">Load: {selectedZone?.compressor_load_pct != null ? `${Math.round(selectedZone.compressor_load_pct)}%` : "—"} · {simState.fansActive ? "Active" : "Halted"}</div>
+                </div>
+
+                <div className="rounded-lg border border-cyan-500/20 bg-slate-900/80 p-2.5">
+                  <div className="text-[10px] text-fg-muted flex items-center gap-1">
+                    <ShieldCheck size={12} className="text-emerald-400" /> Risk Level
+                  </div>
+                  <div className={`font-mono text-xl font-bold mt-0.5 ${
+                    riskAnalysis.category === "critical" ? "text-rose-400" :
+                    riskAnalysis.category === "warning" ? "text-amber-400" : "text-emerald-400"
+                  }`}>
+                    {riskAnalysis.score} / 100
+                  </div>
+                  <div className="text-[9px] text-fg-faint font-mono uppercase">{riskAnalysis.category} Risk</div>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Explainable Risk Factor Breakdown Card */}
           <Card
             title={
               <div className="flex items-center gap-2">
-                <span>Chamber Cross-Section Schematic</span>
-                <span className="text-[11px] font-mono normal-case text-fg-faint">({zone?.name} · {zone?.product})</span>
-              </div>
-            }
-            icon={<Snowflake size={16} className="text-cyan-400" />}
-            actions={
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-fg-muted">Mode:</span>
-                <button
-                  type="button"
-                  onClick={() => setSandboxMode("sync")}
-                  className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                    sandboxMode === "sync"
-                      ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                      : "bg-white/[0.04] text-fg-muted hover:text-fg"
-                  }`}
-                >
-                  Live Sync
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSandboxMode("sandbox")}
-                  className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                    sandboxMode === "sandbox"
-                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-glow-amber"
-                      : "bg-white/[0.04] text-fg-muted hover:text-fg"
-                  }`}
-                >
-                  Sandbox HIL
-                </button>
+                <ShieldAlert size={14} className={riskAnalysis.category === "critical" ? "text-rose-400" : "text-amber-400"} />
+                <span>Explainable Risk Breakdown</span>
               </div>
             }
           >
-            {/* 2.5D Chamber Graphic */}
-            <div className="relative overflow-hidden rounded-xl border border-white/10 bg-slate-950 p-4 select-none">
-              {/* Exterior Ambient Weather Banner */}
-              <div className="mb-3 flex items-center justify-between rounded-lg border border-white/5 bg-slate-900/60 px-3 py-1.5 text-xs">
-                <div className="flex items-center gap-2 text-fg-muted">
-                  <Sun size={15} className="text-amber-400" />
-                  <span>Surrounding Ambient Environment:</span>
-                  <strong className="text-fg font-mono">{currentAmbient.toFixed(1)}°C</strong>
-                </div>
-                <div className="flex items-center gap-3 text-fg-faint">
-                  <span>Relative Humidity: <strong className="text-fg font-mono">{currentHumidity}%</strong></span>
-                  <span>Chamber Pressure: <strong className="text-fg font-mono">1013 mbar</strong></span>
-                </div>
+            <div className="space-y-2">
+              <div className="text-xs text-fg-muted">
+                {riskAnalysis.factors.length > 0 ? (
+                  <span>The following factors directly contributed to the risk increase:</span>
+                ) : (
+                  <span className="text-emerald-400">✓ All risk indicators nominal. No thermal risk factors active.</span>
+                )}
               </div>
 
-              {/* Cutaway Container */}
-              <div className="relative min-h-[360px] rounded-lg border-2 border-slate-700 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 p-4">
-                {/* Wall Heat Infiltration Heat Map Overlays */}
-                <div className="absolute inset-0 pointer-events-none rounded-lg border-4 border-cyan-500/20 opacity-80" />
-                
-                {/* Ceiling Evaporator & Twin Blower Unit */}
-                <div className="mx-auto w-3/4 rounded-lg border border-cyan-500/40 bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 p-3 shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <Fan
-                          size={24}
-                          className={`text-cyan-400 ${isCompressorRunning ? "animate-spin" : "opacity-40"}`}
-                          style={{ animationDuration: isCompressorRunning ? "0.6s" : "0s" }}
-                        />
-                        <Fan
-                          size={24}
-                          className={`text-cyan-400 ${isCompressorRunning ? "animate-spin" : "opacity-40"}`}
-                          style={{ animationDuration: isCompressorRunning ? "0.6s" : "0s" }}
-                        />
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold text-fg flex items-center gap-1.5">
-                          Dual Evaporator Coil Rack
-                          <span className={`inline-block h-1.5 w-1.5 rounded-full ${isCompressorRunning ? "bg-emerald-400 animate-pulse" : "bg-rose-500"}`} />
-                        </div>
-                        <div className="text-[10px] font-mono text-fg-muted">
-                          TXV Superheat: 5.4°C · Coil Temp: {(zone ? zone.setpoint - 4.2 : 0.8).toFixed(1)}°C
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <Badge tone={isCompressorRunning ? "ok" : "crit"}>
-                        {isCompressorRunning ? "COOLING ACTIVE" : "COMPRESSOR IDLE"}
-                      </Badge>
-                      <div className="text-[10px] font-mono text-cyan-300 mt-0.5">{twinMetrics.coolingKw} kW Output</div>
-                    </div>
+              {riskAnalysis.factors.map((factor, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-lg border border-rose-500/30 bg-rose-950/20 p-2 text-xs font-mono space-y-1"
+                >
+                  <div className="flex items-center justify-between text-rose-300 font-bold">
+                    <span>{factor.label}</span>
+                    <span className="text-rose-400">+{factor.points} pts</span>
                   </div>
-
-                  {/* Airflow Particles stream lines (Animated) */}
-                  {isCompressorRunning && (
-                    <div className="relative mt-2 flex justify-around text-cyan-400/50 text-[11px] font-mono">
-                      <span className="animate-bounce">↓↓ Chilled Air ↓↓</span>
-                      <span className="animate-bounce" style={{ animationDelay: "150ms" }}>↓↓ {twinMetrics.airflowCfm} CFM ↓↓</span>
-                      <span className="animate-bounce" style={{ animationDelay: "300ms" }}>↓↓ Circulation ↓↓</span>
-                    </div>
-                  )}
+                  <div className="text-[10px] text-fg-faint">{factor.detail}</div>
                 </div>
-
-                {/* Chamber Center: Storage Racks & Sensor Probe */}
-                <div className="mt-6 grid grid-cols-12 gap-3 items-center">
-                  {/* Left Cargo Racks */}
-                  <div className="col-span-4 rounded-lg border border-slate-700/60 bg-slate-800/40 p-2.5">
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-muted uppercase">
-                      <Boxes size={13} className="text-indigo-400" />
-                      Rack A1 (High Bay)
-                    </div>
-                    <div className="mt-2 space-y-1.5">
-                      <div className="h-6 rounded bg-indigo-900/40 border border-indigo-500/30 flex items-center justify-between px-2 text-[10px]">
-                        <span className="text-fg-faint">Lot #CG-2026</span>
-                        <span className="text-cyan-300 font-mono">{fmtTemp(currentTemp - 0.2)}</span>
-                      </div>
-                      <div className="h-6 rounded bg-indigo-900/40 border border-indigo-500/30 flex items-center justify-between px-2 text-[10px]">
-                        <span className="text-fg-faint">Biologics Core</span>
-                        <span className="text-cyan-300 font-mono">{fmtTemp(currentTemp - 0.1)}</span>
-                      </div>
-                    </div>
-                    <div className="mt-2 text-[9px] text-fg-faint">Thermal Capacity: 18.5 kJ/K</div>
-                  </div>
-
-                  {/* Center: Live Sensor Telemetry Node */}
-                  <div className="col-span-4 flex flex-col items-center justify-center">
-                    <div className="relative grid place-items-center">
-                      <span className="animate-ping absolute h-12 w-12 rounded-full bg-cyan-400/20" />
-                      <div className="relative grid h-14 w-14 place-items-center rounded-2xl border-2 border-cyan-400 bg-slate-900 shadow-glow">
-                        <Activity size={24} className="text-cyan-400" />
-                      </div>
-                    </div>
-
-                    <div className="mt-2 text-center">
-                      <div className="text-xs font-bold text-fg tracking-wide font-mono">{zone?.sensor_id ?? "TS-A01"}</div>
-                      <div className="text-[15px] font-extrabold font-mono text-cyan-300 mt-0.5">{fmtTemp(currentTemp)}</div>
-                      <div className="text-[10px] text-fg-muted font-mono">X:4.2m · Y:2.8m · Z:1.5m</div>
-                    </div>
-                  </div>
-
-                  {/* Right Cargo Racks */}
-                  <div className="col-span-4 rounded-lg border border-slate-700/60 bg-slate-800/40 p-2.5">
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-muted uppercase">
-                      <Boxes size={13} className="text-indigo-400" />
-                      Rack B2 (Low Bay)
-                    </div>
-                    <div className="mt-2 space-y-1.5">
-                      <div className="h-6 rounded bg-indigo-900/40 border border-indigo-500/30 flex items-center justify-between px-2 text-[10px]">
-                        <span className="text-fg-faint">Reserve Stock</span>
-                        <span className="text-cyan-300 font-mono">{fmtTemp(currentTemp + 0.1)}</span>
-                      </div>
-                      <div className="h-6 rounded bg-indigo-900/40 border border-indigo-500/30 flex items-center justify-between px-2 text-[10px]">
-                        <span className="text-fg-faint">Pallet 04-C</span>
-                        <span className="text-cyan-300 font-mono">{fmtTemp(currentTemp + 0.2)}</span>
-                      </div>
-                    </div>
-                    <div className="mt-2 text-[9px] text-fg-faint">Surface Flux: nominal</div>
-                  </div>
-                </div>
-
-                {/* Bottom: Chamber Door & Gasket Vacuum Seal */}
-                <div className="mt-6 flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900/80 p-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className={`grid h-7 w-7 place-items-center rounded border ${isDoorOpen ? "border-rose-500/40 bg-rose-500/20 text-rose-400" : "border-emerald-500/40 bg-emerald-500/20 text-emerald-400"}`}>
-                      <Gauge size={16} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-semibold text-fg">Pneumatic Ingress Door</div>
-                      <div className="text-[10px] text-fg-muted">Seal Vacuum: 988.4 mbar · Convection Resistance: R-45</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {isDoorOpen ? (
-                      <span className="flex items-center gap-1.5 rounded bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 text-xs font-semibold text-rose-300 animate-pulse">
-                        <AlertTriangle size={13} />
-                        DOOR AJAR (AIR INGRESS)
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1.5 rounded bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-xs font-semibold text-emerald-300">
-                        <CheckCircle2 size={13} />
-                        HERMETICALLY SEALED
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Thermal Stratification Gradient Bar */}
-                <div className="absolute right-2 top-16 bottom-16 w-3 rounded-full bg-gradient-to-b from-rose-500/40 via-cyan-500/30 to-blue-600/40 flex flex-col justify-between items-center py-1 text-[8px] font-mono text-fg-faint pointer-events-none">
-                  <span>▲ Top</span>
-                  <span>● Mid</span>
-                  <span>▼ Bot</span>
-                </div>
-              </div>
+              ))}
             </div>
           </Card>
-        </div>
 
-        {/* Right Column: Hardware-in-the-Loop Twin Sandbox Controls */}
-        <div className="xl:col-span-5 space-y-4">
+          {/* Actionable Operator Recommendation Card */}
           <Card
-            title="Twin Sandbox & Actuator Injector"
-            icon={<Sliders size={16} className="text-amber-400" />}
-            actions={
-              <button
-                type="button"
-                onClick={() => {
-                  setCompressorOverride("auto");
-                  setDoorOverride("auto");
-                  setAmbientStress(0);
-                  setThermalMassLoad(75);
-                }}
-                className="flex items-center gap-1 text-xs text-fg-muted hover:text-fg"
-              >
-                <RotateCcw size={12} />
-                Reset Actuators
-              </button>
+            title={
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-cyan-400" />
+                <span>Recommended Operator Action</span>
+              </div>
             }
           >
-            <div className="space-y-4 text-xs">
-              <div className="rounded-lg border border-amber-500/20 bg-amber-950/20 p-2.5 text-amber-200/90 text-[11px] leading-relaxed">
-                <strong>Digital Twin Isolation:</strong> Manipulate virtual actuators below to predict chamber inertia and time-to-excursion without disrupting the live physical warehouse.
+            <div className="space-y-3">
+              <div className="rounded-lg border border-cyan-500/30 bg-slate-900/90 p-3 text-xs">
+                <p className="text-fg font-medium leading-relaxed">
+                  {riskAnalysis.recommendation}
+                </p>
               </div>
 
-              {/* Actuator 1: Compressor Override */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-fg flex items-center gap-1.5">
-                    <Power size={13} className="text-cyan-400" />
-                    Compressor Actuator State
-                  </span>
-                  <span className="font-mono text-fg-muted">{compressorOverride.toUpperCase()}</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { setSandboxMode("sandbox"); setCompressorOverride("auto"); }}
-                    className={`rounded border py-1.5 font-medium transition-colors ${
-                      compressorOverride === "auto" ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 bg-slate-900 text-fg-muted hover:text-fg"
-                    }`}
-                  >
-                    Auto (Thermostat)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setSandboxMode("sandbox"); setCompressorOverride("forced_on"); }}
-                    className={`rounded border py-1.5 font-medium transition-colors ${
-                      compressorOverride === "forced_on" ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-white/10 bg-slate-900 text-fg-muted hover:text-fg"
-                    }`}
-                  >
-                    Force Run 100%
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setSandboxMode("sandbox"); setCompressorOverride("forced_off"); }}
-                    className={`rounded border py-1.5 font-medium transition-colors ${
-                      compressorOverride === "forced_off" ? "border-rose-500/50 bg-rose-500/15 text-rose-300 shadow-glow-crit" : "border-white/10 bg-slate-900 text-fg-muted hover:text-fg"
-                    }`}
-                  >
-                    Trip (Power Cut)
-                  </button>
-                </div>
-              </div>
-
-              {/* Actuator 2: Door Seal Vacuum Breaker */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-fg flex items-center gap-1.5">
-                    <Gauge size={13} className="text-amber-400" />
-                    Door Hermetic Seal
-                  </span>
-                  <span className="font-mono text-fg-muted">{doorOverride.toUpperCase()}</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { setSandboxMode("sandbox"); setDoorOverride("auto"); }}
-                    className={`rounded border py-1.5 font-medium transition-colors ${
-                      doorOverride === "auto" ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 bg-slate-900 text-fg-muted hover:text-fg"
-                    }`}
-                  >
-                    Live Telemetry
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setSandboxMode("sandbox"); setDoorOverride("sealed"); }}
-                    className={`rounded border py-1.5 font-medium transition-colors ${
-                      doorOverride === "sealed" ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-white/10 bg-slate-900 text-fg-muted hover:text-fg"
-                    }`}
-                  >
-                    Sealed (0% Ingress)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setSandboxMode("sandbox"); setDoorOverride("open"); }}
-                    className={`rounded border py-1.5 font-medium transition-colors ${
-                      doorOverride === "open" ? "border-rose-500/50 bg-rose-500/15 text-rose-300" : "border-white/10 bg-slate-900 text-fg-muted hover:text-fg"
-                    }`}
-                  >
-                    Open Ajar (+320% Leak)
-                  </button>
-                </div>
-              </div>
-
-              {/* Actuator 3: Ambient Heat Stress Slider */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-fg flex items-center gap-1.5">
-                    <Sun size={13} className="text-amber-400" />
-                    Exterior Heatwave Injection
-                  </span>
-                  <span className="font-mono text-amber-300">+{ambientStress}°C ({currentAmbient.toFixed(1)}°C)</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="20"
-                  step="1"
-                  value={ambientStress}
-                  onChange={(e) => {
-                    setSandboxMode("sandbox");
-                    setAmbientStress(Number(e.target.value));
-                  }}
-                  className="w-full accent-amber-400 bg-slate-800 rounded-lg h-2 cursor-pointer"
-                />
-                <div className="flex justify-between text-[10px] text-fg-faint">
-                  <span>Baseline (0°C)</span>
-                  <span>Moderate (+10°C)</span>
-                  <span>Severe Heatwave (+20°C)</span>
-                </div>
-              </div>
-
-              {/* Actuator 4: Thermal Mass Capacity Factor */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-fg flex items-center gap-1.5">
-                    <Boxes size={13} className="text-indigo-400" />
-                    Cargo Thermal Mass Buffer
-                  </span>
-                  <span className="font-mono text-indigo-300">{thermalMassLoad}% Capacity</span>
-                </div>
-                <input
-                  type="range"
-                  min="20"
-                  max="100"
-                  step="5"
-                  value={thermalMassLoad}
-                  onChange={(e) => {
-                    setSandboxMode("sandbox");
-                    setThermalMassLoad(Number(e.target.value));
-                  }}
-                  className="w-full accent-indigo-400 bg-slate-800 rounded-lg h-2 cursor-pointer"
-                />
-                <div className="flex justify-between text-[10px] text-fg-faint">
-                  <span>Empty Chamber (20%)</span>
-                  <span>Typical (70%)</span>
-                  <span>Full Pallets (100%)</span>
-                </div>
-              </div>
+              {riskAnalysis.actionLabel && riskAnalysis.onAction && (
+                <button
+                  onClick={riskAnalysis.onAction}
+                  className="w-full py-2.5 px-3 rounded-lg border border-emerald-500/60 bg-emerald-950/60 text-emerald-200 hover:bg-emerald-950/90 font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg animate-pulse"
+                >
+                  <Check size={14} />
+                  {riskAnalysis.actionLabel}
+                </button>
+              )}
             </div>
           </Card>
         </div>
       </div>
 
-      {/* Dynamic 60-Minute Twin Trajectory Projection Chart */}
-      <Card
-        title={
-          <div className="flex items-center gap-2">
-            <span>Twin Dynamic Trajectory (Next 60 Minutes)</span>
-            <span className="text-xs font-normal text-fg-muted">
-              {sandboxMode === "sandbox" ? "— Active Sandbox Projection" : "— Steady-State Projection"}
-            </span>
-          </div>
-        }
-        icon={<Activity size={16} className="text-neon" />}
-        actions={
-          <div className="flex items-center gap-4 text-xs font-mono">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-cyan-400" /> Twin Projection
-            </span>
-            <span className="flex items-center gap-1.5 text-fg-faint">
-              <span className="h-2 w-2 rounded-full bg-slate-500" /> Baseline
-            </span>
-            <span className="flex items-center gap-1.5 text-rose-400">
-              <span className="h-2 w-2 rounded-full bg-rose-500" /> Regulatory Limit
-            </span>
-          </div>
-        }
-      >
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={trajectoryData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-              <XAxis dataKey="timeLabel" stroke="#94a3b8" tick={{ fontSize: 11 }} />
-              <YAxis
-                stroke="#94a3b8"
-                tick={{ fontSize: 11 }}
-                domain={zone ? [Math.min(zone.lower_limit - 1, currentTemp - 2), Math.max(zone.upper_limit + 2, currentTemp + 3)] : ["auto", "auto"]}
-                tickFormatter={(v) => `${v}°C`}
-              />
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    const d = payload[0].payload;
-                    return (
-                      <div className="rounded-lg border border-white/10 bg-slate-900 p-2 text-xs shadow-xl font-mono">
-                        <div className="text-fg font-semibold mb-1">{d.timeLabel} ({d.minute} mins elapsed)</div>
-                        <div className="text-cyan-400">Twin Temp: <strong>{d.twinTemp}°C</strong></div>
-                        <div className="text-fg-muted">Baseline: {d.baselineTemp}°C</div>
-                        {zone && (
-                          <div className="mt-1 pt-1 border-t border-white/10 text-[10px] text-fg-faint">
-                            Safe Range: {zone.lower_limit}°C to {zone.upper_limit}°C
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-
-              {/* Upper & Lower Regulatory Threshold Lines */}
-              {zone && (
-                <>
-                  <ReferenceLine
-                    y={zone.upper_limit}
-                    stroke="#ef4444"
-                    strokeDasharray="4 4"
-                    label={{ value: `Upper Limit (${zone.upper_limit}°C)`, fill: "#ef4444", fontSize: 10, position: "top" }}
-                  />
-                  <ReferenceLine
-                    y={zone.lower_limit}
-                    stroke="#3b82f6"
-                    strokeDasharray="4 4"
-                    label={{ value: `Lower Limit (${zone.lower_limit}°C)`, fill: "#3b82f6", fontSize: 10, position: "bottom" }}
-                  />
-                  <ReferenceLine
-                    y={zone.setpoint}
-                    stroke="#10b981"
-                    strokeOpacity={0.4}
-                    strokeDasharray="2 2"
-                  />
-                </>
-              )}
-
-              {/* Baseline reference */}
-              <Line
-                type="monotone"
-                dataKey="baselineTemp"
-                stroke="#64748b"
-                strokeWidth={1.5}
-                strokeDasharray="3 3"
-                dot={false}
-              />
-
-              {/* Twin Simulated Projection */}
-              <Line
-                type="monotone"
-                dataKey="twinTemp"
-                stroke={isCriticalTemp ? "#ef4444" : isWarningTemp ? "#f59e0b" : "#06b6d4"}
-                strokeWidth={2.5}
-                dot={false}
-                activeDot={{ r: 5 }}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
-
-      {/* Subsystem Engineering Telemetry Grid */}
+      {/* BOTTOM ANALYTICS & FORECASTING GRID */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card title="Inverter Compressor" icon={<Cpu size={14} className="text-cyan-400" />}>
-          <div className="space-y-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-fg-muted">Motor Frequency:</span>
-              <strong className="text-fg font-mono">{isCompressorRunning ? "58.4 Hz" : "0.0 Hz"}</strong>
+        {/* AI Excursion Predictive Horizon */}
+        <Card
+          title={
+            <div className="flex items-center gap-1.5">
+              <TrendingUp size={14} className="text-cyan-400" />
+              <span>AI Forecast (30m Horizon)</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-fg-muted">Vibration Index:</span>
-              <strong className="text-emerald-400 font-mono">0.82 mm/s (Nominal)</strong>
+          }
+          actions={
+            <span className="text-[10px] font-mono text-cyan-300">
+              {selectedConfig.name}
+            </span>
+          }
+        >
+          <div className="h-28 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={forecastData} margin={{ top: 5, right: 5, left: -22, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="minute" tick={{ fontSize: 9 }} stroke="#475569" />
+                <YAxis
+                  tick={{ fontSize: 9 }}
+                  stroke="#475569"
+                  domain={[selectedConfig.lowerLimit - 2, selectedConfig.upperLimit + 3]}
+                  tickFormatter={(v) => `${v}°C`}
+                />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (active && payload?.length) {
+                      return (
+                        <div className="rounded border border-white/10 bg-slate-900 p-1.5 text-[10px] font-mono shadow-xl">
+                          <div className="text-cyan-400 font-bold">{payload[0]?.payload?.minute} Projected</div>
+                          <div className="text-fg">{fmtTemp(payload[0]?.value as number)}</div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <ReferenceLine
+                  y={selectedConfig.upperLimit}
+                  stroke="#ef4444"
+                  strokeDasharray="3 3"
+                  label={{ value: "Upper Limit", fill: "#ef4444", fontSize: 8, position: "top" }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="temperature"
+                  stroke="#22d3ee"
+                  strokeWidth={2}
+                  dot={{ r: 2 }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        {/* 2D Thermal Heatmap */}
+        <Card
+          title="Facility Thermal Floor"
+          icon={<Thermometer size={14} className="text-cyan-400" />}
+        >
+          <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-1.5 text-center font-mono">
+              {ZONE_CONFIGS.map((cfg) => {
+                const temp = simState.zoneTemps[cfg.id] ?? cfg.targetTemp;
+                return (
+                  <div
+                    key={cfg.id}
+                    onClick={() => handleZoneSelect(cfg.id)}
+                    className={`p-2 rounded-lg border text-xs cursor-pointer transition-all hover:scale-102 ${
+                      temp > cfg.upperLimit
+                        ? "border-rose-500 bg-rose-950/40 text-rose-300"
+                        : temp > cfg.upperLimit - 1.5
+                        ? "border-amber-500 bg-amber-950/40 text-amber-300"
+                        : "border-cyan-500/30 bg-slate-900/60 text-cyan-300"
+                    }`}
+                  >
+                    <div className="text-[9px] text-fg-muted">{cfg.name}</div>
+                    <div className="font-bold text-sm mt-0.5">{fmtTemp(temp)}</div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="flex justify-between">
-              <span className="text-fg-muted">Crankcase Heater:</span>
-              <strong className="text-fg font-mono">Active (42.5°C)</strong>
+            <div className="flex justify-between text-[8px] font-mono text-fg-faint pt-1">
+              <span>Deep Freeze: -20°C</span>
+              <span>Safe Band: 2°C - 5°C</span>
+              <span>Excursion: &gt;8°C</span>
             </div>
           </div>
         </Card>
 
-        <Card title="Evaporator Coil" icon={<Snowflake size={14} className="text-cyan-400" />}>
-          <div className="space-y-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-fg-muted">Frost Accumulation:</span>
-              <strong className="text-cyan-400 font-mono">11.4% (Clear)</strong>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-fg-muted">Next Defrost Cycle:</span>
-              <strong className="text-fg font-mono">In 4h 25m</strong>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-fg-muted">Air Pressure Drop:</span>
-              <strong className="text-fg font-mono">44 Pa (Low Impedance)</strong>
-            </div>
+        {/* Live Event Log */}
+        <Card
+          title="Hardware Event Stream"
+          icon={<Activity size={14} className="text-emerald-400" />}
+        >
+          <div className="h-28 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+            {activityLog.map((event, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-1.5 text-[10px] font-mono border-b border-white/5 pb-1 last:border-0"
+              >
+                <span
+                  className={`mt-1 h-1.5 w-1.5 rounded-full shrink-0 ${
+                    event.type === "critical"
+                      ? "bg-rose-500 animate-ping"
+                      : event.type === "warning"
+                      ? "bg-amber-500"
+                      : "bg-cyan-500"
+                  }`}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between text-[9px] text-fg-faint">
+                    <span>{event.zone}</span>
+                    <span>{event.time}</span>
+                  </div>
+                  <div className="text-fg truncate">{event.message}</div>
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
 
-        <Card title="Refrigerant Circuit" icon={<Waves size={14} className="text-indigo-400" />}>
-          <div className="space-y-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-fg-muted">Suction Pressure:</span>
-              <strong className="text-fg font-mono">2.12 bar (R-744)</strong>
+        {/* Isolation Forest Diagnostic */}
+        <Card
+          title="Isolation Forest Diagnostics"
+          icon={<Cpu size={14} className="text-teal-400" />}
+        >
+          <div className="space-y-2 text-xs font-mono">
+            <div className="flex items-center justify-between">
+              <span className="text-fg-muted">Anomaly Detector:</span>
+              <span className="text-emerald-400 font-bold">Isolation Forest (v2.1)</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-fg-muted">Discharge Pressure:</span>
-              <strong className="text-fg font-mono">14.65 bar</strong>
+            <div className="flex items-center justify-between">
+              <span className="text-fg-muted">Active Probes:</span>
+              <span>6 / 6 Online</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-fg-muted">Subcooling Margin:</span>
-              <strong className="text-indigo-400 font-mono">4.2°C</strong>
+            <div className="flex items-center justify-between">
+              <span className="text-fg-muted">Outlier Score:</span>
+              <span className={simState.burnedSensors.size > 0 ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
+                {simState.burnedSensors.size > 0 ? "0.98 (ANOMALY DETECTED)" : "0.04 (Optimal)"}
+              </span>
             </div>
-          </div>
-        </Card>
-
-        <Card title="Structural Envelope" icon={<ShieldCheck size={14} className="text-emerald-400" />}>
-          <div className="space-y-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-fg-muted">Insulation Rating:</span>
-              <strong className="text-fg font-mono">R-45 Polyisocyanurate</strong>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-fg-muted">Thermal Infiltration:</span>
-              <strong className="text-fg font-mono">{twinMetrics.heatLeakWatts} Watts</strong>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-fg-muted">Door Gasket Elasticity:</span>
-              <strong className="text-emerald-400 font-mono">98.2% Intact</strong>
+            <div className="rounded border border-white/10 bg-slate-900/60 p-1.5 text-[9px] text-fg-faint">
+              {simState.burnedSensors.size > 0
+                ? "⚠ Sensor TS-A1 anomalous spike isolated by unsupervised model."
+                : "Continuous unsupervised drift & spike surveillance nominal."}
             </div>
           </div>
         </Card>

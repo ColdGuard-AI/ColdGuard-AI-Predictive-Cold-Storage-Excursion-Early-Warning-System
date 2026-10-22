@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from app import __version__
 from app.api.routes import router
 from app.api.auth_routes import router as auth_router
+from app.api.stream_routes import router as stream_router
 from app.config import Settings, settings
 from app.database.db import Database
 from app.models.registry import ModelBundle, load_or_train
@@ -70,6 +71,7 @@ def create_app(cfg: Settings = settings, models: ModelBundle | None = None, auto
 
     app.include_router(router)
     app.include_router(auth_router)
+    app.include_router(stream_router)
     return app
 
 

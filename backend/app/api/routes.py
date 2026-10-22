@@ -12,15 +12,21 @@ from app.schemas.api import (
     AdvanceRequest,
     Alert,
     ControlRequest,
+    DoorControlRequest,
+    DoorEventItem,
+    EventItem,
     ForecastResponse,
     HealthResponse,
     MessageResponse,
+    ModelEvaluationResponse,
     ReadingsResponse,
+    RecoveryStatusResponse,
     ResetRequest,
     RiskResponse,
     ScenarioRequest,
     Severity,
     WhatIfRequest,
+    ZonePredictionOverview,
     ZoneSummary,
 )
 from app.services.alerts import CATEGORY_LABELS
@@ -90,15 +96,46 @@ def zone_readings(
     return {"zone_id": zone_id, "minutes": minutes, "count": len(records), "readings": records}
 
 
-@router.get("/zones/{zone_id}/forecast", response_model=ForecastResponse, tags=["prediction"])
-def zone_forecast(
+# ---------------------------------------------------------------------- stateful door & recovery
+@router.post("/zones/{zone_id}/door", response_model=RecoveryStatusResponse, tags=["door"])
+def control_door(
     zone_id: str,
-    horizon: int = Query(30, description="Forecast horizon in minutes (15, 30 or 60)"),
+    body: DoorControlRequest,
     monitor: MonitoringService = Depends(get_monitor),
 ) -> dict[str, Any]:
     _zone_or_404(zone_id)
-    if horizon not in (15, 30, 60):
-        raise HTTPException(status_code=422, detail="horizon must be one of 15, 30 or 60 minutes")
+    return monitor.set_door(zone_id, body.action, body.duration_minutes)
+
+
+@router.get("/zones/{zone_id}/recovery-status", response_model=RecoveryStatusResponse, tags=["door"])
+def zone_recovery_status(
+    zone_id: str,
+    monitor: MonitoringService = Depends(get_monitor),
+) -> dict[str, Any]:
+    _zone_or_404(zone_id)
+    return monitor.get_recovery_status(zone_id)
+
+
+@router.get("/zones/{zone_id}/door-events", response_model=list[DoorEventItem], tags=["door"])
+def list_zone_door_events(
+    zone_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    monitor: MonitoringService = Depends(get_monitor),
+) -> list[dict[str, Any]]:
+    _zone_or_404(zone_id)
+    return monitor.db.list_door_events(zone_id=zone_id, limit=limit)
+
+
+# ---------------------------------------------------------------------- prediction
+@router.get("/zones/{zone_id}/forecast", response_model=ForecastResponse, tags=["prediction"])
+def zone_forecast(
+    zone_id: str,
+    horizon: int = Query(30, description="Forecast horizon in minutes (15, 30, 60, 360, 1440)"),
+    monitor: MonitoringService = Depends(get_monitor),
+) -> dict[str, Any]:
+    _zone_or_404(zone_id)
+    if horizon not in (15, 30, 60, 360, 1440):
+        raise HTTPException(status_code=422, detail="horizon must be one of 15, 30, 60, 360, or 1440 minutes")
     fc = monitor.forecast(zone_id, horizon)
     cfg = ZONES[zone_id]
     return {**fc, "zone_id": zone_id, "lower_limit": cfg.lower_limit, "upper_limit": cfg.upper_limit}
@@ -107,13 +144,33 @@ def zone_forecast(
 @router.get("/zones/{zone_id}/risk", response_model=RiskResponse, tags=["prediction"])
 def zone_risk(
     zone_id: str,
-    horizon: int = Query(30, description="Forecast horizon in minutes used for the forecast component (15, 30 or 60)"),
+    horizon: int = Query(30, description="Forecast horizon in minutes (15, 30, 60, 360, 1440)"),
     monitor: MonitoringService = Depends(get_monitor),
 ) -> dict[str, Any]:
     _zone_or_404(zone_id)
-    if horizon not in (15, 30, 60):
-        raise HTTPException(status_code=422, detail="horizon must be one of 15, 30 or 60 minutes")
+    if horizon not in (15, 30, 60, 360, 1440):
+        raise HTTPException(status_code=422, detail="horizon must be one of 15, 30, 60, 360, or 1440 minutes")
     return {**monitor.risk(zone_id, horizon), "zone_id": zone_id}
+
+
+@router.get("/zones/{zone_id}/prediction-overview", response_model=ZonePredictionOverview, tags=["prediction"])
+def zone_prediction_overview(
+    zone_id: str,
+    horizon: int = Query(30, description="Selected chart horizon in minutes (30, 60, 360, 1440)"),
+    monitor: MonitoringService = Depends(get_monitor),
+) -> dict[str, Any]:
+    _zone_or_404(zone_id)
+    if horizon not in (15, 30, 60, 360, 1440):
+        horizon = 30
+    return monitor.get_zone_prediction_overview(zone_id, selected_horizon=horizon)
+
+
+@router.get("/events", response_model=list[EventItem], tags=["alerts"])
+def list_events(
+    limit: int = Query(20, ge=1, le=100),
+    monitor: MonitoringService = Depends(get_monitor),
+) -> list[dict[str, Any]]:
+    return monitor.get_active_events_log(limit=limit)
 
 
 @router.get("/zones/{zone_id}/sensor-health", tags=["prediction"])
@@ -206,13 +263,18 @@ def what_if(body: WhatIfRequest, monitor: MonitoringService = Depends(get_monito
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
-# ---------------------------------------------------------------------- model
+# ---------------------------------------------------------------------- model & validation
 @router.get("/model/metrics", tags=["model"])
 def model_metrics(monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
     fc = monitor.models.forecaster
     if fc is None:
         return {"available": False, "reason": monitor.models.error or "Model not trained.", "metrics": None}
     return {"available": True, "metrics": fc.metrics}
+
+
+@router.get("/model/evaluation", response_model=ModelEvaluationResponse, tags=["model"])
+def model_evaluation(monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
+    return monitor.get_model_evaluation()
 
 
 # ---------------------------------------------------------------------- manager

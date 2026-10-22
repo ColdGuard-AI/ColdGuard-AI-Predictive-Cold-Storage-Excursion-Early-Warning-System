@@ -3,9 +3,141 @@
 export type Severity = "info" | "warning" | "critical";
 export type RiskCategory = "low" | "medium" | "high" | "critical" | "unknown";
 export type TempStatus = "normal" | "warning" | "critical" | "unknown";
-export type ScenarioId = "normal" | "door_open" | "compressor_failure" | "ambient_increase" | "sensor_anomaly";
+export type ScenarioId =
+  | "normal"
+  | "door_open"
+  | "compressor_failure"
+  | "ambient_increase"
+  | "sensor_anomaly"
+  | "cooling_degradation"
+  | "abnormal_humidity"
+  | "fire_runaway";
 export type WhatIfScenarioId = Exclude<ScenarioId, "sensor_anomaly">;
-export type Horizon = 15 | 30 | 60;
+export type Horizon = 15 | 30 | 60 | 360 | 1440;
+
+export interface HorizonPrediction {
+  horizon_minutes: number;
+  horizon_label: string;
+  predicted_temperature: number;
+  temperature_delta: number;
+  risk_score: number;
+  risk_category: string;
+  risk_label: string;
+  excursion_expected: boolean;
+  time_to_breach_minutes: number | null;
+  breach_side: string | null;
+  predicted_peak_temperature?: number | null;
+  residual_rise?: number;
+  recovery_progress_pct?: number;
+}
+
+export interface RecoveryStatus {
+  zone_id: string;
+  door_status: "open" | "closed";
+  door_open_duration_seconds: number;
+  door_open_minutes: number;
+  time_since_closure_seconds: number;
+  time_since_closure_minutes: number;
+  last_door_duration_seconds: number;
+  last_door_duration_minutes: number;
+  temp_at_open: number | null;
+  temp_at_close: number | null;
+  residual_rise_predicted: number;
+  peak_temp_predicted: number | null;
+  recovery_time_minutes: number;
+  recovery_progress_pct: number;
+  recovery_phase: "none" | "door_open" | "residual_rise" | "active_recovery" | "recovered" | string;
+  safe_upper_limit: number;
+  setpoint: number;
+  current_temperature: number | null;
+  ambient_temperature: number | null;
+  events_count_24h: number;
+  cumulative_open_minutes_24h: number;
+}
+
+export interface DoorEventItem {
+  id: number;
+  zone_id: string;
+  opened_at: string;
+  closed_at: string | null;
+  duration_seconds: number;
+  ambient_temp_at_open: number | null;
+  temp_at_open: number | null;
+  temp_at_close: number | null;
+  compressor_state: string | null;
+  residual_rise_predicted: number;
+  peak_temp_predicted: number;
+  recovery_time_minutes: number;
+  recovery_progress_pct: number;
+  status: "open" | "recovering" | "recovered" | string;
+  previous_events_count_24h: number;
+  cumulative_open_seconds_24h: number;
+  notes?: string | null;
+}
+
+export interface HorizonEvaluation {
+  horizon_minutes: number;
+  horizon_label: string;
+  mae_model: number;
+  mae_persistence: number;
+  mae_trend: number;
+  improvement_over_persistence_pct: number;
+  improvement_over_trend_pct: number;
+}
+
+export interface ModelEvaluationResponse {
+  model_architecture: string;
+  data_source: string;
+  validation_split: string;
+  n_train_samples: number;
+  n_test_samples: number;
+  horizons_evaluation: HorizonEvaluation[];
+  excursion_classification_30m: {
+    precision: number;
+    recall: number;
+    f1_score: number;
+    false_alarm_rate_pct: number;
+  };
+  disclaimer: string;
+}
+
+export interface AIExplanation {
+  headline: string;
+  severity: "critical" | "warning" | "info" | "normal";
+  narrative: string;
+  contributing_factors: string[];
+  summary_text: string;
+  recommended_actions: string[];
+  sensor_fault_analysis?: Record<string, unknown> | null;
+}
+
+export interface ZonePredictionOverview {
+  zone_id: string;
+  zone_name: string;
+  current_temperature: number | null;
+  ambient_temperature: number | null;
+  safe_lower_limit: number;
+  safe_upper_limit: number;
+  setpoint: number;
+  selected_horizon: number;
+  horizons: Record<string, HorizonPrediction>;
+  ai_explanation: AIExplanation;
+  forecast_points: ForecastPoint[];
+  recovery_status?: RecoveryStatus | null;
+  is_synthetic?: boolean;
+}
+
+export interface EventItem {
+  id: string;
+  time: string;
+  zone_id: string;
+  zone_name: string;
+  event: string;
+  severity: "high" | "medium" | "low";
+  status: "active" | "resolved";
+  created_at: string;
+  recommended_action?: string | null;
+}
 
 export interface Health {
   status: "ok" | "degraded";
@@ -17,6 +149,7 @@ export interface Health {
   sim_time: string | null;
   tick_seconds: number;
   readings_stored: number;
+  is_synthetic?: boolean;
 }
 
 export interface Alert {
@@ -58,7 +191,10 @@ export interface ZoneSummary {
   humidity: number | null;
   ambient_temperature: number | null;
   temperature_status: TempStatus;
-  compressor_status: "running" | "stopped" | null;
+  compressor_status: "running" | "stopped" | "idle" | "degraded" | "failed" | string | null;
+  compressor_load_pct?: number | null;
+  power_consumption_kw?: number | null;
+  sensor_health?: string;
   door_status: "open" | "closed" | null;
   door_open_minutes: number;
   compressor_off_minutes: number;
@@ -71,6 +207,11 @@ export interface ZoneSummary {
   warning_time_to_breach_minutes: number | null;
   active_alert_count: number;
   latest_alert: Alert | null;
+  forecast_available?: boolean;
+  forecast_points?: any[];
+  excursion_expected?: boolean;
+  slope_per_min?: number;
+  is_synthetic?: boolean;
 }
 
 export interface Reading {
@@ -81,9 +222,13 @@ export interface Reading {
   true_temperature?: number | null;
   humidity: number | null;
   compressor_status: string;
+  compressor_load_pct?: number | null;
+  power_consumption_kw?: number | null;
+  sensor_health?: string;
   door_status: string;
   ambient_temperature: number | null;
   scenario: string;
+  is_synthetic?: boolean;
 }
 
 export interface ReadingsResponse {

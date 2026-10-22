@@ -4,29 +4,38 @@ import { useApp } from "../hooks/AppContext";
 import { InfoTip, StatusDot } from "./ui";
 
 export function ZoneTabs({ className = "" }: { className?: string }) {
-  const { selectedZone } = useApp();
-  const z = selectedZone;
-  if (!z) return null;
-  const tone = z.temperature_status === "critical" || z.risk_category === "critical" || z.risk_category === "high"
-    ? "crit"
-    : z.temperature_status === "warning" || z.risk_category === "medium" || z.sensor_status === "suspicious"
-      ? "warn"
-      : "ok";
+  const { zones, selectedZoneId, setSelectedZoneId } = useApp();
+  if (!zones?.length) return null;
 
   return (
-    <div className={`flex items-center gap-3 rounded-xl border border-cyan-500/30 bg-slate-900/80 px-4 py-2 backdrop-blur-md shadow-glow ${className}`}>
-      <StatusDot tone={tone} pulse={tone === "crit"} />
-      <div className="flex items-center gap-2">
-        <span className="text-[11px] uppercase font-mono font-bold text-cyan-400">Store:</span>
-        <span className="text-sm font-bold text-white tracking-tight">{z.name}</span>
-        <span className="text-white/20">·</span>
-        <span className="font-mono text-xs text-slate-400">{z.sensor_id}</span>
-        <span className="text-white/20 hidden sm:inline">·</span>
-        <span className="text-xs text-slate-300 hidden sm:inline">{z.product}</span>
-      </div>
-      <span className="font-mono text-xs text-cyan-300 font-bold pl-2 border-l border-cyan-500/20">
-        {z.temperature != null ? `${z.temperature.toFixed(1)}°C` : "no data"}
-      </span>
+    <div className={`flex flex-wrap items-center gap-1.5 p-1 rounded-xl border border-white/10 bg-slate-900/80 backdrop-blur-md ${className}`}>
+      {zones.map((z) => {
+        const isSelected = z.zone_id === selectedZoneId;
+        const tone =
+          z.temperature_status === "critical" || z.risk_category === "critical" || z.risk_category === "high"
+            ? "crit"
+            : z.temperature_status === "warning" || z.risk_category === "medium" || z.sensor_status === "suspicious"
+            ? "warn"
+            : "ok";
+
+        return (
+          <button
+            key={z.zone_id}
+            onClick={() => setSelectedZoneId(z.zone_id)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer border ${
+              isSelected
+                ? "bg-cyan-500/20 border-cyan-400/50 text-white shadow-glow"
+                : "border-transparent text-slate-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <StatusDot tone={tone} pulse={tone === "crit"} />
+            <span className="font-bold">{z.name}</span>
+            <span className="font-mono text-[11px] font-semibold text-cyan-300">
+              {z.temperature != null ? `${z.temperature.toFixed(1)}°C` : "—"}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

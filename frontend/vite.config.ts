@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       rollupOptions: {
-        output: { manualChunks: { recharts: ["recharts"], react: ["react", "react-dom", "react-router-dom"] } },
+        output: { manualChunks: { recharts: ["recharts"], react: ["react", "react-dom", "react-router-dom"], three: ["three", "@react-three/fiber", "@react-three/drei"] } },
       },
     },
     test: { environment: "node" },

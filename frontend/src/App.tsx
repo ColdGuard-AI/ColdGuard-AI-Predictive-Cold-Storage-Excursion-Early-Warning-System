@@ -10,11 +10,16 @@ import { setAuthToken } from "./services/api";
 import Alerts from "./pages/Alerts";
 import Dashboard from "./pages/Dashboard";
 import DigitalTwin from "./pages/DigitalTwin";
+import ExcursionMonitor from "./pages/ExcursionMonitor";
 import History from "./pages/History";
 import Manager from "./pages/Manager";
 import Model from "./pages/Model";
 import WhatIf from "./pages/WhatIf";
 import Zones from "./pages/Zones";
+import Predictions from "./pages/Predictions";
+import AIExplanation from "./pages/AIExplanation";
+import Reports from "./pages/Reports";
+import Settings from "./pages/Settings";
 
 // Auth Gateway Components from feature/auth-gateway
 import SimulatedDataBanner from "./components/SimulatedDataBanner";
@@ -99,11 +104,16 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/twin" element={<DigitalTwin />} />
+              <Route path="/excursion" element={<ExcursionMonitor />} />
+              <Route path="/predictions" element={<Predictions />} />
+              <Route path="/ai-explanation" element={<AIExplanation />} />
+              <Route path="/alerts" element={<Alerts />} />
+              <Route path="/what-if" element={<WhatIf />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="/manager" element={<Manager />} />
               <Route path="/zones" element={<Zones />} />
               <Route path="/history" element={<History />} />
-              <Route path="/alerts" element={<Alerts />} />
-              <Route path="/what-if" element={<WhatIf />} />
               <Route path="/model" element={<Model />} />
               <Route
                 path="*"

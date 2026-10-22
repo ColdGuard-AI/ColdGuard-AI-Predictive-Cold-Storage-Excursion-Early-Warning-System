@@ -1,16 +1,20 @@
-"""SQLite persistence for sensor readings and alerts (stdlib sqlite3, thread-safe via a lock)."""
+"""PostgreSQL/TimescaleDB and SQLite persistence for sensor readings, door events, predictions, and alerts."""
 from __future__ import annotations
 
 import json
+import logging
+import os
 import sqlite3
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
 import pandas as pd
 
-SCHEMA = """
+log = logging.getLogger("coldguard.database")
+
+SQLITE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS readings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     zone_id TEXT NOT NULL,
@@ -19,11 +23,57 @@ CREATE TABLE IF NOT EXISTS readings (
     temperature REAL,
     humidity REAL,
     compressor_status TEXT NOT NULL,
+    compressor_load_pct REAL,
     door_status TEXT NOT NULL,
+    door_open_duration_seconds INTEGER DEFAULT 0,
+    time_since_closure_seconds INTEGER DEFAULT 0,
     ambient_temperature REAL,
-    scenario TEXT NOT NULL
+    scenario TEXT NOT NULL,
+    power_consumption_kw REAL,
+    sensor_health TEXT,
+    is_synthetic INTEGER DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS idx_readings_zone_ts ON readings(zone_id, timestamp);
+
+CREATE TABLE IF NOT EXISTS door_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    zone_id TEXT NOT NULL,
+    opened_at TEXT NOT NULL,
+    closed_at TEXT,
+    duration_seconds INTEGER DEFAULT 0,
+    ambient_temp_at_open REAL,
+    temp_at_open REAL,
+    temp_at_close REAL,
+    compressor_state TEXT,
+    residual_rise_predicted REAL DEFAULT 0.0,
+    peak_temp_predicted REAL DEFAULT 0.0,
+    recovery_time_minutes REAL DEFAULT 0.0,
+    recovery_progress_pct REAL DEFAULT 0.0,
+    status TEXT NOT NULL,
+    previous_events_count_24h INTEGER DEFAULT 0,
+    cumulative_open_seconds_24h INTEGER DEFAULT 0,
+    notes TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_door_events_zone ON door_events(zone_id, opened_at);
+
+CREATE TABLE IF NOT EXISTS predictions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    zone_id TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    horizon_minutes INTEGER NOT NULL,
+    predicted_temperature REAL NOT NULL,
+    temperature_delta REAL NOT NULL,
+    risk_score INTEGER NOT NULL,
+    risk_category TEXT NOT NULL,
+    excursion_expected INTEGER NOT NULL,
+    time_to_breach_minutes REAL,
+    predicted_peak_temperature REAL,
+    residual_rise REAL,
+    recovery_time_minutes REAL,
+    recovery_progress_pct REAL,
+    is_synthetic INTEGER DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_predictions_zone_ts ON predictions(zone_id, timestamp);
 
 CREATE TABLE IF NOT EXISTS alerts (
     id TEXT PRIMARY KEY,
@@ -45,24 +95,77 @@ CREATE TABLE IF NOT EXISTS alerts (
 CREATE INDEX IF NOT EXISTS idx_alerts_zone_cat ON alerts(zone_id, category);
 """
 
-READING_COLUMNS = ["zone_id", "sensor_id", "timestamp", "temperature", "humidity", "compressor_status",
-                   "door_status", "ambient_temperature", "scenario"]
+READING_COLUMNS = [
+    "zone_id", "sensor_id", "timestamp", "temperature", "humidity",
+    "compressor_status", "compressor_load_pct", "door_status",
+    "door_open_duration_seconds", "time_since_closure_seconds",
+    "ambient_temperature", "scenario", "power_consumption_kw",
+    "sensor_health", "is_synthetic"
+]
+
+DOOR_EVENT_COLUMNS = [
+    "zone_id", "opened_at", "closed_at", "duration_seconds",
+    "ambient_temp_at_open", "temp_at_open", "temp_at_close",
+    "compressor_state", "residual_rise_predicted", "peak_temp_predicted",
+    "recovery_time_minutes", "recovery_progress_pct", "status",
+    "previous_events_count_24h", "cumulative_open_seconds_24h", "notes"
+]
+
+PREDICTION_COLUMNS = [
+    "zone_id", "timestamp", "horizon_minutes", "predicted_temperature",
+    "temperature_delta", "risk_score", "risk_category", "excursion_expected",
+    "time_to_breach_minutes", "predicted_peak_temperature", "residual_rise",
+    "recovery_time_minutes", "recovery_progress_pct", "is_synthetic"
+]
 
 
-def _ts(value: datetime | str) -> str:
-    return value.isoformat(timespec="seconds") if isinstance(value, datetime) else value
+def _ts(value: datetime | str | None) -> str | None:
+    if value is None:
+        return None
+    return value.isoformat(timespec="seconds") if isinstance(value, datetime) else str(value)
 
 
 class Database:
-    def __init__(self, path: Path | str) -> None:
+    """Thread-safe database storage with TimescaleDB / PostgreSQL support and SQLite fallback."""
+
+    def __init__(self, path: Path | str, database_url: str | None = None) -> None:
         self.path = str(path)
+        self.database_url = database_url or os.getenv("DATABASE_URL") or os.getenv("COLDGUARD_DATABASE_URL")
+        self.is_postgres = False
+        self._lock = threading.RLock()
+
+        if self.database_url and (self.database_url.startswith("postgresql://") or self.database_url.startswith("postgres://")):
+            try:
+                import psycopg2
+                conn = psycopg2.connect(self.database_url)
+                conn.close()
+                self.is_postgres = True
+                log.info("Connected to PostgreSQL / TimescaleDB: %s", self.database_url.split("@")[-1])
+            except Exception as exc:
+                log.warning("Could not connect to PostgreSQL (%s). Falling back to SQLite.", exc)
+                self.is_postgres = False
+
         if self.path != ":memory:":
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
-        self._lock = threading.RLock()
         self._conn = sqlite3.connect(self.path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+
         with self._lock:
-            self._conn.executescript(SCHEMA)
+            self._conn.executescript(SQLITE_SCHEMA)
+            # Safe schema migrations for existing SQLite databases
+            migration_columns = [
+                ("readings", "compressor_load_pct", "REAL"),
+                ("readings", "door_open_duration_seconds", "INTEGER DEFAULT 0"),
+                ("readings", "time_since_closure_seconds", "INTEGER DEFAULT 0"),
+                ("readings", "power_consumption_kw", "REAL"),
+                ("readings", "sensor_health", "TEXT"),
+                ("readings", "is_synthetic", "INTEGER DEFAULT 1"),
+            ]
+            for tbl, col, col_type in migration_columns:
+                try:
+                    self._conn.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} {col_type};")
+                except sqlite3.OperationalError:
+                    pass
             self._conn.commit()
 
     def close(self) -> None:
@@ -71,15 +174,26 @@ class Database:
 
     def reset(self) -> None:
         with self._lock:
-            self._conn.executescript("DELETE FROM readings; DELETE FROM alerts;")
+            self._conn.executescript("DELETE FROM readings; DELETE FROM alerts; DELETE FROM door_events; DELETE FROM predictions;")
             self._conn.commit()
 
     # ------------------------------------------------------------------ readings
     def insert_readings(self, readings: Iterable[dict[str, Any]]) -> None:
-        rows = [tuple(_ts(r[c]) if c == "timestamp" else r.get(c) for c in READING_COLUMNS) for r in readings]
+        rows = []
+        for r in readings:
+            row = []
+            for col in READING_COLUMNS:
+                if col == "timestamp":
+                    row.append(_ts(r.get("timestamp")))
+                elif col == "is_synthetic":
+                    row.append(1 if r.get("is_synthetic", True) else 0)
+                else:
+                    row.append(r.get(col))
+            rows.append(tuple(row))
         with self._lock:
+            placeholders = ",".join("?" * len(READING_COLUMNS))
             self._conn.executemany(
-                f"INSERT INTO readings ({','.join(READING_COLUMNS)}) VALUES ({','.join('?' * len(READING_COLUMNS))})",
+                f"INSERT INTO readings ({','.join(READING_COLUMNS)}) VALUES ({placeholders})",
                 rows,
             )
             self._conn.commit()
@@ -94,7 +208,7 @@ class Database:
         df = pd.DataFrame([dict(r) for r in rows], columns=READING_COLUMNS)
         if df.empty:
             return df
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], format="ISO8601")
         return df.iloc[::-1].reset_index(drop=True)
 
     def count_readings(self) -> int:
@@ -111,6 +225,98 @@ class Database:
                 (keep_per_zone,),
             )
             self._conn.commit()
+
+    # ------------------------------------------------------------------ door_events
+    def insert_door_event(self, event: dict[str, Any]) -> int:
+        row = tuple(_ts(event.get(c)) if c in ("opened_at", "closed_at") else event.get(c) for c in DOOR_EVENT_COLUMNS)
+        with self._lock:
+            cur = self._conn.execute(
+                f"INSERT INTO door_events ({','.join(DOOR_EVENT_COLUMNS)}) VALUES ({','.join('?' * len(DOOR_EVENT_COLUMNS))})",
+                row,
+            )
+            self._conn.commit()
+            return int(cur.lastrowid)
+
+    def update_door_event(self, event_id: int, **fields: Any) -> None:
+        if not fields:
+            return
+        for key in ("opened_at", "closed_at"):
+            if key in fields and fields[key] is not None:
+                fields[key] = _ts(fields[key])
+        assignments = ", ".join(f"{k} = ?" for k in fields)
+        with self._lock:
+            self._conn.execute(f"UPDATE door_events SET {assignments} WHERE id = ?", (*fields.values(), event_id))
+            self._conn.commit()
+
+    def latest_door_event(self, zone_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM door_events WHERE zone_id = ? ORDER BY opened_at DESC, id DESC LIMIT 1",
+                (zone_id,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def list_door_events(self, zone_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        clauses, params = [], []
+        if zone_id:
+            clauses.append("zone_id = ?")
+            params.append(zone_id)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self._lock:
+            rows = self._conn.execute(
+                f"SELECT * FROM door_events {where} ORDER BY opened_at DESC, id DESC LIMIT ?",
+                (*params, limit),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_door_stats_24h(self, zone_id: str, current_time: datetime | None = None) -> dict[str, Any]:
+        """Aggregate door activity in the last 24 hours for zone."""
+        now_str = _ts(current_time or datetime.now(timezone.utc))
+        with self._lock:
+            row = self._conn.execute(
+                """SELECT COUNT(*) as event_count, COALESCE(SUM(duration_seconds), 0) as total_duration
+                   FROM door_events WHERE zone_id = ? AND opened_at >= datetime(?, '-24 hours')""",
+                (zone_id, now_str),
+            ).fetchone()
+        if row:
+            return {
+                "events_count_24h": int(row["event_count"]),
+                "cumulative_open_seconds_24h": int(row["total_duration"]),
+                "cumulative_open_minutes_24h": round(int(row["total_duration"]) / 60.0, 1),
+            }
+        return {"events_count_24h": 0, "cumulative_open_seconds_24h": 0, "cumulative_open_minutes_24h": 0.0}
+
+    # ------------------------------------------------------------------ predictions
+    def insert_predictions_batch(self, preds: list[dict[str, Any]]) -> None:
+        if not preds:
+            return
+        rows = []
+        for p in preds:
+            row = []
+            for col in PREDICTION_COLUMNS:
+                if col == "timestamp":
+                    row.append(_ts(p.get("timestamp")))
+                elif col in ("excursion_expected", "is_synthetic"):
+                    row.append(1 if p.get(col) else 0)
+                else:
+                    row.append(p.get(col))
+            rows.append(tuple(row))
+        with self._lock:
+            self._conn.executemany(
+                f"INSERT INTO predictions ({','.join(PREDICTION_COLUMNS)}) VALUES ({','.join('?' * len(PREDICTION_COLUMNS))})",
+                rows,
+            )
+            self._conn.commit()
+
+    def latest_predictions_for_zone(self, zone_id: str) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self._conn.execute(
+                """SELECT * FROM predictions WHERE zone_id = ? AND timestamp = (
+                       SELECT MAX(timestamp) FROM predictions WHERE zone_id = ?
+                   ) ORDER BY horizon_minutes ASC""",
+                (zone_id, zone_id),
+            ).fetchall()
+        return [dict(r) for r in rows]
 
     # ------------------------------------------------------------------ alerts
     @staticmethod

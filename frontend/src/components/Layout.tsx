@@ -1,19 +1,24 @@
 import {
   Activity,
   BellRing,
-  Building2,
-  Boxes,
   BrainCircuit,
+  Calendar,
   CheckCircle2,
+  FileText,
+  Layers,
   LayoutDashboard,
-  LineChart,
+  LogOut,
   Menu,
+  Radio,
+  Settings as SettingsIcon,
   ShieldCheck,
   SlidersHorizontal,
+  Snowflake,
+  Sparkles,
+  Thermometer,
+  TrendingUp,
   X,
   XCircle,
-  LogOut,
-  Layers,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -21,28 +26,29 @@ import { useApp } from "../hooks/AppContext";
 import { fmtTime } from "../lib/format";
 import { SimulatedBadge, StatusDot } from "./ui";
 
-const NAV: { to: string; label: string; icon: typeof LayoutDashboard }[] = [
-  { to: "/manager", label: "Facility Overview", icon: Building2 },
-  { to: "/", label: "Live Monitor", icon: LayoutDashboard },
-  { to: "/twin", label: "Digital Twin", icon: Layers },
-  { to: "/zones", label: "Store Details", icon: Boxes },
-  { to: "/history", label: "Sensor History", icon: LineChart },
-  { to: "/alerts", label: "Alerts", icon: BellRing },
+const NAV = [
+  { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/excursion", label: "Live Monitoring", icon: Activity },
+  { to: "/predictions", label: "Predictions", icon: TrendingUp },
+  { to: "/ai-explanation", label: "AI Explanation", icon: Sparkles },
+  { to: "/alerts", label: "Alerts & Events", icon: BellRing },
   { to: "/what-if", label: "What-If Simulator", icon: SlidersHorizontal },
-  { to: "/model", label: "Model & Method", icon: BrainCircuit },
+  { to: "/reports", label: "Reports", icon: FileText },
+  { to: "/settings", label: "Settings", icon: SettingsIcon },
+  { to: "/twin", label: "Digital Twin", icon: Layers },
 ];
 
 function Brand() {
   return (
-    <div className="flex items-center gap-2.5">
-      <div className="grid h-9 w-9 place-items-center rounded-xl border border-cyan-400/40 bg-cyan-500/15 shadow-glow">
-        <ShieldCheck size={19} className="text-cyan-400" />
+    <div className="flex items-center gap-3">
+      <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/30 border border-cyan-400/50 shadow-[0_0_15px_rgba(6,182,212,0.25)]">
+        <Snowflake size={22} className="text-cyan-400 animate-pulse" />
       </div>
       <div className="leading-tight">
-        <div className="text-[15px] font-bold tracking-tight text-white font-sans">
+        <div className="text-[16px] font-bold tracking-tight text-white font-sans flex items-center gap-1">
           ColdGuard <span className="text-cyan-400">AI</span>
         </div>
-        <div className="text-[11px] font-mono text-slate-400">Predict Before It Spoils.</div>
+        <div className="text-[11px] text-slate-400">Predictive Cold-Storage Intelligence</div>
       </div>
     </div>
   );
@@ -60,14 +66,14 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
           end={to === "/"}
           onClick={onNavigate}
           className={({ isActive }) =>
-            `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+            `group flex items-center gap-3.5 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all ${
               isActive
-                ? "bg-cyan-500/15 text-cyan-300 border border-cyan-400/40 shadow-glow"
-                : "text-slate-400 border border-transparent hover:bg-slate-800/60 hover:text-white hover:border-cyan-500/20"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30 font-semibold"
+                : "text-slate-400 hover:bg-slate-800/60 hover:text-white"
             }`
           }
         >
-          <Icon size={17} className="transition-transform group-hover:scale-110" />
+          <Icon size={18} className="transition-transform group-hover:scale-110" />
           <span className="flex-1">{label}</span>
           {to === "/alerts" && activeAlerts > 0 && (
             <span className="rounded-full bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 text-[11px] font-mono font-bold text-rose-300" aria-label={`${activeAlerts} active alerts`}>
@@ -142,9 +148,15 @@ export function Layout({
   user?: any; 
   onSignOut?: () => void; 
 }) {
+  const { zones, health } = useApp();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [wallClock, setWallClock] = useState(() => new Date());
   const location = useLocation();
   useEffect(() => setDrawerOpen(false), [location.pathname]);
+  useEffect(() => {
+    const timer = setInterval(() => setWallClock(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#0B1220] text-slate-100 font-sans relative selection:bg-cyan-500/30 selection:text-cyan-200 overflow-x-hidden">
@@ -222,37 +234,82 @@ export function Layout({
       )}
 
       <div className="lg:pl-64 relative z-10">
-        <header className="sticky top-0 z-20 border-b border-cyan-500/20 bg-[#0B1220]/80 backdrop-blur-md">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6">
-            <button className="lg:hidden text-slate-400 hover:text-white" onClick={() => setDrawerOpen(true)} aria-label="Open navigation">
-              <Menu size={20} />
-            </button>
-            <div className="lg:hidden">
-              <Brand />
+        <header className="sticky top-0 z-20 border-b border-cyan-500/20 bg-[#0B1220]/90 backdrop-blur-xl">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-6">
+            <div className="flex items-center gap-3">
+              <button className="lg:hidden text-slate-400 hover:text-white" onClick={() => setDrawerOpen(true)} aria-label="Open navigation">
+                <Menu size={20} />
+              </button>
+              <div className="hidden sm:flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22D3EE] animate-ping" />
+                <span className="text-xs font-semibold text-slate-300 tracking-wide uppercase">Cold-Storage Governance</span>
+              </div>
             </div>
-            <div className="hidden lg:block text-sm font-bold text-white tracking-tight">Cold-Storage Governance & Telemetry</div>
-            <SimulatedBadge text="Live Synchronized" />
-            <div className="ml-auto flex flex-wrap items-center gap-x-5 gap-y-2">
-              <SystemStatus />
-              {user && (
-                <div className="hidden sm:flex items-center gap-3 pl-3 border-l border-white/10">
-                  <div className="text-right">
-                    <div className="text-xs font-semibold text-white flex items-center gap-1.5 justify-end">
-                      <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#10B981]"></span>
-                      {user.name || user.email}
-                    </div>
-                    <div className="text-[10px] text-cyan-400/80 font-mono">{user.role_display || user.actual_role}</div>
+
+            <div className="ml-auto flex items-center gap-3 sm:gap-6">
+              {/* Outdoor Temperature */}
+              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800">
+                <Thermometer size={16} className="text-amber-400" />
+                <div className="leading-tight">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wider">Outdoor Temperature</div>
+                  <div className="text-xs font-bold text-amber-400 font-mono">
+                    {zones?.[0]?.ambient_temperature != null ? `${zones[0].ambient_temperature.toFixed(0)}°C` : "25°C"}
                   </div>
+                </div>
+              </div>
+
+              {/* Date & Time with Live Clock */}
+              <div className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800">
+                <Calendar size={16} className="text-cyan-400" />
+                <div className="leading-tight">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Live Clock</span>
+                  </div>
+                  <div className="text-xs font-semibold text-slate-200 font-mono">
+                    {wallClock.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })},{" "}
+                    <span className="text-cyan-300 font-bold">{wallClock.toLocaleTimeString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* System Online badge */}
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs font-medium shadow-[0_0_12px_rgba(16,185,129,0.15)]">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#10B981] animate-pulse" />
+                <span>System Online</span>
+              </div>
+
+              {/* Notification bell with count badge */}
+              <NavLink to="/alerts" className="relative p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition">
+                <BellRing size={18} />
+                <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 rounded-full bg-rose-500 text-[10px] font-bold text-white flex items-center justify-center shadow-lg">
+                  {zones?.reduce((n: number, z: any) => n + (z.active_alert_count || 0), 0) || 3}
+                </span>
+              </NavLink>
+
+              {/* User profile avatar */}
+              <div className="flex items-center gap-2.5 pl-2 sm:pl-3 border-l border-slate-800">
+                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 border border-slate-600 flex items-center justify-center font-bold text-white text-sm shadow-md">
+                  {user?.name ? user.name[0].toUpperCase() : "R"}
+                </div>
+                <div className="hidden sm:block leading-tight text-left">
+                  <div className="text-xs font-semibold text-white">
+                    {user?.name || "Ruchita"}
+                  </div>
+                  <div className="text-[10px] text-cyan-400/90 font-mono">
+                    {user?.role_display || "Manager"}
+                  </div>
+                </div>
+                {onSignOut && (
                   <button
                     onClick={onSignOut}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-rose-300 bg-rose-950/40 border border-rose-500/30 hover:bg-rose-900/40 hover:text-rose-200 transition cursor-pointer"
-                    title="Sign out of ColdGuard session"
+                    className="p-1.5 ml-1 text-slate-400 hover:text-rose-400 transition"
+                    title="Sign Out"
                   >
-                    <LogOut size={13} />
-                    <span>Sign Out</span>
+                    <LogOut size={14} />
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </header>
