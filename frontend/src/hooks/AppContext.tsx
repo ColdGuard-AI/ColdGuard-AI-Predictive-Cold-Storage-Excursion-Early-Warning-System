@@ -41,6 +41,8 @@ export interface AppState {
   isDoorOpen: (zoneId: string) => boolean;
   getDoorOpenSeconds: (zoneId: string) => number;
   toggleDoor: (zoneId: string, durationMinutes?: number, forceAction?: "open" | "close") => Promise<void>;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -72,6 +74,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [selectedZoneId, setSelected] = useState<string>(readStoredZone);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
 
@@ -390,6 +393,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isDoorOpen,
       getDoorOpenSeconds,
       toggleDoor,
+      searchQuery,
+      setSearchQuery,
     }),
     [
       effectiveZones,
@@ -415,6 +420,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isDoorOpen,
       getDoorOpenSeconds,
       toggleDoor,
+      searchQuery,
     ],
   );
 

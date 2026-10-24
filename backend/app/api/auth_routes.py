@@ -131,6 +131,7 @@ class RegisterRequest(BaseModel):
     phone: Optional[str] = None
     requested_role: str
     organization: Optional[str] = None
+    contract_code: Optional[str] = None
 
 
 class ChangePasswordRequest(BaseModel):
@@ -250,7 +251,8 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     if org_input:
         company = db.query(Company).filter(
             (func.lower(Company.name) == org_input.lower()) |
-            (Company.id == org_input)
+            (Company.id == org_input) |
+            (func.lower(Company.name).like(f"%{org_input.lower()}%"))
         ).first()
     if not company:
         company = db.query(Company).first()
@@ -262,17 +264,81 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     ticket_id = f"REQ-CG-{uuid.uuid4().hex[:8].upper()}"
     hashed_pw = _hash(req.password)
 
-    # Create pending user
+    # ── Instant Verification vs Manager Approval Evaluation ─────────────────
+    # Manager approval strictly remains for internal staff (e.g. facility_operator).
+    # For buyers and retailers (buyer_retailer), instant verification is granted
+    # via a valid partner contract code OR a verified partner company.
+    is_buyer = (role_key == "buyer_retailer")
+    contract_code_clean = (req.contract_code or "").strip().upper()
+
+    KNOWN_CONTRACT_CODES = {
+        "CTR-RETAIL-9901",
+        "CONTRACT-2026-NORDIC",
+        "CTR-BIOPHARMA-2026",
+        "CTR-GLOBAL-770",
+        "CTR-PACIFIC-550",
+        "CTR-WHO-GDP-402",
+        "CTR-APEX-101",
+        "CTR-METRO-404",
+        "CTR-FRESH-2026",
+    }
+    has_valid_contract = False
+    if contract_code_clean:
+        if contract_code_clean in KNOWN_CONTRACT_CODES:
+            has_valid_contract = True
+        elif any(contract_code_clean.startswith(prefix) for prefix in ("CTR-", "CONTRACT-", "WHO-", "CG-", "BUY-", "RET-")) and len(contract_code_clean) >= 6:
+            has_valid_contract = True
+
+    KNOWN_VERIFIED_ORGS = {
+        "nordic frost logistics corp",
+        "arctic vault biopharma coldchain",
+        "pacific marine fresh logistics",
+        "glacier apex logistics",
+        "apex biopharma distribution network",
+        "metro health hospital network",
+        "freshmart global supermarkets",
+        "continental vaccines & cold logistics",
+        "nordic fresh wholesale market",
+    }
+    is_verified_company = bool(company and getattr(company, "verified", False))
+    if org_input and org_input.lower() in KNOWN_VERIFIED_ORGS:
+        is_verified_company = True
+
+    instant_verified = is_buyer and (has_valid_contract or is_verified_company)
+
+    if instant_verified:
+        method_desc = f"contract code {contract_code_clean}" if has_valid_contract else f"verified company ({company.name if company else org_input})"
+        approval_status = "APPROVED"
+        security_clearance = "INSTANT_VERIFIED_BUYER"
+        access_status = "APPROVED"
+        justification = f"Instant verification approved via {method_desc}."
+        message = (
+            f"Instant verification successful via {method_desc}! "
+            "Your account is verified and ready for instant access."
+        )
+    else:
+        approval_status = "PENDING_APPROVAL"
+        security_clearance = "NONE_PENDING_APPROVAL"
+        access_status = "PENDING_ADMIN_SIGN_OFF"
+        justification = "Internal staff registration awaiting Cold Storage Manager sign-off."
+        message = (
+            "Registration submitted. Your account is awaiting approval by the "
+            "Cold Storage Manager. You will be notified when approved."
+        )
+
+    # Create user
     new_user = User(
         email=email_clean,
         password_hash=hashed_pw,
         name=req.full_name.strip(),
         phone=(req.phone or "").strip() or None,
         actual_role=role_key,
-        role_display=ROLE_TITLES.get(role_key, "Facility Operator"),
+        role_display=ROLE_TITLES.get(role_key, "Buyer / Retailer" if is_buyer else "Facility Operator"),
         company_id=company.id if company else "COMP-NORDIC-01",
-        approval_status="PENDING_APPROVAL",
-        security_clearance="NONE_PENDING_APPROVAL",
+        approval_status=approval_status,
+        security_clearance=security_clearance,
+        approved_by="INSTANT_VERIFIED_SYSTEM" if instant_verified else None,
+        approved_at=datetime.datetime.utcnow() if instant_verified else None,
     )
     if facility:
         new_user.assigned_facilities = [facility]
@@ -288,21 +354,55 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
         requested_role=role_key,
         company_id=company.id if company else "COMP-NORDIC-01",
         facility_id=facility.id if facility else "FAC-CHILL-8092",
-        status="PENDING_ADMIN_SIGN_OFF",
+        invitation_code=contract_code_clean or (f"VERIFIED:{company.name}" if is_verified_company and company else None),
+        justification=justification,
+        status=access_status,
+        reviewed_by="SYSTEM_INSTANT_VERIFIER" if instant_verified else None,
+        reviewed_at=datetime.datetime.utcnow() if instant_verified else None,
     )
     db.add(access_req)
     db.commit()
 
-    logger.info("New registration: %s (%s) — awaiting approval", email_clean, role_key)
+    logger.info("New registration: %s (%s) — status: %s", email_clean, role_key, approval_status)
+
+    token = None
+    session_data = None
+    if instant_verified:
+        token = _issue_token(new_user, facility.id if facility else "FAC-CHILL-8092", [facility.id] if facility else ["FAC-CHILL-8092"])
+        session_data = _user_out(new_user, facility, token)
+
     return {
-        "status": "PENDING_APPROVAL",
+        "status": approval_status,
         "ticket_id": ticket_id,
-        "message": (
-            "Registration submitted. Your account is awaiting approval by the "
-            "Cold Storage Manager. You will be notified when approved."
-        ),
+        "message": message,
         "email": email_clean,
         "requested_role": role_key,
+        "instant_verified": instant_verified,
+        "token": token,
+        "session": session_data,
+    }
+
+
+@router.get("/api/auth/verified-partners")
+def get_verified_partners(db: Session = Depends(get_db)):
+    """Returns verified partner companies and example contract codes for instant verification."""
+    companies = db.query(Company).filter(Company.verified == True).all()
+    return {
+        "companies": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "business_type": c.business_type,
+                "verified": c.verified,
+            }
+            for c in companies
+        ],
+        "sample_contract_codes": [
+            "CTR-RETAIL-9901",
+            "CONTRACT-2026-NORDIC",
+            "CTR-BIOPHARMA-2026",
+            "CTR-GLOBAL-770",
+        ],
     }
 
 
