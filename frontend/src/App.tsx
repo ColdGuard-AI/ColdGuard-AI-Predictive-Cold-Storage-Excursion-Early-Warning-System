@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, Route, Routes } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, Navigate, Route, Routes } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Layout } from "./components/Layout";
 import { EmptyState } from "./components/ui";
@@ -29,6 +29,15 @@ import VerticalRoleSelector from "./components/VerticalRoleSelector";
 import RoleAuthGateway from "./components/RoleAuthGateway";
 import RegisterCompanyModal from "./components/RegisterCompanyModal";
 import ForgotPasswordModal from "./components/ForgotPasswordModal";
+
+function ChatRedirect() {
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("coldguard:open-chat"));
+    }
+  }, []);
+  return <Navigate to="/" replace />;
+}
 
 export default function App() {
   const [currentView, setCurrentView] = useState<"landing" | "auth" | "dashboard">(() => {
@@ -104,6 +113,7 @@ export default function App() {
           <ErrorBoundary>
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/chat" element={<ChatRedirect />} />
               <Route path="/blockchain" element={<BlockchainAudit />} />
               <Route path="/twin" element={<DigitalTwin />} />
               <Route path="/excursion" element={<ExcursionMonitor />} />

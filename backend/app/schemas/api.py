@@ -382,13 +382,40 @@ class AdvanceRequest(BaseModel):
 
 class WhatIfRequest(BaseModel):
     zone_id: str = Field(..., examples=["zone-a"])
-    scenario: WhatIfScenario
+    scenario: Optional[WhatIfScenario] = Field("compressor_failure")
     duration_minutes: Optional[int] = Field(30, ge=1, le=240, description="How long the change lasts; null = whole projection")
     ambient_delta: float = Field(15.0, ge=1, le=30)
     projection_minutes: int = Field(90, ge=30, le=240)
+    user_query: Optional[str] = Field(None, description="Free-text custom question or scenario description")
+    language: Optional[str] = Field("en", description="Target response language: 'en', 'es', 'fr', 'de', 'hi', 'pt', 'zh', 'ja', 'ar'")
+    dataset_source: Optional[str] = Field("live", description="Data source: 'live', 'synthetic_full', 'synthetic_train', 'synthetic_val', 'synthetic_test'")
 
 
 class MessageResponse(BaseModel):
     ok: bool = True
     message: str
     data: dict[str, Any] = {}
+
+
+class TranscribeRequest(BaseModel):
+    audio_base64: str = Field(..., description="Base64 encoded audio string (webm/wav/mp3)")
+    provider: Optional[str] = Field("groq", description="Whisper provider: 'groq' or 'openai' or 'custom'")
+    api_key: Optional[str] = Field(None, description="Optional API key for Whisper provider")
+    custom_endpoint: Optional[str] = Field(None, description="Optional custom Whisper HTTP endpoint URL")
+    language: Optional[str] = Field("en", description="Spoken language code (e.g. 'en')")
+    prompt: Optional[str] = Field(
+        "ColdGuard AI predictive cold storage monitoring, refrigeration excursion, setpoint breach. "
+        "Vaccine Store A, Dairy Chiller B, Meat Freezer C, Pharma Cold Room D, Produce Staging E. "
+        "Compressor, condenser, evaporator coil, defrost cycle, glycol loop, RTD sensor, degrees Celsius, "
+        "ambient heatwave, power cut, door open, door ajar, WHO PQS, insulin, mRNA vaccines, biologics. "
+        "मराठी आणि हिंदी भाषा समर्थन: तापमान, शीतगृह, कंप्रेसर, अलार्म, लस, धोका, कोल्ड स्टोरेज, बिजली कटौती.",
+        description="Prompt to guide Whisper vocabulary towards cold storage terms"
+    )
+
+
+class TranscribeResponse(BaseModel):
+    ok: bool
+    transcript: str
+    provider: str
+    duration_ms: Optional[float] = None
+    error: Optional[str] = None

@@ -19,6 +19,8 @@ import type {
   RecoveryStatus,
   DoorEventItem,
   ModelEvaluationResponse,
+  TranscribeRequest,
+  TranscribeResponse,
 } from "../types/api";
 
 let authToken: string | null = null;
@@ -146,6 +148,18 @@ export const api = {
   recoveryStatus: (zoneId: string) => request<RecoveryStatus>(`/api/zones/${zoneId}/recovery-status`),
   doorEvents: (zoneId: string, limit: number = 50) => request<DoorEventItem[]>(`/api/zones/${zoneId}/door-events${qs({ limit })}`),
   modelEvaluation: () => request<ModelEvaluationResponse>("/api/model/evaluation"),
+  transcribe: (body: TranscribeRequest) => post<TranscribeResponse>("/api/transcribe", body),
+  chat: (body: { message: string; history?: { role: string; content: string }[]; language?: string }) =>
+    post<any>("/api/chat/message", body),
+  chatVoice: (body: {
+    audio_base64: string;
+    language?: string;
+    history?: { role: string; content: string }[];
+    provider?: string;
+    api_key?: string | null;
+    custom_endpoint?: string | null;
+  }) => post<any>("/api/chat/voice", body),
+  chatQuickPrompts: (lang = "en") => request<string[]>(`/api/chat/quick-prompts${qs({ lang })}`),
   getTelemetrySource: () => request<import("../types/api").TelemetrySourceStatus>("/api/telemetry/source"),
   setTelemetrySource: (source: "dataset" | "simulator", datasetType?: string) =>
     post<import("../types/api").TelemetrySourceStatus>("/api/telemetry/source", { source, dataset_type: datasetType ?? "test" }),
