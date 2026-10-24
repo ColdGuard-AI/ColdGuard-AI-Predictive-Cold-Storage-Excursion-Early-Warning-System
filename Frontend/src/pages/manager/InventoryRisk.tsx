@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   ColdGuard AI — Inventory & Financial Exposure Analysis (Arctic Blue Theme)
-   Matches Enterprise Data Integrity & Blockchain Audit architecture
-   Real-time thermodynamic risk-weighting, perishable spoilage kinetics, & GxP exposure
+   Manager Dashboard — Inventory & Financial Exposure Analysis
+   Premium Arctic Blue Design System
+   Matches ManagerOverview and UserApproval typography and font sizing
 ───────────────────────────────────────────────────────────────────────────── */
 import React, { useEffect, useState } from "react";
 import {
@@ -13,18 +13,13 @@ import {
   ShieldAlert,
   Zap,
   Activity,
-  ArrowRight,
   Sliders,
   FileSpreadsheet,
   Layers,
   Thermometer,
   ShieldCheck,
-  Clock,
-  ChevronRight,
-  Info,
   CheckCircle2,
-  Percent,
-  TrendingDown,
+  Info,
 } from "lucide-react";
 import { api } from "../../services/api";
 import { useApp } from "../../hooks/AppContext";
@@ -54,7 +49,7 @@ const COMMODITY_PROFILES: Record<string, CommodityProfile> = {
     grossValueUsd: 186000,
     spoilageThresholdC: 8.0,
     spoilageMechanism:
-      "Denaturation of tertiary protein chains and mRNA lipid nanoparticle degradation above 8.0°C; results in total antigenic potency loss requiring mandatory quarantine and disposal under WHO/FDA Good Distribution Practices.",
+      "Denaturation of tertiary protein chains and mRNA lipid nanoparticle degradation above 8.0°C; results in total antigenic potency loss requiring mandatory quarantine under WHO/FDA Good Distribution Practices.",
     vulnerableItems: [
       "COVID-19 mRNA Vaccine Vials (Comirnaty / Spikevax) - 4,200 doses",
       "Pediatric MMR, Varicella & Rotavirus Cold-Chain Vaccines - 3,500 doses",
@@ -102,6 +97,34 @@ const COMMODITY_PROFILES: Record<string, CommodityProfile> = {
     regulatoryStandard: "Codex Alimentarius Code of Practice for Frozen Foods",
   },
 };
+
+function StatCard({ label, value, sub, icon: Icon, color = "blue", alert = false }: any) {
+  const iconColors: any = {
+    blue: "text-[#2563EB] bg-[#EFF6FF] border-[#BAE6FD]",
+    green: "text-emerald-700 bg-emerald-50 border-emerald-200",
+    amber: "text-amber-700 bg-amber-50 border-amber-200",
+    red: "text-rose-700 bg-rose-50 border-rose-200",
+  };
+  const c = iconColors[color] ?? iconColors.blue;
+  return (
+    <div
+      className={`rounded-2xl border border-[#DCE8F6] bg-white p-5 sm:p-6 flex flex-col gap-3 shadow-arctic-card hover:shadow-arctic-hover hover:border-[#BAE6FD] transition-all ${
+        alert ? "ring-2 ring-rose-200 border-rose-300" : ""
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-sm sm:text-base font-bold text-[#475569]">{label}</span>
+        <div className={`h-10 w-10 rounded-xl border flex items-center justify-center shrink-0 shadow-sm ${c}`}>
+          <Icon size={20} />
+        </div>
+      </div>
+      <div className={`text-3xl font-extrabold tracking-tight ${alert ? "text-rose-600" : "text-[#0F172A]"}`}>
+        {value}
+      </div>
+      {sub && <div className="text-xs sm:text-sm font-medium text-[#475569]">{sub}</div>}
+    </div>
+  );
+}
 
 export default function InventoryRisk() {
   const { zones, zonesLoading } = useApp();
@@ -173,7 +196,6 @@ export default function InventoryRisk() {
   const highRiskCount = inventoryRows.filter((r) => r.risk >= 40).length;
   const criticalCount = inventoryRows.filter((r) => r.status === "critical" || r.risk >= 70).length;
   const totalTonnageKg = inventoryRows.reduce((sum, r) => sum + r.massKg, 0);
-  const facilityExposurePct = totalGrossInr > 0 ? (totalExposureInr / totalGrossInr) * 100 : 0;
 
   // What-if calculation
   const simProfile = COMMODITY_PROFILES[simZoneId] || COMMODITY_PROFILES["zone-a"];
@@ -184,7 +206,6 @@ export default function InventoryRisk() {
   const simExceedsThreshold = simProjectedTemp > simThreshold;
   const simThermalOverdrive = Math.max(0, simProjectedTemp - simThreshold);
 
-  // Spoilage probability model: S-curve exponential past threshold
   const simSpoilagePct = simExceedsThreshold
     ? Math.min(100, Math.round(20 + simThermalOverdrive * 18 + simDurationHours * 12))
     : Math.min(15, Math.round((simTempDelta / 5) * 10));
@@ -234,393 +255,233 @@ export default function InventoryRisk() {
   }
 
   return (
-    <div className="space-y-6 pb-12 font-sans selection:bg-[#38BDF8]/30 selection:text-[#0F172A]">
+    <div className="space-y-6">
       {/* ─────────────────────────────────────────────────────────────
-          1. Page Header (Matches BlockchainAudit & Role Portals)
+          1. Page Header (Exact match with ManagerOverview.tsx)
       ───────────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-2 border-b border-[#DCE8F6]">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="h-10 w-10 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] flex items-center justify-center text-[#2563EB] shadow-sm">
-              <Package size={22} className="text-[#2563EB]" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-[#0F172A] flex items-center gap-2">
-                Inventory & Financial Exposure
-                <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] font-semibold uppercase tracking-wider">
-                  Commodity Risk Engine
-                </span>
-              </h1>
-              <p className="text-xs text-[#475569] mt-0.5 font-medium">
-                Real-time thermodynamic risk-weighting, perishable shelf-life spoilage kinetics, and GxP lot financial exposure modeling.
-              </p>
-            </div>
-          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] flex items-center gap-3">
+            <Package size={28} className="text-[#2563EB]" /> Inventory & Financial Exposure Analysis
+          </h1>
+          <p className="text-base text-[#475569] mt-1 font-medium">
+            Estimated inventory value at risk based on real-time temperature fluctuations and commodity valuations
+          </p>
         </div>
-
-        {/* Status Pills */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono font-medium shadow-sm">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>GxP Quarantine Guard</span>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-[#DCE8F6] text-[#2563EB] text-xs font-mono font-semibold shadow-arctic-card">
-            <ShieldCheck size={14} className="text-[#2563EB]" />
-            <span>21 CFR Part 11 Audit-Ready</span>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-[#DCE8F6] text-[#475569] text-xs font-mono shadow-arctic-card">
-            <Zap size={14} className="text-[#38BDF8]" />
-            <span>Dynamic Spoilage Curves</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ─────────────────────────────────────────────────────────────
-          2. Visual 4-Stage Thermal-to-Capital Risk Pipeline
-      ───────────────────────────────────────────────────────────── */}
-      <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card">
-        <div className="text-xs font-bold text-[#2563EB] uppercase tracking-wider font-mono mb-3 flex items-center gap-2">
-          <Zap size={14} />
-          4-Stage Thermal-to-Capital Risk Pipeline
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Step 1 */}
-          <div className="rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] p-3.5 relative flex flex-col justify-between hover:border-[#38BDF8] transition">
-            <div>
-              <div className="flex items-center justify-between text-xs text-[#475569] mb-1">
-                <span className="font-mono text-[#2563EB] font-bold">01. Lot Registry</span>
-                <Package size={14} className="text-[#2563EB]" />
-              </div>
-              <div className="text-sm font-semibold text-[#0F172A]">Certified Batch Registry</div>
-              <p className="text-[11px] text-[#475569] mt-1 leading-relaxed">
-                Immutable tracking of stored lot IDs, certified mass tonnage, unit replacement costs, and GxP regulatory classes.
-              </p>
-            </div>
-          </div>
-
-          {/* Step 2 */}
-          <div className="rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] p-3.5 relative flex flex-col justify-between hover:border-[#38BDF8] transition">
-            <div>
-              <div className="flex items-center justify-between text-xs text-[#475569] mb-1">
-                <span className="font-mono text-[#2563EB] font-bold">02. Thermal Telemetry</span>
-                <Thermometer size={14} className="text-[#2563EB]" />
-              </div>
-              <div className="text-sm font-semibold text-[#0F172A]">Real-Time Ingestion</div>
-              <p className="text-[11px] text-[#475569] mt-1 leading-relaxed">
-                Continuous MQTT streaming of chamber temperature, perimeter heat flux, door duty cycles, and compressor power loads.
-              </p>
-            </div>
-          </div>
-
-          {/* Step 3 */}
-          <div className="rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] p-3.5 relative flex flex-col justify-between hover:border-[#38BDF8] transition">
-            <div>
-              <div className="flex items-center justify-between text-xs text-[#475569] mb-1">
-                <span className="font-mono text-[#2563EB] font-bold">03. Spoilage Kinetics</span>
-                <Activity size={14} className="text-[#2563EB]" />
-              </div>
-              <div className="text-sm font-semibold text-[#0F172A]">Arrhenius Decay Models</div>
-              <p className="text-[11px] text-[#475569] mt-1 leading-relaxed">
-                Physicochemical degradation curves modeling protein denaturation, microbial doubling rates, and shelf-life loss.
-              </p>
-            </div>
-          </div>
-
-          {/* Step 4 */}
-          <div className="rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] p-3.5 relative flex flex-col justify-between hover:border-[#38BDF8] transition">
-            <div>
-              <div className="flex items-center justify-between text-xs text-[#475569] mb-1">
-                <span className="font-mono text-[#2563EB] font-bold">04. Capital Risk</span>
-                <DollarSign size={14} className="text-[#2563EB]" />
-              </div>
-              <div className="text-sm font-semibold text-[#0F172A]">Valuation & Exposure</div>
-              <p className="text-[11px] text-[#475569] mt-1 leading-relaxed">
-                Live probability weighting computes exact monetary capital at risk, salvageable inventory, and insurance deductible reserve.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ─────────────────────────────────────────────────────────────
-          3. Sub-Navigation Tabs & Actions
-      ───────────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-[#DCE8F6] shadow-arctic-card">
-        <div className="flex items-center gap-1.5 p-1 bg-[#EFF6FF] rounded-xl border border-[#DCE8F6]/80">
-          <button
-            onClick={() => setActiveTab("overview")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === "overview"
-                ? "bg-[#2563EB] text-white shadow-sm"
-                : "text-[#475569] hover:text-[#0F172A] hover:bg-white/60"
-            }`}
-          >
-            Overview & Breakdown
-          </button>
-          <button
-            onClick={() => setActiveTab("profiles")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === "profiles"
-                ? "bg-[#2563EB] text-white shadow-sm"
-                : "text-[#475569] hover:text-[#0F172A] hover:bg-white/60"
-            }`}
-          >
-            Commodity Spoilage Profiles
-          </button>
-          <button
-            onClick={() => setActiveTab("simulator")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === "simulator"
-                ? "bg-[#2563EB] text-white shadow-sm"
-                : "text-[#475569] hover:text-[#0F172A] hover:bg-white/60"
-            }`}
-          >
-            <Sliders size={13} /> What-If Loss Simulator
-          </button>
-          <button
-            onClick={() => setActiveTab("history")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === "history"
-                ? "bg-[#2563EB] text-white shadow-sm"
-                : "text-[#475569] hover:text-[#0F172A] hover:bg-white/60"
-            }`}
-          >
-            Excursion & Loss History
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             onClick={exportReportCsv}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#DCE8F6] bg-white hover:bg-[#EFF6FF] hover:border-[#BAE6FD] text-xs font-bold text-[#0F172A] transition shadow-sm cursor-pointer"
+            className="flex items-center gap-2 rounded-xl border border-[#DCE8F6] bg-white hover:bg-[#EFF6FF] hover:border-[#BAE6FD] hover:text-[#2563EB] px-4 py-2.5 text-sm sm:text-base font-bold text-[#0F172A] transition shadow-sm cursor-pointer"
           >
-            <FileSpreadsheet size={14} className="text-[#2563EB]" /> Export Valuation CSV
+            <FileSpreadsheet size={16} className="text-[#2563EB]" /> Export CSV
           </button>
           <button
             onClick={loadData}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#DCE8F6] bg-white hover:bg-[#EFF6FF] hover:border-[#BAE6FD] text-xs font-bold text-[#0F172A] transition shadow-sm cursor-pointer"
+            className="flex items-center gap-2 rounded-xl border border-[#DCE8F6] bg-white hover:bg-[#EFF6FF] hover:border-[#BAE6FD] hover:text-[#2563EB] px-4 py-2.5 text-sm sm:text-base font-bold text-[#0F172A] transition shadow-sm cursor-pointer"
           >
-            <RefreshCw size={14} className={`text-[#2563EB] ${loading ? "animate-spin" : ""}`} /> Refresh
+            <RefreshCw size={16} className={`text-[#2563EB] ${loading ? "animate-spin" : ""}`} /> Refresh
           </button>
         </div>
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          4. Top Metrics Bar (6 Cards matching Enterprise Style)
+          2. KPI Stat Cards (4 Columns matching ManagerOverview.tsx)
       ───────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {/* Metric 1 */}
-        <div className="rounded-xl border border-[#DCE8F6] bg-white p-4 shadow-arctic-card hover:border-[#BAE6FD] transition">
-          <div className="flex items-center justify-between text-xs text-[#475569] font-medium mb-1.5">
-            <span>Gross Inventory</span>
-            <Package size={15} className="text-[#2563EB]" />
-          </div>
-          <div className="text-xl font-extrabold text-[#0F172A] tracking-tight">
-            ₹{(totalGrossInr / 100000).toFixed(2)}L
-          </div>
-          <div className="text-[11px] text-[#475569] font-mono mt-0.5">${totalGrossUsd.toLocaleString()} USD</div>
-        </div>
-
-        {/* Metric 2 */}
-        <div className="rounded-xl border border-[#DCE8F6] bg-white p-4 shadow-arctic-card hover:border-[#BAE6FD] transition">
-          <div className="flex items-center justify-between text-xs text-[#475569] font-medium mb-1.5">
-            <span>Capital Exposure</span>
-            <DollarSign size={15} className={totalExposureInr > 5000 ? "text-rose-600" : "text-emerald-600"} />
-          </div>
-          <div
-            className={`text-xl font-extrabold tracking-tight ${
-              totalExposureInr > 5000 ? "text-rose-600" : "text-[#0F172A]"
-            }`}
-          >
-            ₹{totalExposureInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-          </div>
-          <div className="text-[11px] text-[#475569] font-mono mt-0.5">
-            {facilityExposurePct.toFixed(1)}% of total valuation
-          </div>
-        </div>
-
-        {/* Metric 3 */}
-        <div className="rounded-xl border border-[#DCE8F6] bg-white p-4 shadow-arctic-card hover:border-[#BAE6FD] transition">
-          <div className="flex items-center justify-between text-xs text-[#475569] font-medium mb-1.5">
-            <span>Stored Tonnage</span>
-            <Layers size={15} className="text-[#38BDF8]" />
-          </div>
-          <div className="text-xl font-extrabold text-[#0F172A] tracking-tight">
-            {totalTonnageKg.toLocaleString()} kg
-          </div>
-          <div className="text-[11px] text-emerald-700 font-semibold mt-0.5">Across 3 cold chambers</div>
-        </div>
-
-        {/* Metric 4 */}
-        <div className="rounded-xl border border-[#DCE8F6] bg-white p-4 shadow-arctic-card hover:border-[#BAE6FD] transition">
-          <div className="flex items-center justify-between text-xs text-[#475569] font-medium mb-1.5">
-            <span>High-Risk Rooms</span>
-            <TrendingUp size={15} className={highRiskCount > 0 ? "text-rose-600" : "text-emerald-600"} />
-          </div>
-          <div
-            className={`text-xl font-extrabold tracking-tight ${
-              highRiskCount > 0 ? "text-rose-600" : "text-emerald-700"
-            }`}
-          >
-            {highRiskCount} / {inventoryRows.length}
-          </div>
-          <div className="text-[11px] text-[#475569] font-mono mt-0.5">Risk threshold &ge; 40%</div>
-        </div>
-
-        {/* Metric 5 */}
-        <div className="rounded-xl border border-[#DCE8F6] bg-white p-4 shadow-arctic-card hover:border-[#BAE6FD] transition">
-          <div className="flex items-center justify-between text-xs text-[#475569] font-medium mb-1.5">
-            <span>Critical Breaches</span>
-            <AlertTriangle size={15} className={criticalCount > 0 ? "text-rose-600" : "text-emerald-600"} />
-          </div>
-          <div
-            className={`text-xl font-extrabold tracking-tight ${
-              criticalCount > 0 ? "text-rose-600" : "text-emerald-700"
-            }`}
-          >
-            {criticalCount}
-          </div>
-          <div className="text-[11px] text-emerald-700 font-semibold mt-0.5">
-            {criticalCount === 0 ? "100% GxP Compliant" : "Quarantine required"}
-          </div>
-        </div>
-
-        {/* Metric 6 */}
-        <div className="rounded-xl border border-[#DCE8F6] bg-white p-4 shadow-arctic-card hover:border-[#BAE6FD] transition">
-          <div className="flex items-center justify-between text-xs text-[#475569] font-medium mb-1.5">
-            <span>Insurance Deductible</span>
-            <ShieldAlert size={15} className="text-[#2563EB]" />
-          </div>
-          <div className="text-xl font-extrabold text-[#0F172A] tracking-tight">₹25,000</div>
-          <div className="text-[11px] text-[#475569] font-mono mt-0.5">Policy Tier-1 Cargo Cover</div>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <StatCard
+          label="Total Gross Inventory"
+          value={`₹${(totalGrossInr / 100000).toFixed(2)}L`}
+          sub={`$${totalGrossUsd.toLocaleString()} USD across all cold chambers`}
+          icon={Package}
+          color="blue"
+        />
+        <StatCard
+          label="Total Financial Exposure"
+          value={`₹${totalExposureInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
+          sub={totalExposureInr > 0 ? "Potential monetary loss at current risk" : "Zero exposure — storage within validated range"}
+          icon={DollarSign}
+          color={totalExposureInr > 5000 ? "red" : "blue"}
+          alert={totalExposureInr > 5000}
+        />
+        <StatCard
+          label="Active Stored Tonnage"
+          value={`${totalTonnageKg.toLocaleString()} kg`}
+          sub="Certified pharmaceutical & food batches"
+          icon={Layers}
+          color="green"
+        />
+        <StatCard
+          label="High-Risk Cold Rooms"
+          value={`${highRiskCount} / ${inventoryRows.length}`}
+          sub={highRiskCount > 0 ? "Excursion probability ≥ 40%" : "All chambers in thermal equilibrium"}
+          icon={TrendingUp}
+          color={highRiskCount > 0 ? "red" : "green"}
+          alert={highRiskCount > 0}
+        />
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          5. Tab Views Content
+          3. Sub-Navigation Tabs (Large, clean, standard typography)
       ───────────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-[#DCE8F6] pb-3">
+        <button
+          onClick={() => setActiveTab("overview")}
+          className={`px-4 py-2.5 rounded-xl text-sm sm:text-base font-bold transition-all cursor-pointer ${
+            activeTab === "overview"
+              ? "bg-[#2563EB] text-white shadow-sm"
+              : "text-[#475569] hover:text-[#0F172A] hover:bg-white"
+          }`}
+        >
+          Overview & Chamber Breakdown
+        </button>
+        <button
+          onClick={() => setActiveTab("profiles")}
+          className={`px-4 py-2.5 rounded-xl text-sm sm:text-base font-bold transition-all cursor-pointer ${
+            activeTab === "profiles"
+              ? "bg-[#2563EB] text-white shadow-sm"
+              : "text-[#475569] hover:text-[#0F172A] hover:bg-white"
+          }`}
+        >
+          Commodity Spoilage Profiles
+        </button>
+        <button
+          onClick={() => setActiveTab("simulator")}
+          className={`px-4 py-2.5 rounded-xl text-sm sm:text-base font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            activeTab === "simulator"
+              ? "bg-[#2563EB] text-white shadow-sm"
+              : "text-[#475569] hover:text-[#0F172A] hover:bg-white"
+          }`}
+        >
+          <Sliders size={16} /> What-If Loss Simulator
+        </button>
+        <button
+          onClick={() => setActiveTab("history")}
+          className={`px-4 py-2.5 rounded-xl text-sm sm:text-base font-bold transition-all cursor-pointer ${
+            activeTab === "history"
+              ? "bg-[#2563EB] text-white shadow-sm"
+              : "text-[#475569] hover:text-[#0F172A] hover:bg-white"
+          }`}
+        >
+          Recent Excursions & Log
+        </button>
+      </div>
 
-      {/* TAB 1: OVERVIEW & BREAKDOWN */}
+      {/* ─────────────────────────────────────────────────────────────
+          4. TAB 1: OVERVIEW & BREAKDOWN TABLE
+      ───────────────────────────────────────────────────────────── */}
       {activeTab === "overview" && (
-        <div className="space-y-5">
+        <div className="space-y-6">
           <div className="rounded-2xl border border-[#DCE8F6] bg-white shadow-arctic-card overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#DCE8F6] flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <Package size={20} className="text-[#2563EB]" />
+            <div className="px-6 py-5 border-b border-[#DCE8F6] flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <Package size={22} className="text-[#2563EB]" />
                 <div>
-                  <h2 className="text-base font-bold text-[#0F172A]">Chamber Inventory & Live Risk Breakdown</h2>
-                  <p className="text-xs text-[#475569]">
-                    Monetary risk calculated from continuous temperature telemetry, sensor drift, and Arrhenius spoilage kinetics.
+                  <h2 className="text-lg sm:text-xl font-bold text-[#0F172A]">Chamber Inventory & Live Risk Breakdown</h2>
+                  <p className="text-sm font-medium text-[#475569] mt-0.5">
+                    Live excursion risk scores, commodity unit replacement costs, and active capital exposure
                   </p>
                 </div>
               </div>
-              <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-full bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB]">
+              <span className="text-xs sm:text-sm font-bold px-3 py-1 rounded-full bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB]">
                 Continuous Evaluation
               </span>
             </div>
 
             {zonesLoading ? (
-              <div className="py-16 text-center text-sm font-medium text-[#475569]">
+              <div className="py-16 text-center text-base font-medium text-[#475569]">
                 <RefreshCw size={24} className="animate-spin text-[#2563EB] mx-auto mb-2" />
-                Aggregating multi-zone commodity risk matrices…
+                Loading inventory breakdown…
               </div>
             ) : !inventoryRows.length ? (
-              <div className="py-16 text-center text-sm font-medium text-[#475569]">
-                No active cold chamber inventory mapped.
+              <div className="py-16 text-center text-base font-medium text-[#475569]">
+                No inventory data available.
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead className="bg-[#EFF6FF] text-xs font-bold text-[#0F172A] uppercase tracking-wider border-b border-[#DCE8F6]">
+                  <thead className="bg-[#EFF6FF] text-xs sm:text-sm font-bold text-[#0F172A] uppercase tracking-wider border-b border-[#DCE8F6]">
                     <tr>
-                      <th className="py-3.5 px-5">Chamber & Lot</th>
-                      <th className="py-3.5 px-5">Commodity Category</th>
-                      <th className="py-3.5 px-5">Active Mass</th>
-                      <th className="py-3.5 px-5">Temp vs. Limit</th>
-                      <th className="py-3.5 px-5">Gross Valuation</th>
-                      <th className="py-3.5 px-5">Excursion Risk</th>
-                      <th className="py-3.5 px-5">Financial Exposure</th>
-                      <th className="py-3.5 px-5">GxP Status</th>
+                      <th className="py-4 px-6">Cold Room & Lot</th>
+                      <th className="py-4 px-6">Commodity Category</th>
+                      <th className="py-4 px-6">Stored Mass</th>
+                      <th className="py-4 px-6">Chamber Temp</th>
+                      <th className="py-4 px-6">Gross Valuation</th>
+                      <th className="py-4 px-6">Excursion Risk</th>
+                      <th className="py-4 px-6">Financial Exposure</th>
+                      <th className="py-4 px-6">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#DCE8F6]/60 text-sm">
+                  <tbody className="divide-y divide-[#DCE8F6]">
                     {inventoryRows.map((r) => {
                       const isRiskElevated = r.risk >= 40;
                       const isRiskCritical = r.risk >= 70;
                       return (
                         <tr key={r.zoneId} className="hover:bg-[#F1F7FF] transition">
-                          {/* Chamber & Lot */}
-                          <td className="py-4 px-5">
-                            <div className="font-bold text-[#0F172A]">{r.name}</div>
-                            <div className="text-xs font-mono text-[#2563EB] flex items-center gap-1.5 mt-0.5">
-                              <span>{r.batchId}</span>
-                              <span className="text-[#94A3B8]">·</span>
-                              <span className="text-[#64748B]">{r.sensorId}</span>
+                          {/* Cold Room & Lot */}
+                          <td className="py-4 px-6">
+                            <div className="font-bold text-[#0F172A] text-base">{r.name}</div>
+                            <div className="text-sm font-medium text-[#2563EB] mt-0.5">
+                              {r.batchId} <span className="text-[#94A3B8]">·</span> {r.sensorId}
                             </div>
                           </td>
 
                           {/* Commodity Category */}
-                          <td className="py-4 px-5">
-                            <div className="font-medium text-[#0F172A]">{r.product}</div>
-                            <div className="text-xs text-[#475569] mt-0.5 font-mono">₹{r.unitCostInr} / kg</div>
+                          <td className="py-4 px-6">
+                            <div className="font-semibold text-[#0F172A] text-base">{r.product}</div>
+                            <div className="text-sm font-medium text-[#475569] mt-0.5">₹{r.unitCostInr} / kg</div>
                           </td>
 
-                          {/* Active Mass */}
-                          <td className="py-4 px-5 font-mono font-semibold text-[#0F172A]">
+                          {/* Stored Mass */}
+                          <td className="py-4 px-6 text-base font-bold text-[#0F172A]">
                             {r.massKg.toLocaleString()} kg
                           </td>
 
-                          {/* Temp vs. Limit */}
-                          <td className="py-4 px-5">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-[#0F172A]">
-                                {r.currentTemp.toFixed(1)}°C
-                              </span>
-                              <span className="text-xs font-mono text-[#64748B]">
-                                / max {r.spoilageThresholdC.toFixed(1)}°C
-                              </span>
+                          {/* Chamber Temp */}
+                          <td className="py-4 px-6">
+                            <div className="text-base font-bold text-[#0F172A]">
+                              {r.currentTemp.toFixed(1)}°C
                             </div>
-                            <div className="text-[11px] mt-0.5">
+                            <div className="text-sm font-medium mt-0.5">
                               {r.isExcursion ? (
-                                <span className="text-rose-600 font-bold font-mono">
-                                  +{(r.currentTemp - r.spoilageThresholdC).toFixed(1)}°C breach
+                                <span className="text-rose-600 font-bold">
+                                  Exceeds limit ({r.spoilageThresholdC.toFixed(1)}°C)
                                 </span>
                               ) : (
-                                <span className="text-emerald-700 font-medium font-mono">
-                                  {r.deltaToThreshold.toFixed(1)}°C safety margin
+                                <span className="text-emerald-700 font-medium">
+                                  Safe (max {r.spoilageThresholdC.toFixed(1)}°C)
                                 </span>
                               )}
                             </div>
                           </td>
 
                           {/* Gross Valuation */}
-                          <td className="py-4 px-5">
-                            <div className="font-extrabold text-[#0F172A] font-mono">
+                          <td className="py-4 px-6">
+                            <div className="font-extrabold text-[#0F172A] text-base">
                               ₹{r.grossValInr.toLocaleString("en-IN")}
                             </div>
-                            <div className="text-xs text-[#64748B] font-mono">
+                            <div className="text-xs sm:text-sm font-medium text-[#64748B]">
                               ${r.grossValueUsd.toLocaleString()} USD
                             </div>
                           </td>
 
                           {/* Excursion Risk */}
-                          <td className="py-4 px-5">
-                            <div className="flex items-center gap-2.5">
-                              <div className="flex-1 bg-[#EFF6FF] border border-[#DCE8F6] rounded-full h-2 w-20 overflow-hidden">
+                          <td className="py-4 px-6">
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1 bg-slate-100 border border-[#DCE8F6] rounded-full h-2.5 min-w-[70px] max-w-[100px] overflow-hidden">
                                 <div
-                                  className={`h-2 rounded-full transition-all ${
+                                  className={`h-2.5 rounded-full transition-all ${
                                     isRiskCritical
                                       ? "bg-rose-500"
                                       : isRiskElevated
                                       ? "bg-amber-400"
-                                      : "bg-[#2563EB]"
+                                      : "bg-emerald-500"
                                   }`}
                                   style={{ width: `${Math.min(100, Math.max(5, r.risk))}%` }}
                                 />
                               </div>
                               <span
-                                className={`font-mono font-bold text-xs ${
+                                className={`text-base font-bold ${
                                   isRiskCritical
                                     ? "text-rose-600"
                                     : isRiskElevated
@@ -634,9 +495,9 @@ export default function InventoryRisk() {
                           </td>
 
                           {/* Financial Exposure */}
-                          <td className="py-4 px-5">
+                          <td className="py-4 px-6">
                             <div
-                              className={`font-mono font-extrabold ${
+                              className={`text-base font-extrabold ${
                                 r.financialExposureInr > 5000
                                   ? "text-rose-600"
                                   : r.financialExposureInr > 1000
@@ -646,15 +507,15 @@ export default function InventoryRisk() {
                             >
                               ₹{r.financialExposureInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                             </div>
-                            <div className="text-[11px] text-[#64748B] font-mono">
-                              {((r.financialExposureInr / r.grossValInr) * 100).toFixed(1)}% at risk
+                            <div className="text-xs sm:text-sm font-medium text-[#64748B]">
+                              {((r.financialExposureInr / r.grossValInr) * 100).toFixed(1)}% of lot value
                             </div>
                           </td>
 
-                          {/* GxP Status */}
-                          <td className="py-4 px-5">
+                          {/* Status */}
+                          <td className="py-4 px-6">
                             <span
-                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+                              className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1 text-xs sm:text-sm font-bold border shadow-sm ${
                                 r.status === "critical" || r.isExcursion
                                   ? "bg-rose-50 border-rose-200 text-rose-800"
                                   : r.status === "warning" || isRiskElevated
@@ -663,9 +524,9 @@ export default function InventoryRisk() {
                               }`}
                             >
                               <span
-                                className={`h-1.5 w-1.5 rounded-full ${
+                                className={`h-2 w-2 rounded-full ${
                                   r.status === "critical" || r.isExcursion
-                                    ? "bg-rose-500 animate-pulse"
+                                    ? "bg-rose-500"
                                     : r.status === "warning" || isRiskElevated
                                     ? "bg-amber-500"
                                     : "bg-emerald-500"
@@ -675,7 +536,7 @@ export default function InventoryRisk() {
                                 ? "Quarantine Hold"
                                 : r.status === "warning" || isRiskElevated
                                 ? "Warning Excursion"
-                                : "Nominal Safe"}
+                                : "Nominal"}
                             </span>
                           </td>
                         </tr>
@@ -687,442 +548,336 @@ export default function InventoryRisk() {
             )}
           </div>
 
-          {/* Detailed Financial Notes & Callout */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-2xl border border-[#DCE8F6] bg-white p-5 shadow-arctic-card">
-              <div className="flex items-center gap-2 text-sm font-bold text-[#0F172A] mb-2">
-                <Info size={16} className="text-[#2563EB]" /> Dynamic Spoilage Attribution
+          {/* Explanatory Cards (Matching Overview Style) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="rounded-2xl border border-[#DCE8F6] bg-white p-6 shadow-arctic-card">
+              <div className="flex items-center gap-2.5 text-base font-bold text-[#0F172A] mb-2">
+                <Info size={18} className="text-[#2563EB]" /> Dynamic Spoilage Attribution
               </div>
-              <p className="text-xs text-[#475569] leading-relaxed">
-                ColdGuard AI does not evaluate spoilage as a binary cliff. The platform models cumulative thermal kinetic stress 
-                (Mean Kinetic Temperature, MKT) integrated over time. Prolonged mild excursions (e.g., +1.5°C over 4 hours) trigger 
-                accelerated shelf-life decay formulas, even when peak thresholds have not been breached.
+              <p className="text-sm font-medium text-[#475569] leading-relaxed">
+                ColdGuard AI does not evaluate spoilage as a simple binary on/off switch. The platform integrates cumulative thermal 
+                kinetic stress (Mean Kinetic Temperature, MKT) over time. Prolonged mild excursions trigger accelerated shelf-life decay 
+                formulas, even before peak limits are crossed.
               </p>
             </div>
 
-            <div className="rounded-2xl border border-[#DCE8F6] bg-white p-5 shadow-arctic-card">
-              <div className="flex items-center gap-2 text-sm font-bold text-[#0F172A] mb-2">
-                <ShieldCheck size={16} className="text-emerald-700" /> Automated GxP Quarantine Integration
+            <div className="rounded-2xl border border-[#DCE8F6] bg-white p-6 shadow-arctic-card">
+              <div className="flex items-center gap-2.5 text-base font-bold text-[#0F172A] mb-2">
+                <ShieldCheck size={18} className="text-emerald-700" /> Automated GxP Quarantine Protocol
               </div>
-              <p className="text-xs text-[#475569] leading-relaxed">
+              <p className="text-sm font-medium text-[#475569] leading-relaxed">
                 When a chamber sustains critical thermal exposure, batch quarantine holds are automatically provisioned 
-                in the cryptographic ledger. External supply chain ERPs and dispatch gates are locked out, preventing 
-                compromised inventory from reaching downstream consumers.
+                in the system audit trail. Supply chain ERPs and dispatch gates are immediately flagged, preventing compromised 
+                inventory from leaving the warehouse.
               </p>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: COMMODITY SPOILAGE PROFILES */}
-      {activeTab === "profiles" && (
-        <div className="space-y-5">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {Object.values(COMMODITY_PROFILES).map((profile) => {
-              const liveZone = inventoryRows.find((r) => r.zoneId === profile.zoneId);
-              return (
-                <div
-                  key={profile.zoneId}
-                  className="rounded-2xl border border-[#DCE8F6] bg-white p-6 shadow-arctic-card flex flex-col justify-between hover:shadow-arctic-hover transition-all"
-                >
-                  <div className="space-y-4">
-                    {/* Header */}
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#2563EB] bg-[#EFF6FF] border border-[#BAE6FD] px-2.5 py-0.5 rounded-full">
-                          {profile.batchId}
-                        </span>
-                        <h3 className="text-lg font-bold text-[#0F172A] mt-2">{profile.name}</h3>
-                        <div className="text-xs font-medium text-[#475569]">{profile.product}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-extrabold text-[#0F172A] font-mono">
-                          ₹{(profile.massKg * profile.unitCostInr).toLocaleString("en-IN")}
-                        </div>
-                        <div className="text-[11px] text-[#64748B] font-mono">
-                          ${profile.grossValueUsd.toLocaleString()} USD
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Threshold & Mass Stats */}
-                    <div className="grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
-                      <div>
-                        <div className="text-[11px] text-[#64748B] font-medium">Critical Limit</div>
-                        <div className="text-sm font-bold text-rose-600 font-mono">
-                          {profile.spoilageThresholdC.toFixed(1)}°C
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[11px] text-[#64748B] font-medium">Certified Mass</div>
-                        <div className="text-sm font-bold text-[#0F172A] font-mono">
-                          {profile.massKg.toLocaleString()} kg
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Biological Mechanism */}
-                    <div className="space-y-1.5">
-                      <div className="text-xs font-bold text-[#0F172A] flex items-center gap-1.5">
-                        <Activity size={14} className="text-[#2563EB]" /> Biological Degradation Kinetics
-                      </div>
-                      <p className="text-xs text-[#475569] leading-relaxed bg-[#EFF6FF]/60 p-3 rounded-xl border border-[#BAE6FD]/60">
-                        {profile.spoilageMechanism}
-                      </p>
-                    </div>
-
-                    {/* Vulnerable Items List */}
-                    <div className="space-y-2">
-                      <div className="text-xs font-bold text-[#0F172A]">Vulnerable Stored Commodities:</div>
-                      <div className="space-y-1.5">
-                        {profile.vulnerableItems.map((item, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center gap-2 text-xs text-[#0F172A] bg-[#F8FAFC] px-2.5 py-1.5 rounded-lg border border-[#DCE8F6]"
-                          >
-                            <span className="h-1.5 w-1.5 rounded-full bg-[#2563EB] shrink-0" />
-                            <span className="truncate">{item}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Footer with Regulatory Standard */}
-                  <div className="pt-4 mt-4 border-t border-[#DCE8F6] flex items-center justify-between text-xs">
-                    <span className="text-[#64748B] font-medium">Compliance Standard:</span>
-                    <span className="font-mono font-semibold text-[#2563EB]">{profile.regulatoryStandard}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: WHAT-IF LOSS SIMULATOR */}
-      {activeTab === "simulator" && (
-        <div className="space-y-5">
-          <div className="rounded-2xl border border-[#DCE8F6] bg-white p-6 shadow-arctic-card">
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[#DCE8F6]">
-              <div>
-                <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
-                  <Sliders size={20} className="text-[#2563EB]" /> Interactive What-If Financial Loss Simulator
-                </h2>
-                <p className="text-xs text-[#475569] mt-0.5">
-                  Simulate mechanical cooling failures, door ajar occurrences, and prolonged ambient heat penetration 
-                  to quantify capital exposure before an actual excursion strikes.
-                </p>
-              </div>
-              <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800">
-                Predictive Stress Testing
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-6">
-              {/* Controls Column (5 cols) */}
-              <div className="lg:col-span-5 space-y-6">
-                {/* Chamber Selector */}
-                <div>
-                  <label className="block text-xs font-bold text-[#0F172A] uppercase tracking-wider mb-2">
-                    Select Target Chamber:
-                  </label>
-                  <select
-                    value={simZoneId}
-                    onChange={(e) => setSimZoneId(e.target.value)}
-                    className="w-full rounded-xl border border-[#DCE8F6] bg-[#F8FAFC] px-4 py-2.5 text-sm font-semibold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB] cursor-pointer"
-                  >
-                    {Object.values(COMMODITY_PROFILES).map((p) => (
-                      <option key={p.zoneId} value={p.zoneId}>
-                        {p.name} — {p.product} (${p.grossValueUsd.toLocaleString()} USD)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Temperature Delta Slider */}
-                <div>
-                  <div className="flex items-center justify-between text-xs font-bold mb-2">
-                    <span className="text-[#0F172A]">Simulated Temperature Drift:</span>
-                    <span className="font-mono text-[#2563EB] bg-[#EFF6FF] px-2.5 py-0.5 rounded-full border border-[#BAE6FD]">
-                      +{simTempDelta.toFixed(1)}°C
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="15.0"
-                    step="0.5"
-                    value={simTempDelta}
-                    onChange={(e) => setSimTempDelta(parseFloat(e.target.value))}
-                    className="w-full accent-[#2563EB] cursor-pointer"
-                  />
-                  <div className="flex justify-between text-[11px] font-mono text-[#64748B] mt-1">
-                    <span>+0.5°C (Minor)</span>
-                    <span>+7.5°C (Severe)</span>
-                    <span>+15.0°C (Catastrophic)</span>
-                  </div>
-                </div>
-
-                {/* Duration Slider */}
-                <div>
-                  <div className="flex items-center justify-between text-xs font-bold mb-2">
-                    <span className="text-[#0F172A]">Excursion Duration:</span>
-                    <span className="font-mono text-[#2563EB] bg-[#EFF6FF] px-2.5 py-0.5 rounded-full border border-[#BAE6FD]">
-                      {simDurationHours.toFixed(1)} Hours
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="12.0"
-                    step="0.5"
-                    value={simDurationHours}
-                    onChange={(e) => setSimDurationHours(parseFloat(e.target.value))}
-                    className="w-full accent-[#2563EB] cursor-pointer"
-                  />
-                  <div className="flex justify-between text-[11px] font-mono text-[#64748B] mt-1">
-                    <span>30 mins</span>
-                    <span>6 hours</span>
-                    <span>12 hours</span>
-                  </div>
-                </div>
-
-                {/* Baseline Context */}
-                <div className="rounded-xl p-4 bg-[#F8FAFC] border border-[#DCE8F6] space-y-2 text-xs">
-                  <div className="font-bold text-[#0F172A]">Simulation Baseline Reference:</div>
-                  <div className="flex justify-between text-[#475569]">
-                    <span>Current Chamber Temp:</span>
-                    <span className="font-mono font-bold text-[#0F172A]">{simBaseTemp.toFixed(1)}°C</span>
-                  </div>
-                  <div className="flex justify-between text-[#475569]">
-                    <span>Critical Spoilage Threshold:</span>
-                    <span className="font-mono font-bold text-rose-600">{simThreshold.toFixed(1)}°C</span>
-                  </div>
-                  <div className="flex justify-between text-[#475569]">
-                    <span>Batch Gross Capital:</span>
-                    <span className="font-mono font-bold text-[#0F172A]">
-                      ₹{simGrossValueInr.toLocaleString("en-IN")}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dynamic Results Column (7 cols) */}
-              <div className="lg:col-span-7 space-y-5">
-                <div className="rounded-2xl bg-[#EFF6FF] border border-[#BAE6FD] p-6 shadow-sm space-y-5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#1E40AF] uppercase tracking-wider font-mono">
-                      Projected Stress Impact
-                    </span>
-                    <span
-                      className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                        simExceedsThreshold
-                          ? "bg-rose-100 border-rose-300 text-rose-800"
-                          : "bg-emerald-100 border-emerald-300 text-emerald-800"
-                      }`}
-                    >
-                      {simExceedsThreshold ? "Threshold Exceeded" : "Within Safety Tolerance"}
-                    </span>
-                  </div>
-
-                  {/* Big Impact Numbers */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white rounded-xl p-4 border border-[#BAE6FD] shadow-sm">
-                      <div className="text-xs text-[#475569] font-medium">Projected Peak Temp</div>
-                      <div
-                        className={`text-2xl font-extrabold font-mono mt-1 ${
-                          simExceedsThreshold ? "text-rose-600" : "text-[#0F172A]"
-                        }`}
-                      >
-                        {simProjectedTemp.toFixed(1)}°C
-                      </div>
-                      <div className="text-[11px] text-[#64748B] mt-0.5">
-                        {simExceedsThreshold
-                          ? `+${simThermalOverdrive.toFixed(1)}°C beyond limit`
-                          : "Safe thermal envelope"}
-                      </div>
-                    </div>
-
-                    <div className="bg-white rounded-xl p-4 border border-[#BAE6FD] shadow-sm">
-                      <div className="text-xs text-[#475569] font-medium">Projected Lot Spoilage</div>
-                      <div
-                        className={`text-2xl font-extrabold font-mono mt-1 ${
-                          simSpoilagePct >= 50
-                            ? "text-rose-600"
-                            : simSpoilagePct >= 20
-                            ? "text-amber-700"
-                            : "text-emerald-700"
-                        }`}
-                      >
-                        {simSpoilagePct}%
-                      </div>
-                      <div className="text-[11px] text-[#64748B] mt-0.5">Estimated irreversible decay</div>
-                    </div>
-                  </div>
-
-                  {/* Financial Loss Breakdown */}
-                  <div className="space-y-3 pt-2">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-[#475569] font-medium">Estimated Financial Capital at Risk:</span>
-                      <span className="font-mono font-extrabold text-xl text-rose-600">
-                        ₹{simProjectedLossInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center text-xs text-[#64748B]">
-                      <span>Equivalent USD Loss:</span>
-                      <span className="font-mono font-bold">${simProjectedLossUsd.toLocaleString()} USD</span>
-                    </div>
-
-                    <div className="flex justify-between items-center text-xs text-[#64748B]">
-                      <span>Estimated Salvageable Value (Discounted):</span>
-                      <span className="font-mono font-bold text-emerald-700">
-                        ₹{simSalvageableInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                      </span>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden border border-[#DCE8F6]">
-                      <div
-                        className={`h-3 rounded-full transition-all duration-300 ${
-                          simSpoilagePct >= 50
-                            ? "bg-rose-500"
-                            : simSpoilagePct >= 20
-                            ? "bg-amber-400"
-                            : "bg-[#2563EB]"
-                        }`}
-                        style={{ width: `${Math.min(100, Math.max(2, simSpoilagePct))}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* SOP Mitigation Guidance */}
-                <div className="rounded-xl p-4 bg-white border border-[#DCE8F6] space-y-2 text-xs">
-                  <div className="font-bold text-[#0F172A] flex items-center gap-1.5">
-                    <CheckCircle2 size={15} className="text-[#2563EB]" /> Recommended Preemptive Countermeasures
-                  </div>
-                  <ul className="space-y-1.5 text-[#475569] list-disc list-inside">
-                    <li>Reroute secondary air handlers to bypass chamber hot spots.</li>
-                    <li>Stage dry-ice cryo-boost canisters for rapid thermal quenching within 15 minutes.</li>
-                    <li>If excursion exceeds 3 hours, dispatch emergency refrigerated transport van to transfer lots.</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: EXCURSION & LOSS HISTORY */}
-      {activeTab === "history" && (
-        <div className="space-y-5">
-          <div className="rounded-2xl border border-[#DCE8F6] bg-white shadow-arctic-card overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#DCE8F6] flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <TrendingUp size={20} className="text-[#2563EB]" />
-                <h2 className="text-base font-bold text-[#0F172A]">Recent Temperature Excursions & Loss Audit Log</h2>
-              </div>
-              <span className="text-xs text-[#475569] font-medium">Logged in tamper-evident database</span>
-            </div>
-
-            {loading ? (
-              <div className="py-16 text-center text-sm font-medium text-[#475569]">
-                <RefreshCw size={24} className="animate-spin text-[#2563EB] mx-auto mb-2" />
-                Retrieving compliance excursion log…
-              </div>
-            ) : !events.length ? (
-              <div className="py-16 text-center text-sm font-medium text-[#475569]">
-                Zero temperature excursions recorded in the current monitoring cycle.
-              </div>
-            ) : (
-              <div className="divide-y divide-[#DCE8F6]/60">
-                {events.map((ev: any, idx: number) => {
-                  const isCritical = ev.event_type === "excursion" || ev.severity === "critical";
-                  return (
-                    <div
-                      key={idx}
-                      className="px-6 py-4 flex flex-wrap items-center justify-between gap-4 hover:bg-[#F1F7FF] transition"
-                    >
-                      <div className="flex items-start gap-3.5">
-                        <div
-                          className={`mt-1 h-3 w-3 rounded-full shrink-0 ${
-                            isCritical ? "bg-rose-500 animate-pulse" : "bg-[#2563EB]"
-                          }`}
-                        />
-                        <div>
-                          <div className="text-sm font-bold text-[#0F172A]">{ev.title || ev.event_type}</div>
-                          <div className="text-xs text-[#475569] mt-0.5 flex items-center gap-2 font-mono">
-                            <span className="text-[#2563EB] font-bold">{ev.zone_id}</span>
-                            <span>·</span>
-                            <span>{ev.sim_timestamp ? ev.sim_timestamp.replace("T", " ") : "2026-10-25"}</span>
-                          </div>
-                          {ev.explanation && (
-                            <p className="text-xs text-[#475569] mt-1.5 max-w-2xl leading-relaxed">
-                              {ev.explanation}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="text-right">
-                        <span
-                          className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${
-                            isCritical
-                              ? "bg-rose-50 border-rose-200 text-rose-800"
-                              : "bg-[#EFF6FF] border-[#BAE6FD] text-[#1E40AF]"
-                          }`}
-                        >
-                          {isCritical ? "Excursion Logged" : "Telemetry Event"}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
         </div>
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          6. Bottom Enterprise Assurance Cards (Matches BlockchainAudit)
+          5. TAB 2: COMMODITY SPOILAGE PROFILES
       ───────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card">
-          <div className="flex items-center gap-2 text-sm font-bold text-[#0F172A] mb-2">
-            <ShieldAlert size={18} className="text-[#2563EB]" />
-            <h3>21 CFR Part 11 Electronic Records</h3>
-          </div>
-          <p className="text-xs text-[#475569] leading-relaxed">
-            All inventory valuations, threshold breaches, and quarantine releases are bound to cryptographic SHA-256 
-            hashes and anchored on our Merkle blockchain ledger.
-          </p>
-        </div>
+      {activeTab === "profiles" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {Object.values(COMMODITY_PROFILES).map((profile) => (
+            <div
+              key={profile.zoneId}
+              className="rounded-2xl border border-[#DCE8F6] bg-white p-6 sm:p-7 shadow-arctic-card flex flex-col justify-between hover:shadow-arctic-hover transition-all"
+            >
+              <div className="space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-[#2563EB] bg-[#EFF6FF] border border-[#BAE6FD] px-3 py-1 rounded-full">
+                      {profile.batchId}
+                    </span>
+                    <h3 className="text-xl font-bold text-[#0F172A] mt-3">{profile.name}</h3>
+                    <div className="text-sm font-semibold text-[#475569] mt-0.5">{profile.product}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-base font-extrabold text-[#0F172A]">
+                      ₹{(profile.massKg * profile.unitCostInr).toLocaleString("en-IN")}
+                    </div>
+                    <div className="text-xs sm:text-sm font-medium text-[#64748B]">
+                      ${profile.grossValueUsd.toLocaleString()} USD
+                    </div>
+                  </div>
+                </div>
 
-        <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card">
-          <div className="flex items-center gap-2 text-sm font-bold text-[#0F172A] mb-2">
-            <CheckCircle2 size={18} className="text-emerald-700" />
-            <h3>Automated Lot Quarantine</h3>
-          </div>
-          <p className="text-xs text-[#475569] leading-relaxed">
-            Meets WHO and FDA Good Distribution Practices (GDP) by instantly locking shipment dispatch when 
-            cumulative thermal limits threaten product potency.
-          </p>
-        </div>
+                <div className="grid grid-cols-2 gap-3 p-4 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
+                  <div>
+                    <div className="text-xs font-bold text-[#64748B] uppercase">Critical Limit</div>
+                    <div className="text-base font-extrabold text-rose-600 mt-0.5">
+                      {profile.spoilageThresholdC.toFixed(1)}°C
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-[#64748B] uppercase">Certified Mass</div>
+                    <div className="text-base font-extrabold text-[#0F172A] mt-0.5">
+                      {profile.massKg.toLocaleString()} kg
+                    </div>
+                  </div>
+                </div>
 
-        <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card">
-          <div className="flex items-center gap-2 text-sm font-bold text-[#0F172A] mb-2">
-            <DollarSign size={18} className="text-[#38BDF8]" />
-            <h3>Cargo Underwriting Readiness</h3>
-          </div>
-          <p className="text-xs text-[#475569] leading-relaxed">
-            Export standardized loss projections directly to commercial cold chain underwriters to expedite 
-            spoilage claims and minimize audit friction.
-          </p>
+                <div className="space-y-2">
+                  <div className="text-sm font-bold text-[#0F172A] flex items-center gap-2">
+                    <Activity size={16} className="text-[#2563EB]" /> Degradation Mechanism:
+                  </div>
+                  <p className="text-sm text-[#475569] leading-relaxed bg-[#EFF6FF] p-3.5 rounded-xl border border-[#BAE6FD]">
+                    {profile.spoilageMechanism}
+                  </p>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  <div className="text-sm font-bold text-[#0F172A]">Vulnerable Stored Commodities:</div>
+                  <div className="space-y-1.5">
+                    {profile.vulnerableItems.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2.5 text-xs sm:text-sm font-medium text-[#0F172A] bg-[#F8FAFC] px-3 py-2 rounded-xl border border-[#DCE8F6]"
+                      >
+                        <span className="h-2 w-2 rounded-full bg-[#2563EB] shrink-0" />
+                        <span className="truncate">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 mt-5 border-t border-[#DCE8F6] flex items-center justify-between text-xs sm:text-sm">
+                <span className="text-[#64748B] font-medium">Standard:</span>
+                <span className="font-bold text-[#2563EB]">{profile.regulatoryStandard}</span>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          6. TAB 3: WHAT-IF LOSS SIMULATOR
+      ───────────────────────────────────────────────────────────── */}
+      {activeTab === "simulator" && (
+        <div className="rounded-2xl border border-[#DCE8F6] bg-white p-6 sm:p-8 shadow-arctic-card space-y-6">
+          <div className="pb-4 border-b border-[#DCE8F6]">
+            <h2 className="text-xl font-bold text-[#0F172A] flex items-center gap-2.5">
+              <Sliders size={22} className="text-[#2563EB]" /> Interactive What-If Financial Loss Simulator
+            </h2>
+            <p className="text-sm sm:text-base font-medium text-[#475569] mt-1">
+              Simulate cooling disruptions and door-open events to quantify projected capital exposure in advance
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-5 space-y-6">
+              <div>
+                <label className="block text-sm font-bold text-[#0F172A] uppercase tracking-wider mb-2">
+                  Select Target Cold Room:
+                </label>
+                <select
+                  value={simZoneId}
+                  onChange={(e) => setSimZoneId(e.target.value)}
+                  className="w-full rounded-xl border border-[#DCE8F6] bg-[#F8FAFC] px-4 py-3 text-base font-semibold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB] cursor-pointer"
+                >
+                  {Object.values(COMMODITY_PROFILES).map((p) => (
+                    <option key={p.zoneId} value={p.zoneId}>
+                      {p.name} — {p.product} (${p.grossValueUsd.toLocaleString()} USD)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-sm sm:text-base font-bold mb-2">
+                  <span className="text-[#0F172A]">Simulated Temperature Rise:</span>
+                  <span className="text-[#2563EB] bg-[#EFF6FF] px-3 py-1 rounded-full border border-[#BAE6FD]">
+                    +{simTempDelta.toFixed(1)}°C
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="15.0"
+                  step="0.5"
+                  value={simTempDelta}
+                  onChange={(e) => setSimTempDelta(parseFloat(e.target.value))}
+                  className="w-full accent-[#2563EB] cursor-pointer h-2"
+                />
+                <div className="flex justify-between text-xs sm:text-sm font-medium text-[#64748B] mt-1.5">
+                  <span>+0.5°C (Minor)</span>
+                  <span>+7.5°C (Severe)</span>
+                  <span>+15.0°C (Critical)</span>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-sm sm:text-base font-bold mb-2">
+                  <span className="text-[#0F172A]">Excursion Duration:</span>
+                  <span className="text-[#2563EB] bg-[#EFF6FF] px-3 py-1 rounded-full border border-[#BAE6FD]">
+                    {simDurationHours.toFixed(1)} Hours
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="12.0"
+                  step="0.5"
+                  value={simDurationHours}
+                  onChange={(e) => setSimDurationHours(parseFloat(e.target.value))}
+                  className="w-full accent-[#2563EB] cursor-pointer h-2"
+                />
+                <div className="flex justify-between text-xs sm:text-sm font-medium text-[#64748B] mt-1.5">
+                  <span>30 mins</span>
+                  <span>6 hours</span>
+                  <span>12 hours</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-7 space-y-5">
+              <div className="rounded-2xl bg-[#EFF6FF] border border-[#BAE6FD] p-6 sm:p-7 space-y-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-[#1E40AF] uppercase tracking-wider">
+                    Projected Financial Impact
+                  </span>
+                  <span
+                    className={`text-xs sm:text-sm font-bold px-3 py-1 rounded-full border ${
+                      simExceedsThreshold
+                        ? "bg-rose-100 border-rose-300 text-rose-800"
+                        : "bg-emerald-100 border-emerald-300 text-emerald-800"
+                    }`}
+                  >
+                    {simExceedsThreshold ? "Threshold Exceeded" : "Within Safe Margin"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white rounded-xl p-4 border border-[#BAE6FD] shadow-sm">
+                    <div className="text-xs sm:text-sm text-[#475569] font-bold">Projected Peak Temp</div>
+                    <div
+                      className={`text-2xl sm:text-3xl font-extrabold mt-1 ${
+                        simExceedsThreshold ? "text-rose-600" : "text-[#0F172A]"
+                      }`}
+                    >
+                      {simProjectedTemp.toFixed(1)}°C
+                    </div>
+                    <div className="text-xs font-semibold text-[#64748B] mt-1">
+                      {simExceedsThreshold
+                        ? `+${simThermalOverdrive.toFixed(1)}°C over limit`
+                        : "Safe range maintained"}
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-xl p-4 border border-[#BAE6FD] shadow-sm">
+                    <div className="text-xs sm:text-sm text-[#475569] font-bold">Projected Spoilage Risk</div>
+                    <div
+                      className={`text-2xl sm:text-3xl font-extrabold mt-1 ${
+                        simSpoilagePct >= 50
+                          ? "text-rose-600"
+                          : simSpoilagePct >= 20
+                          ? "text-amber-700"
+                          : "text-emerald-700"
+                      }`}
+                    >
+                      {simSpoilagePct}%
+                    </div>
+                    <div className="text-xs font-semibold text-[#64748B] mt-1">Estimated irreversible loss</div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <div className="flex justify-between items-center text-base sm:text-lg">
+                    <span className="text-[#475569] font-bold">Projected Capital at Risk:</span>
+                    <span className="font-extrabold text-2xl text-rose-600">
+                      ₹{simProjectedLossInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-sm font-medium text-[#64748B]">
+                    <span>USD Equivalent Loss:</span>
+                    <span className="font-bold text-[#0F172A]">${simProjectedLossUsd.toLocaleString()} USD</span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-sm font-medium text-[#64748B]">
+                    <span>Estimated Salvage Value:</span>
+                    <span className="font-bold text-emerald-700">
+                      ₹{simSalvageableInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          7. TAB 4: RECENT EXCURSIONS & AUDIT LOG
+      ───────────────────────────────────────────────────────────── */}
+      {activeTab === "history" && (
+        <div className="rounded-2xl border border-[#DCE8F6] bg-white shadow-arctic-card overflow-hidden">
+          <div className="px-6 py-5 border-b border-[#DCE8F6] flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <TrendingUp size={22} className="text-[#2563EB]" />
+              <h2 className="text-lg sm:text-xl font-bold text-[#0F172A]">Recent Temperature Excursion Events</h2>
+            </div>
+            <span className="text-xs sm:text-sm font-semibold text-[#475569]">Continuous audit logging</span>
+          </div>
+
+          {loading ? (
+            <div className="py-16 text-center text-base font-medium text-[#475569]">
+              <RefreshCw size={24} className="animate-spin text-[#2563EB] mx-auto mb-2" />
+              Loading excursion history…
+            </div>
+          ) : !events.length ? (
+            <div className="py-16 text-center text-base font-medium text-[#475569]">
+              No temperature excursions recorded in the current monitoring cycle.
+            </div>
+          ) : (
+            <div className="divide-y divide-[#DCE8F6]">
+              {events.map((ev: any, idx: number) => {
+                const isCritical = ev.event_type === "excursion" || ev.severity === "critical";
+                return (
+                  <div
+                    key={idx}
+                    className="px-6 py-4 flex flex-wrap items-center justify-between gap-4 hover:bg-[#F1F7FF] transition"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div
+                        className={`mt-1.5 h-3 w-3 rounded-full shrink-0 ${
+                          isCritical ? "bg-rose-500" : "bg-[#2563EB]"
+                        }`}
+                      />
+                      <div>
+                        <div className="text-base font-bold text-[#0F172A]">{ev.title || ev.event_type}</div>
+                        <div className="text-sm font-medium text-[#475569] mt-0.5">
+                          {ev.zone_id} · {ev.sim_timestamp ? ev.sim_timestamp.replace("T", " ") : "Live Telemetry"}
+                        </div>
+                        {ev.explanation && (
+                          <p className="text-sm font-medium text-[#475569] mt-1 max-w-2xl leading-relaxed">
+                            {ev.explanation}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span
+                        className={`inline-block px-3.5 py-1 rounded-full text-xs sm:text-sm font-bold border shadow-sm ${
+                          isCritical
+                            ? "bg-rose-50 border-rose-200 text-rose-800"
+                            : "bg-[#EFF6FF] border-[#BAE6FD] text-[#1E40AF]"
+                        }`}
+                      >
+                        {isCritical ? "Excursion Logged" : "Telemetry Event"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
