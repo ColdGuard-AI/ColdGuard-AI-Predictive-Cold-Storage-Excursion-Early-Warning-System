@@ -600,10 +600,12 @@ class MonitoringService:
 
         if not raise_alerts:
             return []
+        tamper_issue = self.db.get_active_tamper_for_zone(zone_id)
         signals = ZoneSignals(
             config=cfg, timestamp=latest_row["timestamp"], current_temp=current_for_risk, last_valid_temps=valid,
             compressor_off_minutes=comp_off_min, door_open_minutes=door_min, sensor_issues=sensor.issues,
             forecast=forecast, alert_horizon=self.settings.alert_horizon_minutes, slope_per_min=slope,
+            tamper_issue=tamper_issue,
         )
         return self.alerts.process(zone_id, evaluate_conditions(signals), latest_row["timestamp"])
 

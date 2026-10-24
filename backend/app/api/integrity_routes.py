@@ -25,8 +25,8 @@ class TamperDemoRequest(BaseModel):
 
 
 class RestoreDemoRequest(BaseModel):
-    reading_id: int = Field(..., description="ID of reading to restore")
-    original_temperature: float = Field(5.0, description="Original temperature to restore")
+    reading_id: Optional[int] = Field(None, description="ID of reading to restore (or latest tampered if null)")
+    original_temperature: Optional[float] = Field(None, description="Original temperature to restore")
 
 
 class PublishTestTelemetryRequest(BaseModel):
@@ -199,8 +199,11 @@ def demonstrate_tamper(
         audit_rep = _build_audit_response(blockchain, r_id) if blockchain else {}
         return {
             "ok": True,
-            "message": "Deliberately injected altered reading. Tamper detection verified.",
+            "message": "Deliberately injected altered reading. Tamper detection verified and security alert generated.",
             "reading_id": r_id,
+            "zone_id": tamper_res.get("zone_id"),
+            "device_id": tamper_res.get("device_id"),
+            "telemetry_timestamp": tamper_res.get("telemetry_timestamp"),
             "original_temperature": tamper_res["original_temperature"],
             "tampered_temperature": tamper_res["tampered_temperature"],
             "audit_result": audit_rep,
@@ -208,6 +211,8 @@ def demonstrate_tamper(
             "audit_verification": audit_rep,
             "verdict": "TAMPER_DETECTED",
             "proof": "Cryptographic SHA-256 mismatch: calculated reading digest != stored blockchain anchor hash.",
+            "alert_generated": True,
+            "alert": tamper_res.get("alert"),
         }
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -215,20 +220,23 @@ def demonstrate_tamper(
 
 @router.post("/restore")
 def restore_tampered_reading(
-    req: RestoreDemoRequest,
+    req: Optional[RestoreDemoRequest] = None,
     monitor: MonitoringService = Depends(get_monitor),
 ) -> dict[str, Any]:
     """Restore a tampered reading back to its verified baseline value."""
     try:
+        r_id = req.reading_id if (req and req.reading_id) else 0
+        orig_temp = req.original_temperature if req else None
         restore_res = monitor.db.restore_reading_for_demo(
-            reading_id=req.reading_id,
-            original_temperature=req.original_temperature,
+            reading_id=r_id,
+            original_temperature=orig_temp,
         )
+        target_id = restore_res.get("reading_id") or r_id
         blockchain = getattr(monitor, "blockchain", None)
-        audit_rep = _build_audit_response(blockchain, req.reading_id) if blockchain else {}
+        audit_rep = _build_audit_response(blockchain, target_id) if (blockchain and target_id) else {}
         return {
             "ok": True,
-            "message": f"Successfully restored reading #{req.reading_id} to {req.original_temperature}°C.",
+            "message": restore_res.get("message", "Reading restored to verified baseline."),
             "restore_result": restore_res,
             "audit_verification": audit_rep,
             "verdict": "VERIFIED_RESTORED",

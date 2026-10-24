@@ -31,6 +31,7 @@ CATEGORY_LABELS = {
     "door_open": "Door Left Open",
     "sensor_anomaly": "Sensor Anomaly",
     "missing_data": "Missing Sensor Data",
+    "data_tampering": "Cryptographic Data Tampering Detected",
 }
 
 COMPRESSOR_ALERT_MINUTES = 2
@@ -60,6 +61,7 @@ class ZoneSignals:
     forecast: dict[str, Any]
     alert_horizon: int
     slope_per_min: float
+    tamper_issue: dict[str, Any] | None = None
 
 
 def _predicted_action(s: ZoneSignals) -> str:
@@ -151,6 +153,21 @@ def evaluate_conditions(s: ZoneSignals) -> list[Condition]:
             "Check sensor power, wiring and gateway connectivity; take a manual reading in the meantime.",
             {},
         ))
+
+    if s.tamper_issue:
+        t_data = s.tamper_issue.get("tampered_data") or f"Field '{s.tamper_issue.get('tampered_field', 'telemetry')}' altered"
+        t_from = s.tamper_issue.get("tampered_from") or f"Zone {s.config.name} (Device {s.tamper_issue.get('device_id', s.config.sensor_id)})"
+        t_ts = s.tamper_issue.get("telemetry_timestamp") or s.timestamp.isoformat()
+        t_det = s.tamper_issue.get("detected_at") or s.timestamp.isoformat()
+        out.append(Condition(
+            "data_tampering",
+            "critical",
+            f"Tamper Detected: {t_data} in {s.config.name}",
+            f"SECURITY ALERT: Cryptographic data tampering detected! {t_data}. Source: {t_from}. Telemetry Timestamp: {t_ts}. Audit Detected At: {t_det}.",
+            "QUARANTINE PROTOCOL: Exclude tampered reading from ML engine immediately. Restore database record to verified baseline or re-anchor hash ledger.",
+            s.tamper_issue,
+        ))
+
     return out
 
 

@@ -141,6 +141,19 @@ class MqttService:
                 status = "tampered"
                 verdict_msg = f"TAMPER_DETECTED: Claimed hash {claimed_hash[:10]}... != Computed hash {computed_hash[:10]}..."
                 log.warning("ALERT: Tampered telemetry packet detected from device %s! [Hash mismatch]", dev_id)
+                try:
+                    self.db.record_tamper_alert(
+                        zone_id=zid,
+                        tampered_field="payload_signature",
+                        original_value=claimed_hash[:16] + "...",
+                        tampered_value=computed_hash[:16] + "...",
+                        source_location=f"MQTT Telemetry Gateway (Device {dev_id})",
+                        telemetry_timestamp=ts,
+                        device_id=dev_id,
+                        notes=f"Claimed hash {claimed_hash[:12]} does not match calculated canonical SHA-256 {computed_hash[:12]}.",
+                    )
+                except Exception as e:
+                    log.debug("Could not record tamper alert: %s", e)
             elif last_state["last_seq"] >= 0 and seq <= last_state["last_seq"]:
                 status = "duplicate"
                 is_duplicate = True
@@ -155,6 +168,19 @@ class MqttService:
                 status = "tampered"
                 verdict_msg = f"HASH_CHAIN_BROKEN: prev_hash does not match previous reading hash"
                 log.warning("Hash-chain broken on device %s: expected %s..., got %s...", dev_id, last_state["last_hash"][:10], prev_hash[:10])
+                try:
+                    self.db.record_tamper_alert(
+                        zone_id=zid,
+                        tampered_field="prev_hash_chain",
+                        original_value=last_state["last_hash"][:16] + "...",
+                        tampered_value=prev_hash[:16] + "...",
+                        source_location=f"MQTT Telemetry Stream (Device {dev_id})",
+                        telemetry_timestamp=ts,
+                        device_id=dev_id,
+                        notes="Hash-chain broken: prev_hash does not match last seen hash.",
+                    )
+                except Exception as e:
+                    log.debug("Could not record tamper alert: %s", e)
             else:
                 status = "verified"
 

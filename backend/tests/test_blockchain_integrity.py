@@ -250,6 +250,18 @@ def test_integrity_api_and_tamper_demonstration(client):
     # Verification audit must immediately catch the tamper
     assert tamper_data["audit_result"]["tamper_detected"] is True
     assert tamper_data["audit_result"]["cryptographic_audit"]["hash_match"] is False
+    assert tamper_data.get("alert_generated") is True
+
+    # Check alert endpoint: data_tampering alert must be generated with data, location, and timestamp
+    alerts = client.get("/api/alerts", params={"active": True}).json()
+    tamper_alerts = [a for a in alerts if a["category"] == "data_tampering"]
+    assert len(tamper_alerts) > 0
+    t_alert = tamper_alerts[0]
+    assert t_alert["severity"] == "critical"
+    assert "temperature" in t_alert["context"]["tampered_field"]
+    assert "28.5" in t_alert["context"]["tampered_value"]
+    assert t_alert["context"]["tampered_from"] is not None
+    assert t_alert["context"]["telemetry_timestamp"] is not None
 
     # 6. Restore original reading
     restore_res = client.post(
@@ -258,8 +270,12 @@ def test_integrity_api_and_tamper_demonstration(client):
     )
     assert restore_res.status_code == 200
 
-    # 7. Audit again after restore -> Must be authentic again
+    # 7. Audit again after restore -> Must be authentic again and active tamper alert resolved
     audit_restored = client.get(f"/api/integrity/audit/{reading_id}")
     assert audit_restored.status_code == 200
     assert audit_restored.json()["tamper_detected"] is False
     assert audit_restored.json()["cryptographic_audit"]["hash_match"] is True
+
+    # Active tamper alerts must be cleared
+    active_after = client.get("/api/alerts", params={"active": True}).json()
+    assert not any(a["category"] == "data_tampering" for a in active_after)

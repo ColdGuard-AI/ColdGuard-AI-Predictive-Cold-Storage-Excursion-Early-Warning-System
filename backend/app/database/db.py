@@ -9,6 +9,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
+import uuid
 
 import pandas as pd
 
@@ -442,6 +443,161 @@ class Database:
     def active_alerts(self, zone_id: str) -> list[dict[str, Any]]:
         return self.list_alerts(zone_id=zone_id, active=True, limit=50)
 
+    def record_tamper_alert(
+        self,
+        zone_id: str,
+        tampered_field: str,
+        original_value: Any,
+        tampered_value: Any,
+        source_location: str,
+        telemetry_timestamp: str | datetime,
+        device_id: str = "TS-01",
+        reading_id: int | None = None,
+        notes: str = "",
+    ) -> dict[str, Any]:
+        """Generate and persist a critical data_tampering alert specifying which data was tampered, from where, and timestamps."""
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+        ts_str = _ts(telemetry_timestamp) or now_iso
+
+        delta_str = ""
+        if isinstance(original_value, (int, float)) and isinstance(tampered_value, (int, float)):
+            delta = tampered_value - original_value
+            delta_str = f" (Delta: {delta:+0.2f}°C)" if tampered_field == "temperature" else f" (Delta: {delta:+0.2f})"
+
+        field_title = tampered_field.replace("_", " ").capitalize()
+        orig_disp = f"{original_value}°C" if tampered_field == "temperature" else str(original_value)
+        tamp_disp = f"{tampered_value}°C" if tampered_field == "temperature" else str(tampered_value)
+
+        title = f"Data Tampered: {field_title} altered in {zone_id.upper()} ({device_id})"
+        explanation = (
+            f"SECURITY ALERT: Cryptographic data tampering detected! "
+            f"Field '{tampered_field}' was tampered from {orig_disp} to {tamp_disp}{delta_str}. "
+            f"Origin / Location: {source_location} (Zone {zone_id.upper()}, Sensor {device_id}). "
+            f"Telemetry Timestamp: {ts_str}. Audit Detected At: {now_iso}."
+        )
+        if notes:
+            explanation += f" Reason: {notes}"
+
+        context = {
+            "tampered_field": tampered_field,
+            "original_value": orig_disp,
+            "tampered_value": tamp_disp,
+            "delta": delta_str.strip(),
+            "tampered_data": f"{field_title} altered from {orig_disp} to {tamp_disp}{delta_str}",
+            "tampered_from": f"Zone {zone_id.upper()} · Sensor {device_id} ({source_location})",
+            "source_location": source_location,
+            "telemetry_timestamp": ts_str,
+            "detected_at": now_iso,
+            "device_id": device_id,
+            "zone_id": zone_id,
+            "reading_id": reading_id,
+        }
+
+        # Check if an active tamper alert already exists for this zone
+        existing = self.latest_alert_for(zone_id, "data_tampering")
+        if existing and existing.get("active"):
+            alert_id = existing["id"]
+            self.update_alert(
+                alert_id,
+                last_seen_at=now,
+                title=title,
+                explanation=explanation,
+                context=context,
+            )
+            self.increment_occurrence(alert_id)
+            updated = self.get_alert(alert_id)
+            return updated or {}
+        else:
+            alert_id = f"ALT-TAMPER-{uuid.uuid4().hex[:6].upper()}"
+            alert = {
+                "id": alert_id,
+                "zone_id": zone_id,
+                "category": "data_tampering",
+                "severity": "critical",
+                "title": title,
+                "explanation": explanation,
+                "recommended_action": (
+                    "CRITICAL SECURITY PROTOCOL: Quarantine altered telemetry record from ML predictive pipeline. "
+                    "Revert record to cryptographically anchored SHA-256 baseline or inspect storage audit log."
+                ),
+                "created_at": now,
+                "last_seen_at": now,
+                "context": context,
+            }
+            self.insert_alert(alert)
+            return alert
+
+    def resolve_tamper_alerts(self, zone_id: str | None = None, reading_id: int | None = None) -> int:
+        """Mark active data_tampering alerts as resolved upon restoring verified baseline."""
+        now = datetime.now(timezone.utc)
+        resolved_count = 0
+        with self._lock:
+            query = "SELECT id, explanation FROM alerts WHERE category = 'data_tampering' AND active = 1"
+            params: list[Any] = []
+            if zone_id:
+                query += " AND zone_id = ?"
+                params.append(zone_id)
+            rows = self._conn.execute(query, tuple(params)).fetchall()
+            for r in rows:
+                new_expl = r["explanation"]
+                if " [RESOLVED:" not in new_expl:
+                    new_expl = f"{new_expl} [RESOLVED: Restored to verified baseline at {_ts(now)}]"
+                self._conn.execute(
+                    "UPDATE alerts SET active = 0, last_seen_at = ?, explanation = ? WHERE id = ?",
+                    (_ts(now), new_expl, r["id"])
+                )
+                resolved_count += 1
+            self._conn.commit()
+        return resolved_count
+
+    def get_active_tamper_for_zone(self, zone_id: str) -> dict[str, Any] | None:
+        """Retrieve latest un-restored tampered reading detail for a given zone."""
+        with self._lock:
+            t_row = self._conn.execute(
+                """
+                SELECT ti.id as integrity_id, ti.reading_id, ti.zone_id, ti.device_id, ti.timestamp as telemetry_timestamp,
+                       ti.verification_message, ti.canonical_payload, ti.verified_at,
+                       r.temperature as current_temperature
+                FROM telemetry_integrity ti
+                LEFT JOIN readings r ON ti.reading_id = r.id
+                WHERE ti.zone_id = ? AND ti.verification_status = 'tampered'
+                ORDER BY ti.id DESC LIMIT 1
+                """,
+                (zone_id,)
+            ).fetchone()
+            if not t_row:
+                return None
+            orig_temp = None
+            try:
+                c_dict = json.loads(t_row["canonical_payload"]) if t_row["canonical_payload"] else {}
+                orig_temp = c_dict.get("temperature")
+            except Exception:
+                pass
+
+            curr_temp = t_row["current_temperature"]
+            device_id = t_row["device_id"]
+            r_id = t_row["reading_id"]
+            ts = t_row["telemetry_timestamp"]
+            delta_str = f" (Delta: {curr_temp - orig_temp:+0.2f}°C)" if (orig_temp is not None and curr_temp is not None) else ""
+            tamp_desc = f"Temperature altered from {orig_temp}°C to {curr_temp}°C{delta_str}" if (orig_temp is not None and curr_temp is not None) else "Payload hash mismatch against immutable seal"
+
+            return {
+                "integrity_id": t_row["integrity_id"],
+                "reading_id": r_id,
+                "zone_id": t_row["zone_id"],
+                "device_id": device_id,
+                "telemetry_timestamp": ts,
+                "detected_at": t_row["verified_at"] or _ts(datetime.now(timezone.utc)),
+                "tampered_field": "temperature",
+                "original_value": f"{orig_temp}°C" if orig_temp is not None else "Unknown",
+                "tampered_value": f"{curr_temp}°C" if curr_temp is not None else "Unknown",
+                "delta": delta_str.strip(),
+                "tampered_data": tamp_desc,
+                "tampered_from": f"Zone {zone_id.upper()} · Sensor {device_id} (Database Record #{r_id})" if r_id else f"Zone {zone_id.upper()} · Sensor {device_id}",
+                "source_location": f"Database Storage (Reading #{r_id})" if r_id else f"Telemetry Ingress (Sensor {device_id})",
+            }
+
     # ------------------------------------------------------------------ telemetry integrity & blockchain
     def insert_reading_single(self, r: dict[str, Any]) -> int:
         """Insert a single reading and return its generated auto-increment id."""
@@ -569,6 +725,38 @@ class Database:
             unanchored = self._conn.execute("SELECT COUNT(*) FROM telemetry_integrity WHERE verification_status = 'verified' AND anchor_status = 'unanchored'").fetchone()[0]
             blocks_count = self._conn.execute("SELECT COUNT(*) FROM blockchain_blocks").fetchone()[0]
             latest_block = self.get_latest_blockchain_block()
+
+            latest_tampered = None
+            if tampered > 0:
+                t_row = self._conn.execute(
+                    """
+                    SELECT ti.id, ti.reading_id, ti.zone_id, ti.device_id, ti.timestamp,
+                           ti.verification_message, ti.canonical_payload,
+                           r.temperature as current_temperature
+                    FROM telemetry_integrity ti
+                    LEFT JOIN readings r ON ti.reading_id = r.id
+                    WHERE ti.verification_status = 'tampered'
+                    ORDER BY ti.id DESC LIMIT 1
+                    """
+                ).fetchone()
+                if t_row:
+                    orig_temp = None
+                    try:
+                        c_dict = json.loads(t_row["canonical_payload"]) if t_row["canonical_payload"] else {}
+                        orig_temp = c_dict.get("temperature")
+                    except Exception:
+                        pass
+                    latest_tampered = {
+                        "integrity_id": t_row["id"],
+                        "reading_id": t_row["reading_id"],
+                        "zone_id": t_row["zone_id"],
+                        "device_id": t_row["device_id"],
+                        "timestamp": t_row["timestamp"],
+                        "original_temperature": orig_temp,
+                        "tampered_temperature": t_row["current_temperature"],
+                        "message": t_row["verification_message"],
+                    }
+
         return {
             "total_messages_received": total,
             "verified_count": verified,
@@ -582,6 +770,7 @@ class Database:
             "latest_block_hash": latest_block.block_hash if latest_block else None,
             "latest_merkle_root": latest_block.merkle_root if latest_block else None,
             "hash_chain_status": "broken" if (tampered > 0 or seq_anomalies > 0) else "intact",
+            "latest_tampered_detail": latest_tampered,
         }
 
     def get_recent_integrity_verifications(self, limit: int = 50) -> list[dict[str, Any]]:
@@ -700,42 +889,102 @@ class Database:
     def tamper_reading_for_demo(self, reading_id: int, new_temperature: float = 12.8) -> dict[str, Any]:
         """Deliberately modify a stored temperature reading in the database to demonstrate tamper detection."""
         with self._lock:
-            current = self._conn.execute("SELECT id, temperature, zone_id FROM readings WHERE id = ?", (reading_id,)).fetchone()
+            current = self._conn.execute(
+                "SELECT id, temperature, zone_id, sensor_id, timestamp FROM readings WHERE id = ?", (reading_id,)
+            ).fetchone()
             if not current:
                 # Find latest reading if specified ID not found
-                current = self._conn.execute("SELECT id, temperature, zone_id FROM readings ORDER BY id DESC LIMIT 1").fetchone()
+                current = self._conn.execute(
+                    "SELECT id, temperature, zone_id, sensor_id, timestamp FROM readings ORDER BY id DESC LIMIT 1"
+                ).fetchone()
             if not current:
                 raise ValueError("No reading available to tamper")
             r_id = current["id"]
             orig_temp = current["temperature"]
+            zid = current["zone_id"]
+            sensor_id = current["sensor_id"] or "TS-01"
+            telemetry_ts = current["timestamp"]
+
             self._conn.execute("UPDATE readings SET temperature = ? WHERE id = ?", (new_temperature, r_id))
             self._conn.execute(
                 "UPDATE telemetry_integrity SET verification_status = 'tampered', verification_message = 'MANUAL_INJECTION: reading altered in storage' WHERE reading_id = ?",
                 (r_id,)
             )
             self._conn.commit()
-            return {
-                "reading_id": r_id,
-                "zone_id": current["zone_id"],
-                "original_temperature": orig_temp,
-                "tampered_temperature": new_temperature,
-                "status": "tampered",
-                "message": f"Reading #{r_id} temperature modified from {orig_temp}°C to {new_temperature}°C in database.",
-            }
 
-    def restore_reading_for_demo(self, reading_id: int, original_temperature: float = 5.0) -> dict[str, Any]:
+        # Immediately generate critical data_tampering alert
+        alert = self.record_tamper_alert(
+            zone_id=zid,
+            tampered_field="temperature",
+            original_value=orig_temp,
+            tampered_value=new_temperature,
+            source_location=f"Database Storage (Reading #{r_id})",
+            telemetry_timestamp=telemetry_ts,
+            device_id=sensor_id,
+            reading_id=r_id,
+            notes="Manual injection test: reading modified directly in database storage.",
+        )
+
+        return {
+            "reading_id": r_id,
+            "zone_id": zid,
+            "device_id": sensor_id,
+            "telemetry_timestamp": str(telemetry_ts),
+            "original_temperature": orig_temp,
+            "tampered_temperature": new_temperature,
+            "status": "tampered",
+            "alert_generated": True,
+            "alert": alert,
+            "message": f"Reading #{r_id} temperature modified from {orig_temp}°C to {new_temperature}°C in database.",
+        }
+
+    def restore_reading_for_demo(self, reading_id: int = 0, original_temperature: float | None = None) -> dict[str, Any]:
         """Restore a tampered reading back to its original value."""
         with self._lock:
+            # If reading_id not supplied, locate the tampered record automatically
+            if not reading_id or reading_id <= 0:
+                tampered_row = self._conn.execute(
+                    "SELECT reading_id, canonical_payload FROM telemetry_integrity WHERE verification_status = 'tampered' ORDER BY id DESC LIMIT 1"
+                ).fetchone()
+                if tampered_row:
+                    reading_id = tampered_row["reading_id"]
+                else:
+                    self.resolve_tamper_alerts()
+                    return {"reading_id": 0, "status": "verified", "message": "No tampered records found to restore."}
+
+            # If original temperature is not explicitly passed, retrieve it from sealed canonical payload
+            if original_temperature is None:
+                integ = self._conn.execute(
+                    "SELECT canonical_payload FROM telemetry_integrity WHERE reading_id = ? ORDER BY id DESC LIMIT 1",
+                    (reading_id,)
+                ).fetchone()
+                if integ and integ["canonical_payload"]:
+                    try:
+                        c_dict = json.loads(integ["canonical_payload"])
+                        if "temperature" in c_dict:
+                            original_temperature = float(c_dict["temperature"])
+                    except Exception:
+                        pass
+            if original_temperature is None:
+                original_temperature = 4.0
+
+            # Restore in readings table
             self._conn.execute("UPDATE readings SET temperature = ? WHERE id = ?", (original_temperature, reading_id))
+            # Restore in telemetry_integrity table (also restore any other dangling tampered flags)
             self._conn.execute(
-                "UPDATE telemetry_integrity SET verification_status = 'verified', verification_message = 'RESTORED: Verified baseline recovered' WHERE reading_id = ?",
+                "UPDATE telemetry_integrity SET verification_status = 'verified', verification_message = 'RESTORED: Verified baseline recovered' WHERE reading_id = ? OR verification_status = 'tampered'",
                 (reading_id,)
             )
             self._conn.commit()
-            return {
-                "reading_id": reading_id,
-                "restored_temperature": original_temperature,
-                "status": "verified",
-                "message": f"Reading #{reading_id} restored to {original_temperature}°C and re-verified.",
-            }
+
+        # Resolve active tamper alerts in database
+        self.resolve_tamper_alerts(reading_id=reading_id)
+
+        return {
+            "reading_id": reading_id,
+            "restored_temperature": original_temperature,
+            "status": "verified",
+            "alert_cleared": True,
+            "message": f"Reading #{reading_id} restored to {original_temperature}°C and re-verified. Tamper count cleared.",
+        }
 

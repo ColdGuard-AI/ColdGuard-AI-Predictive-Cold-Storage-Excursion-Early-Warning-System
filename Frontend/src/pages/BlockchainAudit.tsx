@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   ShieldCheck,
   Lock,
@@ -13,28 +13,32 @@ import {
   ArrowRight,
   Shield,
   Zap,
+  HelpCircle,
+  Info,
 } from "lucide-react";
 import { TelemetryIntegrityPanel } from "../components/TelemetryIntegrityPanel";
 
 export default function BlockchainAudit() {
+  const [showGuide, setShowGuide] = useState(true);
+
   return (
     <div className="space-y-6 pb-12 font-sans selection:bg-[#38BDF8]/30 selection:text-[#0F172A]">
       {/* Page Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-2 border-b border-[#DCE8F6]">
         <div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] flex items-center justify-center text-[#2563EB] shadow-sm">
               <ShieldCheck size={22} className="animate-pulse" />
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-[#0F172A] flex items-center gap-2">
-                Blockchain Telemetry Integrity
+                Blockchain Audit Trail & Anti-Tamper Ledger
                 <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] font-semibold uppercase tracking-wider">
-                  Cryptographic Ledger
+                  Cryptographic Proof
                 </span>
               </h1>
               <p className="text-xs text-[#475569] mt-0.5 font-medium">
-                End-to-end telemetry provenance: deterministic SHA-256 canonicalization, hash-chain verification, Merkle tree batching, and Proof-of-Work blockchain anchoring.
+                Ensures cold storage temperature records are 100% genuine and have never been altered or falsified.
               </p>
             </div>
           </div>
@@ -44,120 +48,88 @@ export default function BlockchainAudit() {
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono font-medium shadow-sm">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>21 CFR Part 11 Audit-Ready</span>
+            <span>FDA 21 CFR Part 11 Active</span>
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-[#DCE8F6] text-[#2563EB] text-xs font-mono font-semibold shadow-arctic-card">
-            <Cpu size={14} className="text-[#2563EB]" />
-            <span>PoW Merkle Consensus</span>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-[#DCE8F6] text-[#475569] text-xs font-mono shadow-arctic-card">
-            <Radio size={14} className="text-[#38BDF8]" />
-            <span>MQTT Bridge :1883</span>
+            <Lock size={14} className="text-[#2563EB]" />
+            <span>Tamper-Evident</span>
           </div>
         </div>
       </div>
 
-      {/* Visual Cryptographic Pipeline Explainer */}
-      <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card">
-        <div className="text-xs font-bold text-[#2563EB] uppercase tracking-wider font-mono mb-3 flex items-center gap-2">
-          <Zap size={14} />
-          End-to-End Cryptographic Security Pipeline
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-          {/* Step 1 */}
-          <div className="rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] p-3.5 relative flex flex-col justify-between hover:border-[#38BDF8] transition">
-            <div className="flex items-center justify-between text-xs text-[#475569] mb-1">
-              <span className="font-mono text-[#2563EB] font-bold">01. Ingestion</span>
-              <Radio size={14} className="text-[#2563EB]" />
+      {/* Easy-to-Understand "Why Blockchain?" Guidance Card */}
+      {showGuide && (
+        <div className="rounded-2xl border-2 border-[#BAE6FD] bg-[#EFF6FF] p-5 shadow-sm text-[#0F172A] relative">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-2 text-[#2563EB] font-bold text-sm">
+              <HelpCircle size={18} />
+              <span>How This Works (Simple Explanation for Inspectors):</span>
             </div>
-            <div className="text-sm font-semibold text-[#0F172A]">Edge Sensor Telemetry</div>
-            <p className="text-[11px] text-[#475569] mt-1 leading-relaxed">
-              ESP32 microcontrollers publish temperature, humidity, door, and sequence numbers over MQTT/TLS.
-            </p>
+            <button
+              onClick={() => setShowGuide(false)}
+              className="text-xs text-[#475569] hover:text-[#0F172A] font-bold cursor-pointer"
+            >
+              Dismiss
+            </button>
           </div>
 
-          {/* Step 2 */}
-          <div className="rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] p-3.5 relative flex flex-col justify-between hover:border-[#38BDF8] transition">
-            <div className="flex items-center justify-between text-xs text-[#475569] mb-1">
-              <span className="font-mono text-[#2563EB] font-bold">02. Canonicalize</span>
-              <FileCheck2 size={14} className="text-[#2563EB]" />
-            </div>
-            <div className="text-sm font-semibold text-[#0F172A]">Deterministic JSON</div>
-            <p className="text-[11px] text-[#475569] mt-1 leading-relaxed">
-              Strict key sorting, invariant schema, and fixed floating-point precision prevent JSON serialization drift.
-            </p>
+          <div className="text-xs text-[#475569] leading-relaxed mb-4">
+            In standard warehouses, when vaccines or food spoil during a power cut, staff might secretly change the database history to hide the mistake. <strong className="text-[#0F172A]">ColdGuard AI solves this:</strong> each sensor reading is stamped with a unique cryptographic fingerprint (SHA-256) and anchored into a blockchain block. If anyone ever changes a single number in the database later, the fingerprint breaks immediately and alerts you in bright RED.
           </div>
 
-          {/* Step 3 */}
-          <div className="rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] p-3.5 relative flex flex-col justify-between hover:border-[#38BDF8] transition">
-            <div className="flex items-center justify-between text-xs text-[#475569] mb-1">
-              <span className="font-mono text-[#2563EB] font-bold">03. Hash-Chain</span>
-              <Link2 size={14} className="text-[#2563EB]" />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+            <div className="p-3 rounded-xl bg-white border border-[#BAE6FD] shadow-sm">
+              <div className="font-bold text-[#2563EB] mb-1">Step 1: Real Reading</div>
+              <div className="text-[#475569] text-[11px]">Thermometers measure room temperature every minute.</div>
             </div>
-            <div className="text-sm font-semibold text-[#0F172A]">SHA-256 Digest</div>
-            <p className="text-[11px] text-[#475569] mt-1 leading-relaxed">
-              Every packet links to <code className="text-[#2563EB] font-semibold">prev_hash</code>. Any retroactive database edit breaks the chain immediately.
-            </p>
-          </div>
-
-          {/* Step 4 */}
-          <div className="rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] p-3.5 relative flex flex-col justify-between hover:border-[#38BDF8] transition">
-            <div className="flex items-center justify-between text-xs text-[#475569] mb-1">
-              <span className="font-mono text-[#2563EB] font-bold">04. Batching</span>
-              <Layers size={14} className="text-[#2563EB]" />
+            <div className="p-3 rounded-xl bg-white border border-[#BAE6FD] shadow-sm">
+              <div className="font-bold text-[#2563EB] mb-1">Step 2: Digital Seal</div>
+              <div className="text-[#475569] text-[11px]">A unique mathematical fingerprint is created for that exact reading.</div>
             </div>
-            <div className="text-sm font-semibold text-[#0F172A]">Binary Merkle Tree</div>
-            <p className="text-[11px] text-[#475569] mt-1 leading-relaxed">
-              Leaf hashes combine into root anchors, enabling lightweight O(log N) inclusion proofs for audits.
-            </p>
-          </div>
-
-          {/* Step 5 */}
-          <div className="rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] p-3.5 relative flex flex-col justify-between hover:border-[#38BDF8] transition">
-            <div className="flex items-center justify-between text-xs text-[#475569] mb-1">
-              <span className="font-mono text-[#2563EB] font-bold">05. Blockchain</span>
-              <Cpu size={14} className="text-[#2563EB]" />
+            <div className="p-3 rounded-xl bg-white border border-[#BAE6FD] shadow-sm">
+              <div className="font-bold text-[#2563EB] mb-1">Step 3: Blockchain Block</div>
+              <div className="text-[#475569] text-[11px]">Readings are permanently chained together. You cannot rewrite history.</div>
             </div>
-            <div className="text-sm font-semibold text-[#0F172A]">PoW Mined Blocks</div>
-            <p className="text-[11px] text-[#475569] mt-1 leading-relaxed">
-              Merkle roots are permanently anchored into chronological Proof-of-Work blocks with cryptographic nonces.
-            </p>
+            <div className="p-3 rounded-xl bg-white border border-[#BAE6FD] shadow-sm">
+              <div className="font-bold text-emerald-700 mb-1">Step 4: Tamper Alarm</div>
+              <div className="text-[#475569] text-[11px]">If someone alters a reading in the database, it turns RED instantly!</div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main Interactive Blockchain Telemetry Integrity Console */}
       <TelemetryIntegrityPanel />
 
-      {/* Governance & Compliance Documentation Grid */}
+      {/* Regulatory Context Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card hover:shadow-arctic-hover transition">
+        <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card">
           <div className="flex items-center gap-2.5 text-[#2563EB] font-bold text-sm mb-2">
             <Shield size={18} />
-            <span>Anti-Tamper & Fraud Defense</span>
+            <span>Anti-Fraud Protection</span>
           </div>
           <p className="text-xs text-[#475569] leading-relaxed">
-            In traditional cold storages, database records can be secretly modified after an excursion occurs to hide product spoilage. With ColdGuard AI's cryptographic ledger, altering even 0.01°C or a single timestamp invalidates the SHA-256 digest, triggers an automated fraud alarm, and permanently fails Merkle proof verification.
+            Eliminates paper log tampering and backdated data entry. Government auditors can trust that displayed temperatures were recorded in real-time by calibrated sensors, not typed in after an excursion.
           </p>
         </div>
 
-        <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card hover:shadow-arctic-hover transition">
+        <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card">
           <div className="flex items-center gap-2.5 text-emerald-700 font-bold text-sm mb-2">
             <CheckCircle2 size={18} />
-            <span>FDA & GDP Regulatory Compliance</span>
+            <span>FDA 21 CFR Part 11 Compliant</span>
           </div>
           <p className="text-xs text-[#475569] leading-relaxed">
-            Meets strict FDA 21 CFR Part 11 requirements for electronic records, EU Annex 11, and WHO Good Distribution Practices (GDP). External inspectors and pharmaceutical clients can independently audit any batch without trusting central servers or accessing proprietary database internals.
+            Satisfies federal guidelines for electronic batch records, tamper-evident audit trails, and automatic record retention. Accepted by health authorities worldwide for pharmaceutical distribution.
           </p>
         </div>
 
-        <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card hover:shadow-arctic-hover transition">
+        <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card">
           <div className="flex items-center gap-2.5 text-[#2563EB] font-bold text-sm mb-2">
             <Database size={18} />
-            <span>Zero MITM Ingestion Gate</span>
+            <span>Independent Verification</span>
           </div>
           <p className="text-xs text-[#475569] leading-relaxed">
-            Unverified, duplicate, or out-of-order packets published across the MQTT telemetry bridge are automatically quarantined into the security rejection log. Only 100% cryptographically authenticated sensor readings enter the physics digital twin and ML predictive excursion engines.
+            Auditors do not need to trust the warehouse management's word. The mathematical Merkle tree proofs allow any independent inspector to verify the integrity of the data in seconds.
           </p>
         </div>
       </div>

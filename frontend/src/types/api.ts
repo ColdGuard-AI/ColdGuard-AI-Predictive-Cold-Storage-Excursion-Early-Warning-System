@@ -576,10 +576,19 @@ export interface AuditReadingResponse {
 }
 
 export interface TamperDemoResponse {
+  ok?: boolean;
   message: string;
   reading_id: number;
+  zone_id?: string;
+  device_id?: string;
+  telemetry_timestamp?: string;
   original_temperature: number;
   tampered_temperature: number;
   audit_result: AuditReadingResponse;
+  audit_verification?: AuditReadingResponse;
+  verdict?: string;
+  proof?: string;
+  alert_generated?: boolean;
+  alert?: Alert;
 }
 

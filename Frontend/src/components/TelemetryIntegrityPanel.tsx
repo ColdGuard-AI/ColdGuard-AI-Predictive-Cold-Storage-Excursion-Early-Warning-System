@@ -17,6 +17,8 @@ import {
   X,
   RotateCcw,
   Cpu,
+  Clock,
+  MapPin,
 } from "lucide-react";
 import { api } from "../services/api";
 import type {
@@ -111,15 +113,18 @@ export function TelemetryIntegrityPanel() {
     }
   };
 
-  const handleRestoreTamper = async () => {
-    if (!tamperDemo) return;
+  const handleRestoreTamper = async (readingId?: number, origTemp?: number) => {
     setIsLoading(true);
     setActionMessage(null);
     try {
-      const res = await api.restoreReading(tamperDemo.reading_id, tamperDemo.original_temperature);
-      setActionMessage(res.message);
-      const refreshedAudit = await api.auditReading(tamperDemo.reading_id);
-      setAuditResult(refreshedAudit);
+      const rId = readingId ?? tamperDemo?.reading_id ?? 0;
+      const t = origTemp ?? tamperDemo?.original_temperature;
+      const res = await api.restoreReading(rId, t);
+      setActionMessage(res.message || "Tampered record restored to verified baseline.");
+      if (rId) {
+        const refreshedAudit = await api.auditReading(rId).catch(() => null);
+        if (refreshedAudit) setAuditResult(refreshedAudit);
+      }
       setTamperDemo(null);
       await fetchData();
     } catch (err: any) {
@@ -133,6 +138,15 @@ export function TelemetryIntegrityPanel() {
   const mqtt = status?.mqtt;
   const blockchain = status?.blockchain;
   const isChainIntact = metrics?.hash_chain_status === "intact" && (metrics?.tampered_count ?? 0) === 0;
+
+  const latestTampered = metrics?.latest_tampered_detail || (tamperDemo ? {
+    reading_id: tamperDemo.reading_id,
+    zone_id: tamperDemo.zone_id || "zone-a",
+    device_id: tamperDemo.device_id || "TS-01",
+    timestamp: tamperDemo.telemetry_timestamp || new Date().toISOString(),
+    original_temperature: tamperDemo.original_temperature,
+    tampered_temperature: tamperDemo.tampered_temperature,
+  } : null);
 
   return (
     <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card transition-all">
@@ -221,6 +235,19 @@ export function TelemetryIntegrityPanel() {
             <AlertTriangle size={13} className={isTampering ? "animate-bounce" : ""} />
             <span>{isTampering ? "Injecting Attack..." : "Simulate Tamper Attack"}</span>
           </button>
+
+          {/* Restore Baseline Button */}
+          {((metrics?.tampered_count ?? 0) > 0 || tamperDemo != null) && (
+            <button
+              onClick={() => handleRestoreTamper()}
+              disabled={isLoading}
+              className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 font-mono text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+              title="Restore altered readings to verified baseline"
+            >
+              <RotateCcw size={13} className={isLoading ? "animate-spin" : ""} />
+              <span>Restore Baseline ({metrics?.tampered_count ?? 1})</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -231,6 +258,85 @@ export function TelemetryIntegrityPanel() {
           <button onClick={() => setActionMessage(null)} className="text-[#2563EB] hover:text-[#1D4ED8] ml-2">
             <X size={14} />
           </button>
+        </div>
+      )}
+
+      {/* Active Cryptographic Tamper Alert Banner */}
+      {((metrics?.tampered_count ?? 0) > 0 || tamperDemo != null) && (
+        <div className="mt-4 p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 shadow-sm text-xs font-mono space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-rose-200">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-rose-100 text-rose-700 animate-pulse">
+                <ShieldAlert size={18} />
+              </span>
+              <div>
+                <span className="text-sm font-bold text-rose-950 uppercase tracking-tight flex items-center gap-2">
+                  <span>🚨 Security Alert: Cryptographic Data Tampering Detected!</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] bg-rose-200 text-rose-900 font-extrabold">
+                    Quarantine Enforced
+                  </span>
+                </span>
+                <div className="text-[11px] text-rose-800 font-sans mt-0.5">
+                  Stored database telemetry deviates from immutable SHA-256 digital signature recorded at sensor ingress.
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => handleRestoreTamper()}
+              disabled={isLoading}
+              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition disabled:opacity-50"
+            >
+              <RotateCcw size={13} className={isLoading ? "animate-spin" : ""} />
+              <span>Restore Baseline ({metrics?.tampered_count ?? 1})</span>
+            </button>
+          </div>
+
+          {/* Details Grid: Which Data Tampered, From Where, Timestamp */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
+            {/* 1. Which Data Was Tampered */}
+            <div className="p-2.5 rounded-xl bg-white/80 border border-rose-200">
+              <div className="text-[10px] font-bold uppercase text-[#475569] flex items-center gap-1.5">
+                <Database size={12} className="text-rose-600" /> Which Data Is Tampered:
+              </div>
+              <div className="mt-1 text-xs font-bold text-rose-950">
+                Temperature: <span className="text-emerald-700">{latestTampered?.original_temperature != null ? `${latestTampered.original_temperature}°C` : "Baseline"}</span>{" "}
+                → <span className="text-rose-700 font-extrabold">{latestTampered?.tampered_temperature != null ? `${latestTampered.tampered_temperature}°C` : "12.8°C"}</span>
+                {latestTampered?.original_temperature != null && latestTampered?.tampered_temperature != null && (
+                  <span className="ml-1 text-[10px] text-rose-700 font-normal">
+                    (Δ: +{(latestTampered.tampered_temperature - latestTampered.original_temperature).toFixed(1)}°C)
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* 2. From Where (Location / Origin) */}
+            <div className="p-2.5 rounded-xl bg-white/80 border border-rose-200">
+              <div className="text-[10px] font-bold uppercase text-[#475569] flex items-center gap-1.5">
+                <MapPin size={12} className="text-rose-600" /> Tampered From (Location):
+              </div>
+              <div className="mt-1 text-xs font-bold text-[#0F172A] truncate">
+                Zone: <span className="uppercase text-[#2563EB]">{latestTampered?.zone_id || "zone-a"}</span> · Sensor:{" "}
+                <span className="text-[#0F172A]">{latestTampered?.device_id || "TS-01"}</span>
+              </div>
+              <div className="text-[10px] text-[#475569] mt-0.5">
+                Record #{latestTampered?.reading_id || "N/A"} in database storage
+              </div>
+            </div>
+
+            {/* 3. Timestamp */}
+            <div className="p-2.5 rounded-xl bg-white/80 border border-rose-200">
+              <div className="text-[10px] font-bold uppercase text-[#475569] flex items-center gap-1.5">
+                <Clock size={12} className="text-rose-600" /> Incident Timestamps:
+              </div>
+              <div className="mt-1 text-xs font-bold text-[#0F172A] truncate">
+                Telemetry: <span className="text-[#0F172A]">{latestTampered?.timestamp || "Latest tick"}</span>
+              </div>
+              <div className="text-[10px] text-rose-700 font-semibold mt-0.5">
+                Audit Detection: Real-Time Rejection
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -634,21 +740,41 @@ export function TelemetryIntegrityPanel() {
                   gateway entry. This altered packet is strictly quarantine-blocked from entering the trusted ML
                   forecasting and Digital Twin analytics pipeline.
                 </div>
-                {tamperDemo && (
-                  <div className="pt-2 border-t border-rose-200 flex items-center justify-between flex-wrap gap-2">
-                    <span>
-                      Original: {tamperDemo.original_temperature}°C → Tampered: {tamperDemo.tampered_temperature}°C
+                {/* Forensics of tampered item */}
+                <div className="p-2.5 rounded-lg bg-white/80 border border-rose-200 space-y-1.5 text-[11px]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#475569]">Tampered Data:</span>
+                    <span className="font-bold text-rose-700">
+                      Original: {latestTampered?.original_temperature != null ? `${latestTampered.original_temperature}°C` : "Baseline"} → Altered: {auditResult.current_reading?.temperature ?? latestTampered?.tampered_temperature}°C
                     </span>
-                    <button
-                      onClick={handleRestoreTamper}
-                      disabled={isLoading}
-                      className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
-                    >
-                      <RotateCcw size={12} />
-                      <span>Restore Original Reading</span>
-                    </button>
                   </div>
-                )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#475569]">Tampered From:</span>
+                    <span className="font-bold text-[#0F172A]">
+                      Zone {auditResult.current_reading?.zone_id?.toUpperCase() ?? latestTampered?.zone_id?.toUpperCase()} · Sensor {auditResult.current_reading?.sensor_id ?? latestTampered?.device_id} (Reading #{auditResult.reading_id})
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#475569]">Telemetry Timestamp:</span>
+                    <span className="font-mono text-[#0F172A]">
+                      {auditResult.current_reading?.timestamp ?? latestTampered?.timestamp}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-rose-200 flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-rose-800 text-[11px]">
+                    Status: Flagged in /api/alerts as Critical Data Tampering
+                  </span>
+                  <button
+                    onClick={() => handleRestoreTamper()}
+                    disabled={isLoading}
+                    className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    <RotateCcw size={12} />
+                    <span>Restore Original Reading</span>
+                  </button>
+                </div>
               </div>
             )}
 
@@ -752,7 +878,17 @@ export function TelemetryIntegrityPanel() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end pt-2 border-t border-[#DCE8F6]">
+            <div className="flex items-center justify-between pt-2 border-t border-[#DCE8F6]">
+              {auditResult.tamper_detected || (metrics?.tampered_count ?? 0) > 0 ? (
+                <button
+                  onClick={() => handleRestoreTamper(auditResult.reading_id, tamperDemo?.original_temperature)}
+                  disabled={isLoading}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                >
+                  <RotateCcw size={14} className={isLoading ? "animate-spin" : ""} />
+                  <span>Restore Verified Baseline</span>
+                </button>
+              ) : <div />}
               <button
                 onClick={() => {
                   setShowDetailModal(false);

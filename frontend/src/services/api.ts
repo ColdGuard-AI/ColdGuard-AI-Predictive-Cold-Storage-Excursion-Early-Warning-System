@@ -175,10 +175,14 @@ export const api = {
   setTelemetrySource: (source: "dataset" | "simulator", datasetType?: string) =>
     post<import("../types/api").TelemetrySourceStatus>("/api/telemetry/source", { source, dataset_type: datasetType ?? "test" }),
   integrityStatus: () => request<import("../types/api").IntegrityStatusResponse>("/api/integrity/status"),
-  integrityVerifications: (limit = 20) =>
-    request<import("../types/api").VerificationRecord[]>(`/api/integrity/verifications${qs({ limit })}`),
-  blockchainBlocks: (limit = 10) =>
-    request<import("../types/api").BlockchainBlockItem[]>(`/api/integrity/blocks${qs({ limit })}`),
+  integrityVerifications: async (limit = 20): Promise<import("../types/api").VerificationRecord[]> => {
+    const res = await request<any>(`/api/integrity/verifications${qs({ limit })}`);
+    return Array.isArray(res) ? res : res?.verifications ?? [];
+  },
+  blockchainBlocks: async (limit = 10): Promise<import("../types/api").BlockchainBlockItem[]> => {
+    const res = await request<any>(`/api/integrity/blocks${qs({ limit })}`);
+    return Array.isArray(res) ? res : res?.blocks ?? [];
+  },
   anchorBatch: () => post<{ status: string; block?: unknown; message?: string }>("/api/integrity/anchor"),
   auditReading: (readingId: number) =>
     request<import("../types/api").AuditReadingResponse>(`/api/integrity/audit/${readingId}`),
@@ -187,12 +191,12 @@ export const api = {
       reading_id: readingId,
       new_temperature: newTemperature,
     }),
-  restoreReading: (readingId: number, originalTemperature: number) =>
+  restoreReading: (readingId?: number, originalTemperature?: number) =>
     post<{ status: string; message: string }>("/api/integrity/restore", {
       reading_id: readingId,
       original_temperature: originalTemperature,
     }),
-  restoreTamper: (readingId: number, originalTemperature: number) =>
+  restoreTamper: (readingId?: number, originalTemperature?: number) =>
     post<{ status: string; message: string }>("/api/integrity/restore", {
       reading_id: readingId,
       original_temperature: originalTemperature,
