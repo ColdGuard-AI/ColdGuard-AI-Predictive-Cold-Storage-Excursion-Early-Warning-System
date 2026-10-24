@@ -24,6 +24,7 @@ import {
   Users,
   X,
   XCircle,
+  Search,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -77,12 +78,12 @@ const ROLE_ICON: Record<string, any> = {
 function Brand() {
   return (
     <div className="flex items-center gap-3 px-2 pb-5">
-      <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[#2563EB] border border-[#1D4ED8] shadow-md shadow-blue-500/20">
-        <Snowflake size={22} className="text-white" />
+      <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/20 border border-white/30 shadow-md backdrop-blur-md">
+        <Snowflake size={22} className="text-white animate-pulse" />
       </div>
       <div className="leading-tight">
-        <div className="text-lg font-extrabold text-[#0F172A] tracking-tight">ColdGuard <span className="text-[#2563EB]">AI</span></div>
-        <div className="text-xs font-semibold text-[#475569]">Industrial Cold Intelligence</div>
+        <div className="text-lg font-extrabold text-white tracking-tight">ColdGuard <span className="text-cyan-300">AI</span></div>
+        <div className="text-xs font-semibold text-cyan-100/80">Industrial Cold Intelligence</div>
       </div>
     </div>
   );
@@ -105,20 +106,20 @@ function NavItems({ role, onNavigate, pendingCount }: { role: string; onNavigate
           className={({ isActive }) =>
             `group flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-[15px] font-semibold transition-all ${
               isActive
-                ? "bg-[#2563EB] text-white shadow-md shadow-blue-600/20 font-bold"
-                : "text-[#475569] hover:bg-[#EFF6FF] hover:text-[#2563EB]"
+                ? "bg-white/25 text-white font-bold backdrop-blur-md shadow-md border border-white/30"
+                : "text-white/85 hover:bg-white/10 hover:text-white"
             }`
           }
         >
-          <Icon size={19} className="shrink-0 transition-transform group-hover:scale-110" />
+          <Icon size={19} className="shrink-0 transition-transform group-hover:scale-110 text-white" />
           <span className="flex-1 leading-tight">{label}</span>
           {(label.includes("Alerts") || label.includes("Incidents")) && activeAlerts > 0 && (
-            <span className="rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-xs font-bold text-red-700" aria-label={`${activeAlerts} active alerts`}>
+            <span className="rounded-full bg-rose-500/90 border border-white/40 px-2 py-0.5 text-xs font-bold text-white shadow-sm" aria-label={`${activeAlerts} active alerts`}>
               {activeAlerts}
             </span>
           )}
           {label === "User Approval Requests" && pendingCount > 0 && (
-            <span id="pending-badge" className="rounded-full bg-amber-50 border border-amber-300 px-2.5 py-0.5 text-xs font-bold text-amber-800 animate-pulse">
+            <span id="pending-badge" className="rounded-full bg-amber-400 border border-white/50 px-2.5 py-0.5 text-xs font-bold text-slate-950 animate-pulse shadow-sm">
               {pendingCount}
             </span>
           )}
@@ -198,50 +199,52 @@ export function RoleLayout({
   }, [role, location.pathname]);
 
   const Sidebar = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full text-white">
       <Brand />
       {/* Role badge */}
-      <div className={`mx-1 mb-4 flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-bold shadow-sm ${ROLE_COLOR[role] ?? "bg-[#2563EB] text-white"}`}>
+      <div className="mx-1 mb-4 flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-bold shadow-sm bg-white/15 text-white border border-white/20 backdrop-blur-md">
         <RoleIcon size={16} />
         <span className="truncate">{session.user.role_display}</span>
       </div>
 
       <NavItems role={role} onNavigate={() => setDrawerOpen(false)} pendingCount={pendingCount} />
 
-      <div className="mt-auto pt-4 border-t border-[#DCE8F6] space-y-3">
-        {/* User card */}
-        <div className="rounded-2xl border border-[#DCE8F6] bg-[#EFF6FF] p-3.5 shadow-sm">
+      <div className="mt-auto pt-4 border-t border-white/20 space-y-3">
+        {/* User card (Frosted White Card matching Dribbble design) */}
+        <div className="rounded-2xl border border-white/40 bg-white/95 text-[#0F172A] p-4 shadow-xl backdrop-blur-md">
           <div className="flex items-center justify-between mb-1">
-            <span className="font-bold text-[#0F172A] text-sm truncate">{session.user.name}</span>
+            <span className="font-extrabold text-sm truncate text-[#0F172A]">{session.user.name}</span>
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shrink-0" />
           </div>
           <div className="text-[#475569] text-xs font-medium truncate">{session.user.email}</div>
           <button
             onClick={onSignOut}
-            className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl bg-white hover:bg-red-50 border border-[#DCE8F6] hover:border-red-200 text-[#475569] hover:text-red-700 text-xs font-bold py-2 transition shadow-sm cursor-pointer"
+            className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-[#475569] hover:text-rose-700 text-xs font-bold py-2 transition shadow-sm cursor-pointer"
           >
             <LogOut size={13} /> Sign Out
           </button>
         </div>
-        <SimBadge />
-        <p className="text-xs text-[#475569] font-medium px-1">Continuous Telemetry Active</p>
+        <div className="flex items-center justify-between px-1 text-xs text-cyan-100/80 font-medium">
+          <SimBadge />
+          <span>Telemetry Active</span>
+        </div>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#F1F7FF] text-[#0F172A] font-sans relative overflow-x-hidden">
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-[#DCE8F6] bg-white px-3.5 py-5 lg:flex shadow-sm">
+    <div className="min-h-screen bg-[#F0F7FF] text-[#0F172A] font-sans relative overflow-x-hidden">
+      {/* Desktop sidebar with vibrant Dribbble electric blue gradient */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-gradient-to-b from-[#142C6F] via-[#1D4ED8] to-[#0284C7] px-3.5 py-5 lg:flex shadow-2xl border-r border-[#1D4ED8]/30">
         {Sidebar}
       </aside>
 
       {/* Mobile drawer overlay */}
       {drawerOpen && (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
-          <div className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-[#DCE8F6] bg-white px-3.5 py-5 shadow-2xl">
-            <button onClick={() => setDrawerOpen(false)} className="self-end text-slate-400 hover:text-[#0F172A] p-1 mb-2 cursor-pointer">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
+          <div className="absolute inset-y-0 left-0 flex w-64 flex-col bg-gradient-to-b from-[#142C6F] via-[#1D4ED8] to-[#0284C7] px-3.5 py-5 shadow-2xl">
+            <button onClick={() => setDrawerOpen(false)} className="self-end text-white/70 hover:text-white p-1 mb-2 cursor-pointer">
               <X size={20} />
             </button>
             {Sidebar}
@@ -253,7 +256,7 @@ export function RoleLayout({
       <div className="lg:pl-64 flex flex-col min-h-screen">
         {/* Top header bar */}
         <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-[#DCE8F6] shadow-sm">
-          <div className="flex items-center justify-between px-4 py-3 sm:px-6">
+          <div className="flex items-center justify-between px-4 py-3 sm:px-6 gap-4">
             <div className="flex items-center gap-3">
               <button className="lg:hidden text-[#475569] hover:text-[#0F172A] p-1 cursor-pointer" onClick={() => setDrawerOpen(true)} aria-label="Open navigation">
                 <Menu size={22} />
@@ -262,6 +265,20 @@ export function RoleLayout({
                 <span className="h-2 w-2 rounded-full bg-[#2563EB] animate-pulse" />
                 <span className="text-xs sm:text-sm font-bold text-[#475569] uppercase tracking-wide">ColdGuard AI — Enterprise Intelligence</span>
               </div>
+            </div>
+
+            {/* Dribbble Search Bar */}
+            <div className="relative flex-1 max-w-md hidden md:flex items-center">
+              <Search size={15} className="absolute left-3.5 text-[#64748B]" />
+              <input
+                type="text"
+                placeholder="Search cold room, telemetry, lot, or alert..."
+                className="w-full pl-9 pr-14 py-2 rounded-xl border border-[#DCE8F6] bg-[#F8FAFC] text-xs sm:text-sm font-medium text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/25 focus:border-[#2563EB]"
+                readOnly
+              />
+              <span className="absolute right-3 text-[10px] font-mono font-bold text-[#64748B] bg-white px-1.5 py-0.5 rounded border border-[#DCE8F6]">
+                ⌘ K
+              </span>
             </div>
 
             <div className="flex items-center gap-3 sm:gap-4">
