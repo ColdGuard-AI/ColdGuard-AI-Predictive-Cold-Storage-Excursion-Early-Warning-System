@@ -33,6 +33,7 @@ import InventoryRisk from "./pages/manager/InventoryRisk";
 
 // ── Operator pages ────────────────────────────────────────────────────────────
 import EquipmentHealth from "./pages/operator/EquipmentHealth";
+import WorkOrders from "./pages/operator/WorkOrders";
 
 // ── Auditor pages ─────────────────────────────────────────────────────────────
 import AuditorCompliance from "./pages/auditor/AuditorCompliance";
@@ -69,7 +70,7 @@ function OperatorRoutes() {
       <Route path="/" element={<Dashboard />} />
       <Route path="/twin" element={<DigitalTwin />} />
       <Route path="/equipment" element={<EquipmentHealth />} />
-      <Route path="/alerts" element={<Alerts />} />
+      <Route path="/alerts" element={<WorkOrders />} />
       <Route path="/ai" element={<AIExplanation />} />
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -3295,7 +3295,29 @@ export default function DigitalTwin() {
   }, [allZones, simState]);
 
   return (
-    <div className="space-y-4 font-sans selection:bg-[#EFF6FF] selection:text-[#2563EB]">
+    <div className="space-y-5 font-sans selection:bg-[#EFF6FF] selection:text-[#2563EB]">
+      {/* ─────────────────────────────────────────────────────────────
+          Top Header: Exact match with Manager Overview typography
+      ───────────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-2 border-b border-[#DCE8F6]">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] tracking-tight flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center shadow-sm">
+                <Layers size={20} />
+              </div>
+              Digital Twin (3D Model)
+            </h1>
+            <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB]">
+              3D FACILITY TWIN
+            </span>
+          </div>
+          <p className="text-sm text-[#475569] mt-0.5 font-medium">
+            Interactive spatial thermodynamics, CFD airflow velocity vectors, multi-tier rack sensors, and thermal boundary visualization.
+          </p>
+        </div>
+      </div>
+
       {/* ═══════════════════════════════════════════════════════════════════
           FACILITY HEADER BAR (MATCHING REFERENCE IMAGE)
           ═══════════════════════════════════════════════════════════════════ */}

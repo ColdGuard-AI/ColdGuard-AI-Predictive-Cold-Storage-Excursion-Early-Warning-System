@@ -114,42 +114,142 @@ export default function UserApproval() {
   });
 
   const pendingCount = users.filter(u => u.approval_status === "PENDING_APPROVAL").length;
+  const approvedCount = users.filter(u => u.approval_status === "APPROVED" || u.approval_status === "ACTIVE").length;
+  const rejectedCount = users.filter(u => u.approval_status === "REJECTED").length;
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-6 pb-12 font-sans selection:bg-[#38BDF8]/30 selection:text-[#0F172A]">
+      {/* ─────────────────────────────────────────────────────────────
+          1. Header Section (Exact match with ManagerOverview.tsx)
+      ───────────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-2 border-b border-[#DCE8F6]">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] flex items-center gap-3">
-            <Users size={28} className="text-[#2563EB]" /> User Access Approval Requests
-          </h1>
-          <p className="text-base text-[#475569] mt-1 font-medium">Verify credentials, approve registered personnel, and manage role-based permissions.</p>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] tracking-tight flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center shadow-sm">
+                <Users size={20} />
+              </div>
+              User Access Approval Requests
+            </h1>
+            <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB]">
+              ACCESS CONTROL
+            </span>
+          </div>
+          <p className="text-sm text-[#475569] mt-0.5 font-medium">
+            Verify credentials, review identity registrations, and govern multi-role GxP facility security clearances.
+          </p>
         </div>
+
         <div className="flex items-center gap-3">
           {pendingCount > 0 && (
-            <span className="rounded-full bg-amber-50 border border-amber-200 px-4 py-1.5 text-sm font-extrabold text-amber-800 shadow-sm animate-pulse">
+            <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-800 shadow-sm animate-pulse">
               {pendingCount} Pending Approval
             </span>
           )}
-          <button onClick={load} disabled={loading} className="flex items-center gap-2 rounded-xl border border-[#DCE8F6] bg-white px-4 py-2.5 text-sm font-bold text-[#0F172A] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] hover:text-[#2563EB] transition shadow-sm cursor-pointer">
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
+          <button
+            onClick={load}
+            disabled={loading}
+            className="flex items-center gap-2 rounded-xl border border-[#DCE8F6] bg-white px-4 py-2 text-sm font-bold text-[#0F172A] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] hover:text-[#2563EB] transition shadow-sm cursor-pointer"
+          >
+            <RefreshCw size={15} className={`text-[#2563EB] ${loading ? "animate-spin" : ""}`} />
+            Refresh
           </button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-4">
+      {/* ─────────────────────────────────────────────────────────────
+          2. KPI Stat Cards (4 Columns matching ManagerOverview.tsx)
+      ───────────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        <div className="rounded-2xl border border-[#DCE8F6] bg-white p-5 sm:p-6 shadow-arctic-card hover:shadow-arctic-hover hover:border-[#BAE6FD] transition-all">
+          <div className="flex items-center justify-between text-xs sm:text-sm font-bold text-[#475569] mb-2">
+            <span>Total Registered Personnel</span>
+            <div className="h-8 w-8 rounded-xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center border border-[#BAE6FD]">
+              <Users size={17} />
+            </div>
+          </div>
+          <div className="text-3xl sm:text-4xl font-extrabold text-[#0F172A] tracking-tight font-sans">
+            {users.length}
+          </div>
+          <div className="text-xs font-semibold text-[#64748B] mt-1 font-mono">
+            Across 4 authorized roles
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[#DCE8F6] bg-white p-5 sm:p-6 shadow-arctic-card hover:shadow-arctic-hover hover:border-[#BAE6FD] transition-all">
+          <div className="flex items-center justify-between text-xs sm:text-sm font-bold text-[#475569] mb-2">
+            <span>Pending Review</span>
+            <div
+              className={`h-8 w-8 rounded-xl flex items-center justify-center border ${
+                pendingCount > 0
+                  ? "bg-amber-50 text-amber-600 border-amber-200"
+                  : "bg-emerald-50 text-emerald-600 border-emerald-200"
+              }`}
+            >
+              <UserCheck size={17} />
+            </div>
+          </div>
+          <div
+            className={`text-3xl sm:text-4xl font-extrabold tracking-tight font-sans ${
+              pendingCount > 0 ? "text-amber-600" : "text-[#0F172A]"
+            }`}
+          >
+            {pendingCount}
+          </div>
+          <div className="text-xs font-bold text-amber-700 mt-1">
+            {pendingCount > 0 ? "Awaiting manager clearance" : "All requests reviewed"}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[#DCE8F6] bg-white p-5 sm:p-6 shadow-arctic-card hover:shadow-arctic-hover hover:border-[#BAE6FD] transition-all">
+          <div className="flex items-center justify-between text-xs sm:text-sm font-bold text-[#475569] mb-2">
+            <span>Active Authorized Users</span>
+            <div className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200">
+              <CheckCircle2 size={17} />
+            </div>
+          </div>
+          <div className="text-3xl sm:text-4xl font-extrabold text-[#0F172A] tracking-tight font-sans">
+            {approvedCount}
+          </div>
+          <div className="text-xs font-bold text-emerald-800 mt-1 flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            Active facility session clearance
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[#DCE8F6] bg-white p-5 sm:p-6 shadow-arctic-card hover:shadow-arctic-hover hover:border-[#BAE6FD] transition-all">
+          <div className="flex items-center justify-between text-xs sm:text-sm font-bold text-[#475569] mb-2">
+            <span>Rejected / Suspended</span>
+            <div className="h-8 w-8 rounded-xl bg-slate-100 text-[#475569] flex items-center justify-center border border-slate-200">
+              <UserX size={17} />
+            </div>
+          </div>
+          <div className="text-3xl sm:text-4xl font-extrabold text-[#0F172A] tracking-tight font-sans">
+            {rejectedCount}
+          </div>
+          <div className="text-xs font-semibold text-[#64748B] mt-1 font-mono">
+            Restricted access accounts
+          </div>
+        </div>
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          3. Filters & Search Toolbar
+      ───────────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[240px]">
-          <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
-            value={search} onChange={e => setSearch(e.target.value)}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by full name or email address…"
-            className="w-full rounded-xl border border-[#DCE8F6] bg-white pl-10 pr-4 py-2.5 text-base font-medium text-[#0F172A] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/25 focus:border-[#2563EB] shadow-sm"
+            className="w-full rounded-xl border border-[#DCE8F6] bg-white pl-10 pr-4 py-2 text-xs sm:text-sm font-medium text-[#0F172A] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] shadow-sm"
           />
         </div>
         <select
-          value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          className="rounded-xl border border-[#DCE8F6] bg-white px-4 py-2.5 text-base font-bold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/25 focus:border-[#2563EB] shadow-sm cursor-pointer"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="rounded-xl border border-[#DCE8F6] bg-white px-3 py-2 text-xs font-bold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] shadow-sm cursor-pointer"
         >
           <option value="all">All Approval Statuses</option>
           <option value="PENDING_APPROVAL">Pending Review</option>

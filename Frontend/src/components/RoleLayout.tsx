@@ -42,11 +42,11 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string; icon: any }[]> = 
     { to: "/manager/users", label: "User Approval Requests", icon: Users },
   ],
   facility_operator: [
-    { to: "/operator", label: "Live Telemetry Monitor", icon: LayoutDashboard },
-    { to: "/operator/twin", label: "3D Digital Twin", icon: Layers },
+    { to: "/operator", label: "Live Monitor", icon: LayoutDashboard },
+    { to: "/operator/twin", label: "Digital Twin (3D)", icon: Layers },
     { to: "/operator/equipment", label: "Equipment & Sensor Health", icon: Cpu },
-    { to: "/operator/alerts", label: "Alerts & Incidents", icon: BellRing },
-    { to: "/operator/ai", label: "AI Diagnosis & SOPs", icon: BrainCircuit },
+    { to: "/operator/alerts", label: "Alerts & Work Orders", icon: BellRing },
+    { to: "/operator/ai", label: "AI Diagnosis & SOP Playbook", icon: BrainCircuit },
   ],
   government_auditor: [
     { to: "/auditor", label: "Compliance Overview", icon: ShieldCheck },

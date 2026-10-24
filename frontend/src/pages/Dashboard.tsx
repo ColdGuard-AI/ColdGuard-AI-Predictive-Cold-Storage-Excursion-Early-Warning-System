@@ -399,6 +399,43 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 pb-12 font-sans selection:bg-[#38BDF8]/30 selection:text-[#0F172A]">
+      {/* ─────────────────────────────────────────────────────────────
+          Top Header: Exact match with Manager Overview typography
+      ───────────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-2 border-b border-[#DCE8F6]">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] tracking-tight flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center shadow-sm">
+                <Thermometer size={20} />
+              </div>
+              Live Monitor & Telemetry
+            </h1>
+            <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB]">
+              LIVE SENSORS
+            </span>
+          </div>
+          <p className="text-sm text-[#475569] mt-0.5 font-medium">
+            Real-time multi-zone sensor telemetry, chamber door dynamics, and multi-horizon temperature forecasts.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              predictionQuery.refresh();
+              recoveryQuery.refresh();
+              doorEventsQuery.refresh();
+              readingsQuery.refresh();
+            }}
+            className="flex items-center gap-2 rounded-xl border border-[#DCE8F6] bg-white hover:bg-[#EFF6FF] hover:border-[#BAE6FD] hover:text-[#2563EB] px-4 py-2 text-sm font-bold text-[#0F172A] transition shadow-sm cursor-pointer"
+          >
+            <RefreshCw size={15} className="text-[#2563EB]" />
+            Refresh Telemetry
+          </button>
+        </div>
+      </div>
+
       {/* ═══════════════════════════════════════════════════════════════════
           SECTION 1: SYSTEM TELEMETRY RIBBON & LIVE MONITORING BAR
           ═══════════════════════════════════════════════════════════════════ */}
