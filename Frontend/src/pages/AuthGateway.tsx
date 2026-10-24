@@ -187,6 +187,9 @@ export default function AuthGateway({ onLoginSuccess }: Props) {
   const [regPassword, setRegPassword] = useState("");
   const [regPhone, setRegPhone] = useState("");
   const [regOrg, setRegOrg] = useState("");
+  const [regContractCode, setRegContractCode] = useState("");
+  const [regInstantVerified, setRegInstantVerified] = useState(false);
+  const [regSession, setRegSession] = useState<AuthSession | null>(null);
   const [regLoading, setRegLoading] = useState(false);
   const [regError, setRegError] = useState("");
   const [regSuccess, setRegSuccess] = useState("");
@@ -211,7 +214,16 @@ export default function AuthGateway({ onLoginSuccess }: Props) {
         : "Buyer123!"
     );
     setLoginError("");
-    setRegName(""); setRegEmail(""); setRegPassword(""); setRegPhone(""); setRegOrg(""); setRegError(""); setRegSuccess("");
+    setRegName("");
+    setRegEmail("");
+    setRegPassword("");
+    setRegPhone("");
+    setRegOrg(role.id === "buyer_retailer" ? "Apex Global Perishables & Retail Hub" : "");
+    setRegContractCode(role.id === "buyer_retailer" ? "CTR-RETAIL-9901" : "");
+    setRegInstantVerified(false);
+    setRegSession(null);
+    setRegError("");
+    setRegSuccess("");
     setView("login");
   }
 
@@ -245,15 +257,26 @@ export default function AuthGateway({ onLoginSuccess }: Props) {
     setRegLoading(true);
     setRegError(""); setRegSuccess("");
     try {
-      await auth.register({
+      const res = await auth.register({
         full_name: regName,
         email: regEmail,
         password: regPassword,
         phone: regPhone || undefined,
         requested_role: selectedRole.id,
         organization: regOrg || undefined,
+        contract_code: regContractCode || undefined,
       });
-      setRegSuccess("Registration submitted! Your account is pending approval by the Cold Storage Manager. Please check back after approval.");
+
+      if (res.status === "APPROVED" || res.instant_verified) {
+        setRegInstantVerified(true);
+        setRegSuccess(res.message || "Instant verification successful! Your account is active and verified.");
+        if (res.session && res.token) {
+          setRegSession(res.session);
+        }
+      } else {
+        setRegInstantVerified(false);
+        setRegSuccess("Registration submitted! Your account is pending approval by the Cold Storage Manager. Please check back after approval.");
+      }
     } catch (err: any) {
       setRegError(err?.message ?? "Registration failed.");
     } finally {
@@ -476,39 +499,130 @@ export default function AuthGateway({ onLoginSuccess }: Props) {
 
             {regSuccess ? (
               <div className="flex flex-col items-center gap-4 py-6 text-center">
-                <div className="h-16 w-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-sm">
-                  <CheckCircle2 size={36} />
+                <div className={`h-16 w-16 rounded-full flex items-center justify-center shadow-sm ${
+                  regInstantVerified ? "bg-emerald-50 border border-emerald-200 text-[#0D9488]" : "bg-blue-50 border border-blue-200 text-[#2563EB]"
+                }`}>
+                  <ShieldCheck size={36} />
                 </div>
-                <h3 className="text-xl font-bold text-[#0F172A]">Application Submitted</h3>
+                <h3 className="text-xl font-bold text-[#0F172A]">
+                  {regInstantVerified ? "Instant Verification Approved!" : "Registration Submitted"}
+                </h3>
                 <p className="text-base text-[#475569] leading-relaxed max-w-sm">{regSuccess}</p>
-                <button
-                  onClick={() => { setRegSuccess(""); setView("login"); }}
-                  className="mt-4 px-6 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-base transition shadow-sm cursor-pointer"
-                >
-                  Return to Sign In
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3 mt-4 w-full justify-center">
+                  {regInstantVerified && regSession ? (
+                    <button
+                      onClick={() => {
+                        setAuthToken(regSession.token);
+                        onLoginSuccess(regSession);
+                      }}
+                      className="px-6 py-2.5 rounded-xl bg-[#0D9488] hover:bg-[#0F766E] text-white font-bold text-base transition shadow-sm cursor-pointer"
+                    >
+                      Enter Buyer Portal Directly →
+                    </button>
+                  ) : null}
+                  <button
+                    onClick={() => {
+                      setLoginEmail(regEmail);
+                      setLoginPassword(regPassword);
+                      setRegSuccess("");
+                      setView("login");
+                    }}
+                    className="px-6 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-base transition shadow-sm cursor-pointer"
+                  >
+                    Return to Sign In
+                  </button>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleRegister} className="flex flex-col gap-4">
+
                 <InputField label="Full Name" id="reg-name" value={regName} onChange={setRegName} placeholder="Dr. / Mr. / Ms. Full Name" required icon={User} />
                 <InputField label="Organization Email Address" id="reg-email" type="email" value={regEmail} onChange={setRegEmail} placeholder="you@organization.com" required icon={Mail} />
                 <InputField label="Phone Number" id="reg-phone" type="tel" value={regPhone} onChange={setRegPhone} placeholder="+91 XXXXX XXXXX" icon={Phone} />
-                <InputField label="Organization / Company" id="reg-org" value={regOrg} onChange={setRegOrg} placeholder="e.g. Apex Cold Chain Logistics" />
+
+                <div>
+                  <InputField label="Organization / Company" id="reg-org" value={regOrg} onChange={setRegOrg} placeholder="e.g. Apex Global Perishables & Retail Hub" />
+                  {selectedRole.id === "buyer_retailer" && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-semibold text-[#64748B]">Verified Partners:</span>
+                      {[
+                        "Apex Global Perishables & Retail Hub",
+                        "Metro Health Hospital Network",
+                        "FreshMart Supermarkets Supply Alliance",
+                        "Nordic Frost Logistics Corp",
+                      ].map((orgName) => (
+                        <button
+                          key={orgName}
+                          type="button"
+                          onClick={() => setRegOrg(orgName)}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md transition cursor-pointer border ${
+                            regOrg === orgName
+                              ? "bg-[#0D9488] text-white border-[#0D9488]"
+                              : "bg-[#F1F7FF] text-[#475569] border-[#DCE8F6] hover:bg-[#E2E8F0]"
+                          }`}
+                        >
+                          {orgName.split(" ")[0]} ({orgName.includes("Hospital") ? "Hospital" : "Retail"})
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {selectedRole.id === "buyer_retailer" && (
+                  <div>
+                    <InputField
+                      label="Partner Wholesale Contract Code"
+                      id="reg-contract-code"
+                      value={regContractCode}
+                      onChange={setRegContractCode}
+                      placeholder="e.g. CTR-RETAIL-9901 or CONTRACT-2026-NORDIC"
+                      icon={KeyRound}
+                    />
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[#64748B]">
+                      <span>Valid Codes:</span>
+                      {["CTR-RETAIL-9901", "CONTRACT-2026-NORDIC", "CTR-BIOPHARMA-2026"].map((code) => (
+                        <button
+                          key={code}
+                          type="button"
+                          onClick={() => setRegContractCode(code)}
+                          className="font-mono text-[10px] font-bold text-[#0D9488] bg-[#0D9488]/10 hover:bg-[#0D9488]/20 px-1.5 py-0.5 rounded transition cursor-pointer"
+                        >
+                          {code}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <InputField label="Create Password" id="reg-password" type="password" value={regPassword} onChange={setRegPassword} placeholder="Minimum 8 characters" required icon={Lock} />
 
-                <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs sm:text-sm font-medium text-amber-900 leading-relaxed">
-                  <strong>Notice:</strong> Your registration will remain in a pending state until verified and approved by the Cold Storage Manager.
-                </div>
+                {selectedRole.id !== "buyer_retailer" && (
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs sm:text-sm font-medium text-amber-900 leading-relaxed">
+                    <strong>Notice:</strong> Internal staff registrations remain in a pending state until reviewed and approved by the Cold Storage Manager.
+                  </div>
+                )}
 
                 {regError && <Alert kind="error" msg={regError} />}
 
                 <button
                   type="submit"
                   disabled={regLoading}
-                  className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] active:bg-[#1E40AF] text-white font-bold py-3.5 text-base shadow-md hover:shadow-lg transition disabled:opacity-60 cursor-pointer"
+                  className={`mt-2 w-full flex items-center justify-center gap-2 rounded-xl text-white font-bold py-3.5 text-base shadow-md hover:shadow-lg transition disabled:opacity-60 cursor-pointer ${
+                    selectedRole.id === "buyer_retailer"
+                      ? "bg-[#0D9488] hover:bg-[#0F766E] active:bg-[#115E59]"
+                      : "bg-[#2563EB] hover:bg-[#1D4ED8] active:bg-[#1E40AF]"
+                  }`}
                 >
-                  {regLoading ? <span className="h-5 w-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <UserPlus size={18} />}
-                  {regLoading ? "Submitting application…" : "Submit Access Request"}
+                  {regLoading ? (
+                    <span className="h-5 w-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <UserPlus size={18} />
+                  )}
+                  {regLoading
+                    ? "Submitting application…"
+                    : selectedRole.id === "buyer_retailer"
+                    ? "Verify & Activate Buyer Account"
+                    : "Submit Access Request"}
                 </button>
               </form>
             )}

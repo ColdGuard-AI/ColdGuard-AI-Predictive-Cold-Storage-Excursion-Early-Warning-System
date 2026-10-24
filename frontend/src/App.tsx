@@ -28,6 +28,7 @@ import WhatIf from "./pages/WhatIf";
 
 // ── Manager pages ─────────────────────────────────────────────────────────────
 import ManagerOverview from "./pages/manager/ManagerOverview";
+import ManagerOrders from "./pages/manager/ManagerOrders";
 import UserApproval from "./pages/manager/UserApproval";
 import InventoryRisk from "./pages/manager/InventoryRisk";
 import ManagerAssistant from "./pages/manager/ManagerAssistant";
@@ -41,6 +42,8 @@ import AuditorCompliance from "./pages/auditor/AuditorCompliance";
 
 // ── Buyer pages ───────────────────────────────────────────────────────────────
 import BuyerOrders from "./pages/buyer/BuyerOrders";
+import BuyerInventory from "./pages/buyer/BuyerInventory";
+import BuyerQualityAlerts from "./pages/buyer/BuyerQualityAlerts";
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 function NotFound() {
@@ -57,6 +60,7 @@ function ManagerRoutes() {
   return (
     <Routes>
       <Route path="/" element={<ManagerOverview />} />
+      <Route path="/orders" element={<ManagerOrders />} />
       <Route path="/alerts" element={<Alerts />} />
       <Route path="/inventory" element={<InventoryRisk />} />
       <Route path="/users" element={<UserApproval />} />
@@ -94,8 +98,8 @@ function BuyerRoutes() {
   return (
     <Routes>
       <Route path="/" element={<BuyerOrders />} />
-      <Route path="/inventory" element={<BuyerOrders />} />
-      <Route path="/quality" element={<Alerts />} />
+      <Route path="/inventory" element={<BuyerInventory />} />
+      <Route path="/quality" element={<BuyerQualityAlerts />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

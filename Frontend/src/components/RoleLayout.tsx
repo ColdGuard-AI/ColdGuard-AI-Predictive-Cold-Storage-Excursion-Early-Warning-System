@@ -39,6 +39,7 @@ import ManagerVoiceDrawer from "./ManagerVoiceDrawer";
 const NAV_BY_ROLE: Record<string, { to: string; label: string; icon: any }[]> = {
   cold_storage_manager: [
     { to: "/manager", label: "Overview Dashboard", icon: LayoutDashboard },
+    { to: "/manager/orders", label: "Order Management", icon: ShoppingBag },
     { to: "/manager/alerts", label: "Alerts & Incidents", icon: BellRing },
     { to: "/manager/inventory", label: "Inventory & Financial Risk", icon: Package },
     { to: "/manager/users", label: "User Approval Requests", icon: Users },
@@ -98,6 +99,27 @@ function NavItems({ role, onNavigate, pendingCount }: { role: string; onNavigate
   const activeAlerts = zones?.reduce((n, z) => n + z.active_alert_count, 0) ?? 0;
   const navItems = NAV_BY_ROLE[role] ?? NAV_BY_ROLE.facility_operator;
 
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  useEffect(() => {
+    const updateOrderCount = () => {
+      try {
+        const saved = localStorage.getItem("coldguard_buyer_orders");
+        if (saved) {
+          const list = JSON.parse(saved);
+          const count = list.filter((o: any) => o.status === "PENDING_INSPECTION").length;
+          setPendingOrdersCount(count);
+        } else {
+          setPendingOrdersCount(2);
+        }
+      } catch {
+        setPendingOrdersCount(0);
+      }
+    };
+    updateOrderCount();
+    window.addEventListener("storage", updateOrderCount);
+    return () => window.removeEventListener("storage", updateOrderCount);
+  }, []);
+
   return (
     <nav aria-label="Main" className="flex flex-col gap-1.5">
       {navItems.map(({ to, label, icon: Icon }) => (
@@ -124,6 +146,11 @@ function NavItems({ role, onNavigate, pendingCount }: { role: string; onNavigate
           {label === "User Approval Requests" && pendingCount > 0 && (
             <span id="pending-badge" className="rounded-full bg-amber-400 border border-white/50 px-2.5 py-0.5 text-xs font-bold text-slate-950 animate-pulse shadow-sm">
               {pendingCount}
+            </span>
+          )}
+          {label === "Order Management" && pendingOrdersCount > 0 && (
+            <span id="pending-orders-badge" className="rounded-full bg-amber-400 border border-white/50 px-2.5 py-0.5 text-xs font-bold text-slate-950 animate-pulse shadow-sm">
+              {pendingOrdersCount}
             </span>
           )}
         </NavLink>
@@ -178,7 +205,7 @@ export function RoleLayout({
   session: AuthSession;
   onSignOut: () => void;
 }) {
-  const { zones } = useApp();
+  const { zones, searchQuery, setSearchQuery } = useApp();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [wallClock, setWallClock] = useState(() => new Date());
   const [pendingCount, setPendingCount] = useState(0);
@@ -186,7 +213,17 @@ export function RoleLayout({
   const role = session.user.actual_role;
   const RoleIcon = ROLE_ICON[role] ?? ShieldCheck;
 
-  useEffect(() => setDrawerOpen(false), [location.pathname]);
+  // Determine current buyer portal tab
+  const isBuyerOrders = location.pathname === "/buyer" || location.pathname === "/buyer/";
+  const isBuyerInventory = location.pathname.startsWith("/buyer/inventory");
+  const isBuyerQuality = location.pathname.startsWith("/buyer/quality");
+  const isBuyerPortal = isBuyerOrders || isBuyerInventory || isBuyerQuality;
+
+  useEffect(() => {
+    setDrawerOpen(false);
+    setSearchQuery("");
+  }, [location.pathname]);
+
   useEffect(() => {
     const t = setInterval(() => setWallClock(new Date()), 1000);
     return () => clearInterval(t);
@@ -270,21 +307,40 @@ export function RoleLayout({
               </div>
             </div>
 
-            {/* Dribbble Search Bar */}
-            <div className="relative flex-1 max-w-md hidden md:flex items-center">
-              <Search size={15} className="absolute left-3.5 text-[#64748B]" />
-              <input
-                type="text"
-                placeholder="Search cold room, telemetry, lot, or alert..."
-                className="w-full pl-9 pr-14 py-2 rounded-xl border border-[#DCE8F6] bg-[#F8FAFC] text-xs sm:text-sm font-medium text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/25 focus:border-[#2563EB]"
-                readOnly
-              />
-              <span className="absolute right-3 text-[10px] font-mono font-bold text-[#64748B] bg-white px-1.5 py-0.5 rounded border border-[#DCE8F6]">
-                ⌘ K
-              </span>
-            </div>
+            {/* Dynamic Search Bar: Hidden on 'Orders & Lot Quality', enabled for Inventory and Quality Alerts */}
+            {(!isBuyerPortal || isBuyerInventory || isBuyerQuality) && !isBuyerOrders && (
+              <div className="relative flex-1 max-w-md hidden md:flex items-center">
+                <Search size={15} className="absolute left-3.5 text-[#64748B]" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={
+                    isBuyerInventory
+                      ? "Search inventory by Lot ID, SKU, product, or chamber..."
+                      : isBuyerQuality
+                      ? "Search quality alerts by title, chamber, lot, or severity..."
+                      : "Search cold room, telemetry, lot, or alert..."
+                  }
+                  className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#DCE8F6] bg-[#F8FAFC] text-xs sm:text-sm font-medium text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/25 focus:border-[#2563EB]"
+                />
+                {searchQuery ? (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 text-[#64748B] hover:text-[#0F172A] p-1 cursor-pointer"
+                    title="Clear search"
+                  >
+                    <X size={14} />
+                  </button>
+                ) : (
+                  <span className="absolute right-3 text-[10px] font-mono font-bold text-[#64748B] bg-white px-1.5 py-0.5 rounded border border-[#DCE8F6]">
+                    ⌘ K
+                  </span>
+                )}
+              </div>
+            )}
 
-            <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-4 ml-auto">
               {/* Outdoor temp */}
               <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#EFF6FF] border border-[#DCE8F6] text-xs sm:text-sm">
                 <Thermometer size={15} className="text-[#2563EB]" />
@@ -300,11 +356,13 @@ export function RoleLayout({
                 {wallClock.toLocaleTimeString()}
               </div>
 
-              {/* System online */}
-              <div className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-bold">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                Telemetry Online
-              </div>
+              {/* System online - Removed from all three buyer tabs */}
+              {!isBuyerPortal && (
+                <div className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-bold">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Telemetry Online
+                </div>
+              )}
 
               {/* User avatar */}
               <div className="flex items-center gap-2.5 pl-2 border-l border-[#DCE8F6]">

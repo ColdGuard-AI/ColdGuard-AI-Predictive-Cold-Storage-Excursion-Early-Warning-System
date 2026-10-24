@@ -107,6 +107,7 @@ export interface LoginPayload { email: string; password: string; }
 export interface RegisterPayload {
   full_name: string; email: string; password: string;
   phone?: string; requested_role: string; organization?: string;
+  contract_code?: string;
 }
 export interface ChangePasswordPayload {
   email: string; current_password: string; new_password: string;
@@ -121,6 +122,7 @@ export const auth = {
   changePassword: (payload: ChangePasswordPayload) => post<any>("/api/auth/change-password", payload),
   getRoles: () => get<any[]>("/api/roles"),
   getFacilities: () => get<any>("/api/facilities"),
+  getVerifiedPartners: () => get<any>("/api/auth/verified-partners"),
   // Manager admin
   getPendingUsers: (status?: string) => get<any[]>(`/api/admin/pending-users${status ? `?status=${status}` : ""}`),
   getAllUsers: () => get<any[]>("/api/admin/all-users"),

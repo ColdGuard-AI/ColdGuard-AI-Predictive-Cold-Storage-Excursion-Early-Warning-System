@@ -196,7 +196,28 @@ def init_and_seed_db(drop_existing: bool = False):
             headquarters="Seattle / Vancouver Gateway",
             verified=True
         )
-        db.add_all([c1, c2, c3])
+        c4 = Company(
+            id="COMP-RETAIL-04",
+            name="Apex Global Perishables & Retail Hub",
+            business_type="Retail Cold Chain & Supermarket Logistics",
+            headquarters="Chicago / Minneapolis Central",
+            verified=True
+        )
+        c5 = Company(
+            id="COMP-METRO-05",
+            name="Metro Health Hospital Network",
+            business_type="Hospital Pharmacy & Cryo-Biologics Procurement",
+            headquarters="New York / Philadelphia Hub",
+            verified=True
+        )
+        c6 = Company(
+            id="COMP-FRESH-06",
+            name="FreshMart Supermarkets Supply Alliance",
+            business_type="Fresh Produce & Dairy Distribution",
+            headquarters="Atlanta / Dallas Regional Center",
+            verified=True
+        )
+        db.add_all([c1, c2, c3, c4, c5, c6])
         db.flush()
 
         # 3. SEED RELATIONAL FACILITIES

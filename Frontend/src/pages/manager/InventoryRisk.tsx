@@ -20,6 +20,18 @@ import {
   ShieldCheck,
   CheckCircle2,
   Info,
+  ShoppingBag,
+  XCircle,
+  Clock,
+  ArrowUpRight,
+  X,
+  FileText,
+  AlertOctagon,
+  Calendar,
+  Building,
+  Check,
+  ExternalLink,
+  Search,
 } from "lucide-react";
 import { api } from "../../services/api";
 import { useApp } from "../../hooks/AppContext";
@@ -127,21 +139,98 @@ function StatCard({ label, value, sub, icon: Icon, color = "blue", alert = false
 }
 
 export default function InventoryRisk() {
-  const { zones, zonesLoading } = useApp();
+  const { zones, zonesLoading, notify } = useApp();
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "profiles" | "simulator" | "history">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "profiles" | "simulator" | "history" | "orders">("overview");
 
   // What-If Simulator State
   const [simZoneId, setSimZoneId] = useState<string>("zone-a");
   const [simTempDelta, setSimTempDelta] = useState<number>(3.5);
   const [simDurationHours, setSimDurationHours] = useState<number>(2.0);
 
+  // Staged Buyer Purchase Orders State
+  const [buyerOrders, setBuyerOrders] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem("coldguard_buyer_orders");
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  });
+  const [orderSearch, setOrderSearch] = useState("");
+  const [orderFilter, setOrderFilter] = useState<"ALL" | "PENDING_INSPECTION" | "ACCEPTED" | "CONDITIONAL_HOLD" | "REJECTED_QUARANTINE">("ALL");
+  const [decisionModalOrder, setDecisionModalOrder] = useState<any | null>(null);
+  const [decisionAction, setDecisionAction] = useState<"ACCEPT" | "HOLD" | "REJECT">("ACCEPT");
+  const [decisionNotes, setDecisionNotes] = useState("");
+
+  const syncBuyerOrders = () => {
+    try {
+      const saved = localStorage.getItem("coldguard_buyer_orders");
+      if (saved) {
+        setBuyerOrders(JSON.parse(saved));
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    syncBuyerOrders();
+    window.addEventListener("storage", syncBuyerOrders);
+    return () => window.removeEventListener("storage", syncBuyerOrders);
+  }, []);
+
+  function handleManagerOrderAction(orderId: string, action: "ACCEPT" | "HOLD" | "REJECT", customNote?: string) {
+    const updated = buyerOrders.map((ord) => {
+      if (ord.id !== orderId) return ord;
+      const now = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
+      if (action === "ACCEPT") {
+        return {
+          ...ord,
+          status: "ACCEPTED",
+          acceptedAt: now,
+          acceptedBy: "Cold Storage Facility Manager",
+          decisionNote:
+            customNote || "Authorized & cleared for dock release by Cold Storage Manager under GxP compliance standards.",
+        };
+      }
+      if (action === "HOLD") {
+        return {
+          ...ord,
+          status: "CONDITIONAL_HOLD",
+          decisionNote:
+            customNote || "Thermal Hold flagged by Facility Manager: Secondary chamber inspection required before dispatch.",
+        };
+      }
+      return {
+        ...ord,
+        status: "REJECTED_QUARANTINE",
+        decisionNote:
+          customNote || "Quarantine mandated by Facility Manager: Thermal non-compliance detected. Stock isolation initiated.",
+      };
+    });
+
+    setBuyerOrders(updated);
+    try {
+      localStorage.setItem("coldguard_buyer_orders", JSON.stringify(updated));
+    } catch {}
+
+    if (action === "ACCEPT") {
+      notify("success", "Purchase order authorized and cleared for outbound dispatch!");
+    } else if (action === "HOLD") {
+      notify("info", "Purchase order placed on thermal inspection hold.");
+    } else {
+      notify("error", "Purchase order flagged and quarantined.");
+    }
+
+    setDecisionModalOrder(null);
+    setDecisionNotes("");
+  }
+
   async function loadData() {
     setLoading(true);
     try {
       const ev = await api.events(25).catch(() => []);
       setEvents(ev as any[]);
+      syncBuyerOrders();
     } finally {
       setLoading(false);
     }
@@ -381,6 +470,25 @@ export default function InventoryRisk() {
           }`}
         >
           Recent Excursions & Log
+        </button>
+        <button
+          onClick={() => setActiveTab("orders")}
+          className={`px-4 py-2.5 rounded-xl text-sm sm:text-base font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            activeTab === "orders"
+              ? "bg-[#2563EB] text-white shadow-sm"
+              : "text-[#475569] hover:text-[#0F172A] hover:bg-white"
+          }`}
+        >
+          <ShoppingBag size={16} /> Buyer Staged Orders ({buyerOrders.length})
+          {buyerOrders.filter((o) => o.status === "PENDING_INSPECTION").length > 0 && (
+            <span
+              className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                activeTab === "orders" ? "bg-amber-400 text-slate-900" : "bg-amber-100 text-amber-800"
+              }`}
+            >
+              {buyerOrders.filter((o) => o.status === "PENDING_INSPECTION").length} Pending
+            </span>
+          )}
         </button>
       </div>
 
@@ -895,6 +1003,469 @@ export default function InventoryRisk() {
               })}
             </div>
           )}
+        </div>
+      )}
+      {/* ─────────────────────────────────────────────────────────────
+          8. TAB 5: BUYER STAGED PURCHASE ORDERS & CLEARANCE
+      ───────────────────────────────────────────────────────────── */}
+      {activeTab === "orders" && (() => {
+        const enrichedOrders = buyerOrders.map((ord: any) => {
+          const z = (zones ?? []).find((zone: any) => zone.zone_id === ord.zoneId);
+          const temp = z?.temperature ?? (z as any)?.temp ?? null;
+          const isExcursion = temp != null && temp > ord.spoilageThresholdC;
+          return {
+            ...ord,
+            liveTemp: temp,
+            riskScore: z?.risk_score ?? 0,
+            isExcursion,
+            zoneStatus: (z as any)?.status ?? (z as any)?.temperature_status ?? "SAFE",
+          };
+        });
+
+        const filteredOrders = enrichedOrders.filter((ord: any) => {
+          const matchesFilter = orderFilter === "ALL" || ord.status === orderFilter;
+          const q = orderSearch.trim().toLowerCase();
+          const matchesSearch =
+            !q ||
+            ord.poNumber?.toLowerCase().includes(q) ||
+            ord.lotId?.toLowerCase().includes(q) ||
+            ord.productName?.toLowerCase().includes(q) ||
+            ord.customerOrg?.toLowerCase().includes(q) ||
+            ord.zoneName?.toLowerCase().includes(q) ||
+            ord.supplier?.toLowerCase().includes(q);
+          return matchesFilter && matchesSearch;
+        });
+
+        const pendingCount = enrichedOrders.filter((o) => o.status === "PENDING_INSPECTION").length;
+        const acceptedCount = enrichedOrders.filter((o) => o.status === "ACCEPTED").length;
+        const holdCount = enrichedOrders.filter((o) => o.status === "CONDITIONAL_HOLD").length;
+        const quarantineCount = enrichedOrders.filter((o) => o.status === "REJECTED_QUARANTINE").length;
+        const totalGrossUsdOrders = enrichedOrders.reduce((sum, o) => sum + (o.grossValueUsd || 0), 0);
+
+        return (
+          <div className="space-y-6">
+            {/* Quick KPI stats for Buyer Orders */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="rounded-2xl border border-[#DCE8F6] bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#475569]">Staged Orders</span>
+                  <div className="h-8 w-8 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] flex items-center justify-center text-[#2563EB]">
+                    <ShoppingBag size={18} />
+                  </div>
+                </div>
+                <div className="text-2xl font-black text-[#0F172A]">{enrichedOrders.length} Orders</div>
+                <div className="text-xs font-medium text-[#64748B] mt-1">${totalGrossUsdOrders.toLocaleString()} USD Total Value</div>
+              </div>
+
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-800">Awaiting Manager Clearance</span>
+                  <div className="h-8 w-8 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800">
+                    <Clock size={18} />
+                  </div>
+                </div>
+                <div className="text-2xl font-black text-amber-900">{pendingCount} Pending</div>
+                <div className="text-xs font-medium text-amber-700 mt-1">Requires Manager GxP sign-off before dock release</div>
+              </div>
+
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">Released / Cleared</span>
+                  <div className="h-8 w-8 rounded-lg bg-emerald-100 border border-emerald-300 flex items-center justify-center text-emerald-700">
+                    <CheckCircle2 size={18} />
+                  </div>
+                </div>
+                <div className="text-2xl font-black text-emerald-900">{acceptedCount} Orders</div>
+                <div className="text-xs font-medium text-emerald-700 mt-1">Cleared for outbound logistics & transport</div>
+              </div>
+
+              <div className="rounded-2xl border border-rose-200 bg-rose-50/40 p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-rose-800">Holds & Quarantines</span>
+                  <div className="h-8 w-8 rounded-lg bg-rose-100 border border-rose-300 flex items-center justify-center text-rose-700">
+                    <AlertTriangle size={18} />
+                  </div>
+                </div>
+                <div className="text-2xl font-black text-rose-900">{holdCount + quarantineCount} Orders</div>
+                <div className="text-xs font-medium text-rose-700 mt-1">{holdCount} on Thermal Hold · {quarantineCount} Quarantined</div>
+              </div>
+            </div>
+
+            {/* Main Order Table Card */}
+            <div className="rounded-2xl border border-[#DCE8F6] bg-white shadow-arctic-card overflow-hidden">
+              <div className="px-6 py-5 border-b border-[#DCE8F6] flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-bold text-[#0F172A] flex items-center gap-2">
+                    <ShoppingBag size={20} className="text-[#2563EB]" /> Buyer Staged Purchase Orders
+                  </h2>
+                  <p className="text-sm font-medium text-[#475569] mt-0.5">
+                    Orders placed by verified buyers and retailers. Inspect live storage chambers, verify GxP criteria, and authorize dock dispatch.
+                  </p>
+                </div>
+
+                {/* Search Bar */}
+                <div className="relative min-w-[260px]">
+                  <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+                  <input
+                    type="text"
+                    value={orderSearch}
+                    onChange={(e) => setOrderSearch(e.target.value)}
+                    placeholder="Search PO, Buyer, Lot, Chamber…"
+                    className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] text-sm font-medium text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:bg-white transition"
+                  />
+                  {orderSearch && (
+                    <button
+                      onClick={() => setOrderSearch("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Status Filter Tabs */}
+              <div className="px-6 py-3 border-b border-[#F1F5F9] bg-[#F8FAFC] flex flex-wrap items-center gap-2">
+                {[
+                  { key: "ALL", label: `All (${enrichedOrders.length})` },
+                  { key: "PENDING_INSPECTION", label: `Awaiting Clearance (${pendingCount})` },
+                  { key: "ACCEPTED", label: `Released & Dispatched (${acceptedCount})` },
+                  { key: "CONDITIONAL_HOLD", label: `Thermal Hold (${holdCount})` },
+                  { key: "REJECTED_QUARANTINE", label: `Quarantined (${quarantineCount})` },
+                ].map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setOrderFilter(t.key as any)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      orderFilter === t.key
+                        ? "bg-[#2563EB] text-white shadow-sm"
+                        : "bg-white text-[#475569] hover:bg-slate-100 border border-[#E2E8F0]"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Orders Table */}
+              {!filteredOrders.length ? (
+                <div className="py-16 text-center text-sm font-medium text-[#64748B]">
+                  No staged purchase orders matching current filter.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-[#F8FAFC] border-b border-[#DCE8F6] text-xs font-bold uppercase tracking-wider text-[#64748B]">
+                      <tr>
+                        <th className="px-5 py-3.5">PO & Delivery</th>
+                        <th className="px-5 py-3.5">Customer Organization</th>
+                        <th className="px-5 py-3.5">Commodity / Staged Bay</th>
+                        <th className="px-5 py-3.5">Value & Units</th>
+                        <th className="px-5 py-3.5">Chamber Telemetry</th>
+                        <th className="px-5 py-3.5">Status</th>
+                        <th className="px-5 py-3.5 text-right">Manager Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E2E8F0]">
+                      {filteredOrders.map((ord: any) => {
+                        const statusColors: Record<string, string> = {
+                          PENDING_INSPECTION: "bg-amber-50 text-amber-800 border-amber-200",
+                          ACCEPTED: "bg-emerald-50 text-emerald-800 border-emerald-200",
+                          CONDITIONAL_HOLD: "bg-orange-50 text-orange-800 border-orange-200",
+                          REJECTED_QUARANTINE: "bg-rose-50 text-rose-800 border-rose-200",
+                        };
+
+                        const statusLabel: Record<string, string> = {
+                          PENDING_INSPECTION: "Awaiting Clearance",
+                          ACCEPTED: "Released / Cleared",
+                          CONDITIONAL_HOLD: "Thermal Hold",
+                          REJECTED_QUARANTINE: "Quarantined",
+                        };
+
+                        return (
+                          <tr key={ord.id} className="hover:bg-[#F8FAFC] transition">
+                            {/* PO & Delivery */}
+                            <td className="px-5 py-4">
+                              <div className="font-extrabold text-[#0F172A] flex items-center gap-1.5">
+                                <FileText size={15} className="text-[#2563EB]" /> {ord.poNumber}
+                              </div>
+                              <div className="text-xs font-medium text-[#64748B] mt-0.5">
+                                Exp: {ord.expectedDelivery || "Next Cycle"}
+                              </div>
+                            </td>
+
+                            {/* Customer Org */}
+                            <td className="px-5 py-4">
+                              <div className="font-bold text-[#0F172A] flex items-center gap-1">
+                                <Building size={14} className="text-slate-400" /> {ord.customerOrg}
+                              </div>
+                              <div className="text-xs font-medium text-[#64748B] mt-0.5">
+                                Supplier: {ord.supplier}
+                              </div>
+                            </td>
+
+                            {/* Commodity & Bay */}
+                            <td className="px-5 py-4">
+                              <div className="font-semibold text-[#0F172A] line-clamp-1 max-w-[200px]" title={ord.productName}>
+                                {ord.productName}
+                              </div>
+                              <div className="text-xs font-medium text-[#64748B] mt-0.5">
+                                Bay: <span className="font-bold text-[#0F172A]">{ord.zoneName}</span> · {ord.lotId}
+                              </div>
+                            </td>
+
+                            {/* Value */}
+                            <td className="px-5 py-4">
+                              <div className="font-extrabold text-[#0F172A]">
+                                ${(ord.grossValueUsd || 0).toLocaleString()} USD
+                              </div>
+                              <div className="text-xs font-medium text-[#64748B] mt-0.5">
+                                {ord.quantityUnits}
+                              </div>
+                            </td>
+
+                            {/* Chamber Telemetry */}
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-2">
+                                <span className="font-black text-[#0F172A]">
+                                  {ord.liveTemp !== null ? `${Number(ord.liveTemp).toFixed(1)}°C` : "Monitoring"}
+                                </span>
+                                {ord.isExcursion ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                                    Breach
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                    Optimal
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] font-medium text-[#64748B] mt-0.5">
+                                Mandate: {ord.mandatedRange}
+                              </div>
+                            </td>
+
+                            {/* Status */}
+                            <td className="px-5 py-4">
+                              <span
+                                className={`inline-block px-3 py-1 rounded-full text-xs font-bold border ${
+                                  statusColors[ord.status] || "bg-slate-100 text-slate-700"
+                                }`}
+                              >
+                                {statusLabel[ord.status] || ord.status}
+                              </span>
+                              {ord.acceptedBy && (
+                                <div className="text-[10px] font-medium text-[#64748B] mt-1 line-clamp-1">
+                                  by {ord.acceptedBy}
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Actions */}
+                            <td className="px-5 py-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {/* Quick Authorize */}
+                                {ord.status !== "ACCEPTED" && (
+                                  <button
+                                    onClick={() => handleManagerOrderAction(ord.id, "ACCEPT")}
+                                    title="Authorize dock release"
+                                    className="p-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 transition cursor-pointer"
+                                  >
+                                    <Check size={16} />
+                                  </button>
+                                )}
+
+                                {/* Quick Hold */}
+                                {ord.status !== "CONDITIONAL_HOLD" && (
+                                  <button
+                                    onClick={() => handleManagerOrderAction(ord.id, "HOLD")}
+                                    title="Place on thermal hold"
+                                    className="p-1.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 transition cursor-pointer"
+                                  >
+                                    <AlertTriangle size={16} />
+                                  </button>
+                                )}
+
+                                {/* Quick Quarantine */}
+                                {ord.status !== "REJECTED_QUARANTINE" && (
+                                  <button
+                                    onClick={() => handleManagerOrderAction(ord.id, "REJECT")}
+                                    title="Quarantine lot"
+                                    className="p-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800 transition cursor-pointer"
+                                  >
+                                    <XCircle size={16} />
+                                  </button>
+                                )}
+
+                                {/* Detailed Review Modal */}
+                                <button
+                                  onClick={() => {
+                                    setDecisionModalOrder(ord);
+                                    setDecisionAction(
+                                      ord.status === "ACCEPTED"
+                                        ? "ACCEPT"
+                                        : ord.status === "CONDITIONAL_HOLD"
+                                        ? "HOLD"
+                                        : "ACCEPT"
+                                    );
+                                    setDecisionNotes(ord.decisionNote || "");
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-lg border border-[#DCE8F6] bg-white hover:bg-[#EFF6FF] text-[#2563EB] text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                                >
+                                  <FileText size={13} /> Review
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ─────────────────────────────────────────────────────────────
+          9. MANAGER DECISION & SIGN-OFF MODAL
+      ───────────────────────────────────────────────────────────── */}
+      {decisionModalOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-[#DCE8F6] max-w-xl w-full p-6 space-y-5 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] flex items-center justify-center text-[#2563EB]">
+                  <ShieldCheck size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-[#0F172A]">Manager GxP Inspection & Sign-Off</h3>
+                  <p className="text-xs font-semibold text-[#64748B]">
+                    Purchase Order: <span className="text-[#0F172A] font-bold">{decisionModalOrder.poNumber}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDecisionModalOrder(null)}
+                className="h-8 w-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Order Brief */}
+            <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="font-bold text-[#64748B]">Customer Organization:</span>
+                <span className="font-extrabold text-[#0F172A]">{decisionModalOrder.customerOrg}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-bold text-[#64748B]">Commodity / Lot:</span>
+                <span className="font-extrabold text-[#0F172A]">{decisionModalOrder.productName} ({decisionModalOrder.lotId})</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-bold text-[#64748B]">Assigned Chamber:</span>
+                <span className="font-extrabold text-[#0F172A]">{decisionModalOrder.zoneName} (Limit: {decisionModalOrder.mandatedRange})</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-bold text-[#64748B]">Gross Staged Value:</span>
+                <span className="font-extrabold text-[#0F172A]">
+                  ${(decisionModalOrder.grossValueUsd || 0).toLocaleString()} USD (₹{(decisionModalOrder.grossValueInr || 0).toLocaleString("en-IN")})
+                </span>
+              </div>
+            </div>
+
+            {/* Action Chooser */}
+            <div>
+              <label className="block text-xs font-bold text-[#475569] uppercase tracking-wider mb-2">
+                Manager Clearance Decision
+              </label>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDecisionAction("ACCEPT")}
+                  className={`p-3 rounded-xl border text-center transition cursor-pointer ${
+                    decisionAction === "ACCEPT"
+                      ? "border-emerald-500 bg-emerald-50/80 text-emerald-900 ring-2 ring-emerald-300"
+                      : "border-slate-200 hover:bg-slate-50 text-slate-700"
+                  }`}
+                >
+                  <CheckCircle2 size={20} className="mx-auto mb-1 text-emerald-600" />
+                  <div className="font-bold text-xs">Authorize Release</div>
+                  <div className="text-[10px] text-emerald-700 mt-0.5">Cleared for dispatch</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDecisionAction("HOLD")}
+                  className={`p-3 rounded-xl border text-center transition cursor-pointer ${
+                    decisionAction === "HOLD"
+                      ? "border-amber-500 bg-amber-50/80 text-amber-900 ring-2 ring-amber-300"
+                      : "border-slate-200 hover:bg-slate-50 text-slate-700"
+                  }`}
+                >
+                  <AlertTriangle size={20} className="mx-auto mb-1 text-amber-600" />
+                  <div className="font-bold text-xs">Thermal Hold</div>
+                  <div className="text-[10px] text-amber-700 mt-0.5">Secondary check</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDecisionAction("REJECT")}
+                  className={`p-3 rounded-xl border text-center transition cursor-pointer ${
+                    decisionAction === "REJECT"
+                      ? "border-rose-500 bg-rose-50/80 text-rose-900 ring-2 ring-rose-300"
+                      : "border-slate-200 hover:bg-slate-50 text-slate-700"
+                  }`}
+                >
+                  <XCircle size={20} className="mx-auto mb-1 text-rose-600" />
+                  <div className="font-bold text-xs">Quarantine</div>
+                  <div className="text-[10px] text-rose-700 mt-0.5">Mandate return</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Custom Notes */}
+            <div>
+              <label className="block text-xs font-bold text-[#475569] uppercase tracking-wider mb-1.5">
+                Manager Inspection & Audit Note
+              </label>
+              <textarea
+                rows={3}
+                value={decisionNotes}
+                onChange={(e) => setDecisionNotes(e.target.value)}
+                placeholder="Enter GxP temperature verification notes, dock clearance details, or hold justification..."
+                className="w-full p-3 rounded-xl border border-[#CBD5E1] bg-white text-xs font-medium text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+              />
+            </div>
+
+            {/* Sign-Off Footer */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#E2E8F0]">
+              <button
+                type="button"
+                onClick={() => setDecisionModalOrder(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-[#64748B] hover:text-[#0F172A] hover:bg-slate-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleManagerOrderAction(decisionModalOrder.id, decisionAction, decisionNotes)
+                }
+                className={`px-5 py-2.5 rounded-xl text-xs font-extrabold text-white shadow-md transition cursor-pointer flex items-center gap-1.5 ${
+                  decisionAction === "ACCEPT"
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : decisionAction === "HOLD"
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : "bg-rose-600 hover:bg-rose-700"
+                }`}
+              >
+                <Check size={16} /> Confirm Manager Sign-Off
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
