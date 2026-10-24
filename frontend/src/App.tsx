@@ -25,6 +25,7 @@ import ExcursionMonitor from "./pages/ExcursionMonitor";
 import BlockchainAudit from "./pages/BlockchainAudit"; // auditor: Blockchain
 import Reports from "./pages/Reports";              // auditor: Reports
 import WhatIf from "./pages/WhatIf";
+import Chatbot from "./pages/Chatbot";            // operator: What-If Assistant
 
 // ── Manager pages ─────────────────────────────────────────────────────────────
 import ManagerOverview from "./pages/manager/ManagerOverview";
@@ -71,6 +72,7 @@ function OperatorRoutes() {
       <Route path="/equipment" element={<EquipmentHealth />} />
       <Route path="/alerts" element={<Alerts />} />
       <Route path="/ai" element={<AIExplanation />} />
+      <Route path="/what-if" element={<Chatbot />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

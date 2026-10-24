@@ -1,0 +1,8 @@
+# Ollama model for the ColdGuard What-If Assistant: Llama 3.2 3B + ColdGuard LoRA adapter.
+#   ollama pull llama3.2:3b
+#   ollama create coldguard-assistant -f Modelfile
+# The adapter folder (from train_lora.py) must sit next to this file and be trained on the same base model.
+FROM llama3.2:3b
+ADAPTER ./coldguard-lora
+PARAMETER temperature 0.2
+PARAMETER num_ctx 8192

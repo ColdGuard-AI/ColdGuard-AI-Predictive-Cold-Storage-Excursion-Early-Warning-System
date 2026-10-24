@@ -4,7 +4,8 @@ from __future__ import annotations
 from typing import Any, List, Optional, Union
 
 import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.concurrency import run_in_threadpool
 
 from app import __version__
 from app.schemas.api import (
@@ -33,6 +34,9 @@ from app.schemas.api import (
     ZonePredictionOverview,
     ZoneSummary,
 )
+from pydantic import BaseModel, Field
+
+from app.services import assistant, voice
 from app.services.alerts import CATEGORY_LABELS
 from app.services.monitor import MonitoringService
 from app.simulator.engine import SCENARIOS
@@ -227,6 +231,70 @@ def phone_alert_status(monitor: MonitoringService = Depends(get_monitor)) -> dic
 @router.post("/notifications/phone/test", tags=["alerts"])
 def phone_alert_test(monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
     return monitor.notifier.send_test()
+
+
+# ---------------------------------------------------------------------- what-if assistant
+class ChatTurn(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str = Field(..., max_length=8000)
+
+
+class AssistantRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
+    history: List[ChatTurn] = Field(default_factory=list, max_length=30)
+    zone_id: Optional[str] = None
+    language: str = Field("en", pattern="^(en|hi|mr)$")
+
+
+class SpeechRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=12000)
+    language: str = Field("en", pattern="^(en|hi|mr)$")
+
+
+@router.get("/assistant/status", tags=["assistant"])
+def assistant_status() -> dict[str, Any]:
+    return assistant.llm_status()
+
+
+@router.post("/assistant/what-if", tags=["assistant"])
+def assistant_what_if(body: AssistantRequest, monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
+    try:
+        return assistant.answer(monitor, body.message.strip(), [t.model_dump() for t in body.history],
+                                body.zone_id, body.language)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/assistant/voice-status", tags=["assistant"])
+def assistant_voice_status() -> dict[str, Any]:
+    return voice.status()
+
+
+@router.post("/assistant/tts", tags=["assistant"], response_class=Response)
+async def assistant_tts(body: SpeechRequest) -> Response:
+    """Speak an answer aloud (MP3) in English, Hindi or Marathi."""
+    try:
+        audio = await voice.synthesize(body.text, body.language)
+    except voice.VoiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return Response(content=audio, media_type="audio/mpeg", headers={"Cache-Control": "no-store"})
+
+
+@router.post("/assistant/transcribe", tags=["assistant"])
+async def assistant_transcribe(request: Request, language: str = Query("en", pattern="^(en|hi|mr)$")) -> dict[str, Any]:
+    """Server-side speech-to-text for browsers without built-in speech recognition. Body: raw audio (WAV preferred)."""
+    audio = await request.body()
+    if len(audio) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Recording too long (max 10 MB)")
+    mime = (request.headers.get("content-type") or "audio/wav").split(";")[0]
+    try:
+        return await run_in_threadpool(voice.transcribe, audio, mime, language)
+    except voice.VoiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=f"Speech recognition unavailable: {exc}") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # ---------------------------------------------------------------------- simulator

@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Cpu,
+  FlaskConical,
   Layers,
   LayoutDashboard,
   Lock,
@@ -47,6 +48,7 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string; icon: any }[]> = 
     { to: "/operator/equipment", label: "Equipment & Sensor Health", icon: Cpu },
     { to: "/operator/alerts", label: "Alerts & Incidents", icon: BellRing },
     { to: "/operator/ai", label: "AI Diagnosis & SOPs", icon: BrainCircuit },
+    { to: "/operator/what-if", label: "What-If Assistant", icon: FlaskConical },
   ],
   government_auditor: [
     { to: "/auditor", label: "Compliance Overview", icon: ShieldCheck },

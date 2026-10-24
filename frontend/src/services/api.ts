@@ -27,6 +27,21 @@ export interface PhoneAlertStatus {
   recipients: PhoneAlertRecipient[]; sent_count: number; last_error: string | null;
 }
 
+export interface WhatIfChartPoint { minute: number; scenario: number; baseline: number }
+export interface WhatIfChart {
+  zone_id: string; zone_name: string; scenario: string; scenario_label: string; duration_minutes: number | null;
+  limits: { lower: number; upper: number; setpoint: number }; spoilage_threshold: number;
+  points: WhatIfChartPoint[];
+  metrics: { peak_temperature: number; time_to_limit_minutes: number | null; ai_lead_time_minutes: number | null; peak_risk: number | null; inventory_at_risk_usd: number };
+}
+export type AssistantEngine = "ollama" | "gemini" | "rules";
+export interface AssistantReply { reply: string; charts: WhatIfChart[]; mode: AssistantEngine; planner: AssistantEngine; model: string | null; notice: string | null }
+export interface AssistantStatus {
+  providers: Record<string, { available: boolean; model: string | null }>;
+  active: AssistantEngine; ai_enabled: boolean;
+}
+export interface AssistantTurn { role: "user" | "assistant"; content: string }
+
 let authToken: string | null = null;
 let onUnauthorized: (() => void) | null = null;
 
@@ -65,9 +80,9 @@ export function describeErrorBody(body: unknown, status: number): string {
   return `Request failed with status ${status}`;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, timeoutMs: number = TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
   try {
     res = await fetch(`${BASE_URL}${path}`, {
@@ -99,6 +114,46 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 const get = <T>(path: string) => request<T>(path);
+
+// ─── What-If Assistant voice (binary audio, so these bypass the JSON helper) ──
+async function fetchWithAuth(path: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      ...init,
+      headers: { ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}), ...(init.headers ?? {}) },
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      let body: unknown = null;
+      try { body = await res.json(); } catch { /* not JSON */ }
+      throw new ApiError(describeErrorBody(body, res.status), res.status);
+    }
+    return res;
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    throw new ApiError("Cannot reach the ColdGuard backend.", null);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** MP3 of `text` spoken in English, Hindi or Marathi. */
+export async function synthesizeSpeech(text: string, language: "en" | "hi" | "mr"): Promise<Blob> {
+  const res = await fetchWithAuth("/api/assistant/tts", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, language }),
+  }, 60000);
+  return res.blob();
+}
+
+/** Server-side speech-to-text (used when the browser has no speech recognition). */
+export async function transcribeAudio(wav: Blob, language: "en" | "hi" | "mr"): Promise<{ text: string; engine: string }> {
+  const res = await fetchWithAuth(`/api/assistant/transcribe?language=${language}`, {
+    method: "POST", headers: { "Content-Type": "audio/wav" }, body: wav,
+  }, 120000);
+  return res.json();
+}
 const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) });
 
@@ -147,6 +202,12 @@ export const api = {
   acknowledge: (alertId: string) => post<Alert>(`/api/alerts/${alertId}/acknowledge`),
   phoneAlertStatus: () => request<PhoneAlertStatus>("/api/notifications/phone"),
   phoneAlertTest: () => post<{ recipients: PhoneAlertRecipient[]; error: string | null }>("/api/notifications/phone/test"),
+  assistantStatus: () => request<AssistantStatus>("/api/assistant/status"),
+  askWhatIf: (message: string, history: AssistantTurn[], zoneId?: string, language: "en" | "hi" | "mr" = "en") =>
+    // Local models on CPU can take a while (plan + write), so allow up to 4 minutes.
+    request<AssistantReply>("/api/assistant/what-if", {
+      method: "POST", body: JSON.stringify({ message, history, zone_id: zoneId ?? null, language }),
+    }, 240000),
   simulatorStatus: () => request<SimulatorStatus>("/api/simulator/status"),
   setScenario: (zoneId: string, scenario: ScenarioId, ambientDelta?: number) =>
     post<MessageResponse>("/api/simulator/scenario", { zone_id: zoneId, scenario, ambient_delta: ambientDelta ?? null }),

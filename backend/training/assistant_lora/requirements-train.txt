@@ -1,0 +1,7 @@
+# Only needed on the GPU machine that trains the adapter (e.g. Google Colab), not for running ColdGuard.
+torch>=2.4
+transformers>=4.56
+peft>=0.17
+trl>=0.23
+datasets>=3.0
+accelerate>=1.0
