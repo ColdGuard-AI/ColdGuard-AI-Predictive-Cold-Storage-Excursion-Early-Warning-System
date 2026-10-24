@@ -24,6 +24,7 @@ from app.simulator.zones import ZONES, ZoneConfig
 from .alerts import CATEGORY_LABELS, AlertManager, ZoneSignals, evaluate_conditions
 from .forecasting import forecast_from_history
 from .risk import compute_risk, temperature_status
+from .synthetic_loader import load_synthetic_readings
 from .whatif import run_what_if
 
 log = logging.getLogger("coldguard.monitor")
@@ -962,13 +963,21 @@ class MonitoringService:
                     self._assess(zid, raise_alerts=False)
 
     def what_if(self, zone_id: str, scenario: str, duration_minutes: int | None, ambient_delta: float,
-                projection_minutes: int) -> dict[str, Any]:
+                projection_minutes: int, user_query: str | None = None, language: str = "en",
+                dataset_source: str = "live") -> dict[str, Any]:
         with self._lock:
             sim = self.sims[zone_id]
-            history = self.db.recent_readings(zone_id, ANALYSIS_WINDOW)
-            current_risk = self.get_assessment(zone_id).risk.get("score")
+            if dataset_source and dataset_source != "live":
+                history = load_synthetic_readings(zone_id, dataset_source, ANALYSIS_WINDOW)
+            else:
+                history = self.db.recent_readings(zone_id, ANALYSIS_WINDOW)
+                if history.empty:
+                    history = load_synthetic_readings(zone_id, "full", ANALYSIS_WINDOW)
+            assessment = self.get_assessment(zone_id)
+            current_risk = assessment.risk.get("score") if assessment and assessment.risk else None
             return run_what_if(sim, history, self.models.forecaster, scenario, duration_minutes, ambient_delta,
-                               projection_minutes, current_risk, seed=self.settings.seed + 999)
+                               projection_minutes, current_risk, seed=self.settings.seed + 999,
+                               user_query=user_query, language=language, dataset_source=dataset_source)
 
     def status(self) -> dict[str, Any]:
         return {

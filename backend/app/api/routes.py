@@ -25,12 +25,15 @@ from app.schemas.api import (
     RiskResponse,
     ScenarioRequest,
     Severity,
+    TranscribeRequest,
+    TranscribeResponse,
     WhatIfRequest,
     ZonePredictionOverview,
     ZoneSummary,
 )
 from app.services.alerts import CATEGORY_LABELS
 from app.services.monitor import MonitoringService
+from app.services.transcription import transcribe_audio
 from app.simulator.engine import SCENARIOS
 from app.simulator.zones import ZONES
 
@@ -258,9 +261,39 @@ def advance_simulator(body: AdvanceRequest, monitor: MonitoringService = Depends
 def what_if(body: WhatIfRequest, monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
     _zone_or_404(body.zone_id)
     try:
-        return monitor.what_if(body.zone_id, body.scenario, body.duration_minutes, body.ambient_delta, body.projection_minutes)
+        return monitor.what_if(
+            body.zone_id,
+            body.scenario or "compressor_failure",
+            body.duration_minutes,
+            body.ambient_delta,
+            body.projection_minutes,
+            user_query=body.user_query,
+            language=body.language or "en",
+            dataset_source=body.dataset_source or "live",
+        )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/simulator/datasets", tags=["simulator"])
+def list_synthetic_datasets_route() -> list[dict[str, Any]]:
+    """List all available calibrated synthetic CSV datasets in backend/data/synthetic."""
+    from app.services.synthetic_loader import list_available_synthetic_datasets
+    return list_available_synthetic_datasets()
+
+
+# ---------------------------------------------------------------------- Speech-to-Text (Whisper API)
+@router.post("/transcribe", response_model=TranscribeResponse, tags=["speech"])
+async def transcribe(body: TranscribeRequest) -> dict[str, Any]:
+    """Transcribe audio recording using Whisper API (Groq, OpenAI, or custom endpoint)."""
+    return await transcribe_audio(
+        audio_base64=body.audio_base64,
+        provider=body.provider or "groq",
+        api_key=body.api_key,
+        custom_endpoint=body.custom_endpoint,
+        language=body.language or "en",
+        prompt=body.prompt or "",
+    )
 
 
 # ---------------------------------------------------------------------- model & validation

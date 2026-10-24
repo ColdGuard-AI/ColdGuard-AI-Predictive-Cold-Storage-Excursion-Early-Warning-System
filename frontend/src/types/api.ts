@@ -12,7 +12,7 @@ export type ScenarioId =
   | "cooling_degradation"
   | "abnormal_humidity"
   | "fire_runaway";
-export type WhatIfScenarioId = Exclude<ScenarioId, "sensor_anomaly">;
+export type WhatIfScenarioId = ScenarioId;
 export type Horizon = 15 | 30 | 60 | 360 | 1440;
 
 export interface HorizonPrediction {
@@ -314,10 +314,85 @@ export interface MessageResponse {
 
 export interface WhatIfRequest {
   zone_id: string;
-  scenario: WhatIfScenarioId;
-  duration_minutes: number | null;
-  ambient_delta: number;
-  projection_minutes: number;
+  scenario?: WhatIfScenarioId;
+  duration_minutes?: number | null;
+  ambient_delta?: number;
+  projection_minutes?: number;
+  user_query?: string | null;
+  language?: string;
+  dataset_source?: string;
+}
+
+export interface TranscribeRequest {
+  audio_base64: string;
+  provider?: "groq" | "openai" | "custom" | string;
+  api_key?: string | null;
+  custom_endpoint?: string | null;
+  language?: string;
+  prompt?: string;
+}
+
+export interface TranscribeResponse {
+  ok: boolean;
+  transcript: string;
+  provider: string;
+  duration_ms?: number | null;
+  error?: string | null;
+}
+
+export interface WhatIfTimelineMilestone {
+  minute: number;
+  label: string;
+  detail: string;
+}
+
+export interface WhatIfProductImpact {
+  product_name: string;
+  exposure_summary: string;
+  thermal_stress_level: "low" | "moderate" | "severe";
+  critical_action_deadline_minutes: number | null;
+}
+
+export interface WhatIfLoraMetadata {
+  adapter: string;
+  base_architecture: string;
+  rank: number;
+  alpha: number;
+  active_status: string;
+  compound_effects_detected: string[];
+  domain_framework?: string;
+}
+
+export interface WhatIfAiAnswer {
+  user_query?: string | null;
+  resolved_query?: string;
+  is_custom_query?: boolean;
+  headline: string;
+  verdict: "safe" | "warning" | "critical";
+  direct_answer: string;
+  speech_text?: string;
+  language?: string;
+  detailed_analysis?: string;
+  timeline_milestones: WhatIfTimelineMilestone[];
+  product_impact: WhatIfProductImpact;
+  key_factors: string[];
+  recommended_actions: string[];
+  parsed_scenario: {
+    inferred_scenario: string;
+    inferred_duration_minutes: number | null;
+    inferred_ambient_delta: number;
+  };
+  lora_metadata?: WhatIfLoraMetadata;
+  real_world_situation?: {
+    title: string;
+    description: string;
+    incident_cause: string;
+    inventory_risk_usd: number;
+    inventory_risk_inr: number;
+    regulatory_standard: string;
+    protocol_code: string;
+    immediate_sop_steps: string[];
+  };
 }
 
 export interface ProjectionResult {
@@ -338,6 +413,7 @@ export interface ProjectionResult {
 
 export interface WhatIfResponse {
   zone_id: string;
+  dataset_source?: string;
   scenario: WhatIfScenarioId;
   scenario_label: string;
   baseline_label: string;
@@ -356,6 +432,8 @@ export interface WhatIfResponse {
   recommendations: string[];
   model_available: boolean;
   notes: string[];
+  user_query?: string | null;
+  ai_answer?: WhatIfAiAnswer;
 }
 
 export interface ExcursionScores {
