@@ -1,7 +1,7 @@
 """REST endpoints. Every value the dashboard shows comes from here."""
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, List, Optional, Union
 
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -25,6 +25,10 @@ from app.schemas.api import (
     RiskResponse,
     ScenarioRequest,
     Severity,
+    TelemetryIngestItem,
+    TelemetryIngestResponse,
+    TelemetrySourceChangeRequest,
+    TelemetrySourceStatus,
     WhatIfRequest,
     ZonePredictionOverview,
     ZoneSummary,
@@ -288,3 +292,27 @@ def manager_overview(
         _with_alert(zone)
     overview["action_items"] = [_alert_out(a) for a in overview["action_items"]]
     return overview
+
+
+# ---------------------------------------------------------------------- telemetry ingestion & source
+@router.post("/telemetry/ingest", response_model=TelemetryIngestResponse, tags=["telemetry"])
+def ingest_telemetry(
+    body: Union[List[TelemetryIngestItem], TelemetryIngestItem],
+    monitor: MonitoringService = Depends(get_monitor),
+) -> dict[str, Any]:
+    items = [body.model_dump()] if isinstance(body, TelemetryIngestItem) else [i.model_dump() for i in body]
+    return monitor.ingest_readings(items)
+
+
+@router.get("/telemetry/source", response_model=TelemetrySourceStatus, tags=["telemetry"])
+def get_telemetry_source(monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
+    return monitor.get_telemetry_source_status()
+
+
+@router.post("/telemetry/source", response_model=TelemetrySourceStatus, tags=["telemetry"])
+def set_telemetry_source(
+    body: TelemetrySourceChangeRequest,
+    monitor: MonitoringService = Depends(get_monitor),
+) -> dict[str, Any]:
+    return monitor.set_telemetry_source(body.source, body.dataset_type or "test")
+

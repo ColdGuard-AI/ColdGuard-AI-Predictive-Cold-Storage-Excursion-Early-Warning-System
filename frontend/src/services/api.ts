@@ -146,5 +146,26 @@ export const api = {
   recoveryStatus: (zoneId: string) => request<RecoveryStatus>(`/api/zones/${zoneId}/recovery-status`),
   doorEvents: (zoneId: string, limit: number = 50) => request<DoorEventItem[]>(`/api/zones/${zoneId}/door-events${qs({ limit })}`),
   modelEvaluation: () => request<ModelEvaluationResponse>("/api/model/evaluation"),
+  getTelemetrySource: () => request<import("../types/api").TelemetrySourceStatus>("/api/telemetry/source"),
+  setTelemetrySource: (source: "dataset" | "simulator", datasetType?: string) =>
+    post<import("../types/api").TelemetrySourceStatus>("/api/telemetry/source", { source, dataset_type: datasetType ?? "test" }),
+  integrityStatus: () => request<import("../types/api").IntegrityStatusResponse>("/api/integrity/status"),
+  integrityVerifications: (limit = 20) =>
+    request<import("../types/api").VerificationRecord[]>(`/api/integrity/verifications${qs({ limit })}`),
+  blockchainBlocks: (limit = 10) =>
+    request<import("../types/api").BlockchainBlockItem[]>(`/api/integrity/blocks${qs({ limit })}`),
+  anchorBatch: () => post<{ status: string; block?: unknown; message?: string }>("/api/integrity/anchor"),
+  auditReading: (readingId: number) =>
+    request<import("../types/api").AuditReadingResponse>(`/api/integrity/audit/${readingId}`),
+  demonstrateTamper: (readingId?: number, newTemperature?: number) =>
+    post<import("../types/api").TamperDemoResponse>("/api/integrity/demonstrate-tamper", {
+      reading_id: readingId,
+      new_temperature: newTemperature,
+    }),
+  restoreReading: (readingId: number, originalTemperature: number) =>
+    post<{ status: string; message: string }>("/api/integrity/restore", {
+      reading_id: readingId,
+      original_temperature: originalTemperature,
+    }),
 };
 

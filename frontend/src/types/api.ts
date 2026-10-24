@@ -11,7 +11,8 @@ export type ScenarioId =
   | "sensor_anomaly"
   | "cooling_degradation"
   | "abnormal_humidity"
-  | "fire_runaway";
+  | "fire_runaway"
+  | "fan_off";
 export type WhatIfScenarioId = Exclude<ScenarioId, "sensor_anomaly">;
 export type Horizon = 15 | 30 | 60 | 360 | 1440;
 
@@ -101,6 +102,19 @@ export interface ModelEvaluationResponse {
   disclaimer: string;
 }
 
+export interface InventorySpoilageRisk {
+  zone_name: string;
+  inventory_category: string;
+  total_inventory_value_usd: string;
+  spoilage_status: string;
+  vulnerable_items: string[];
+  critical_threshold_c: number;
+  time_to_spoilage_minutes: number | null;
+  spoilage_mechanism: string;
+  financial_impact_risk: string;
+  mitigation_urgency: string;
+}
+
 export interface AIExplanation {
   headline: string;
   severity: "critical" | "warning" | "info" | "normal";
@@ -109,6 +123,7 @@ export interface AIExplanation {
   summary_text: string;
   recommended_actions: string[];
   sensor_fault_analysis?: Record<string, unknown> | null;
+  inventory_spoilage_risk?: InventorySpoilageRisk | null;
 }
 
 export interface ZonePredictionOverview {
@@ -192,11 +207,15 @@ export interface ZoneSummary {
   ambient_temperature: number | null;
   temperature_status: TempStatus;
   compressor_status: "running" | "stopped" | "idle" | "degraded" | "failed" | string | null;
+  fans_active?: boolean;
+  fan_status?: string;
+  fan_off_seconds?: number;
   compressor_load_pct?: number | null;
   power_consumption_kw?: number | null;
   sensor_health?: string;
   door_status: "open" | "closed" | null;
   door_open_minutes: number;
+  door_open_seconds?: number;
   compressor_off_minutes: number;
   sensor_status: "normal" | "suspicious" | "no_data";
   sensor_issues: SensorIssue[];
@@ -236,6 +255,11 @@ export interface Reading {
   door_status: string;
   ambient_temperature: number | null;
   scenario: string;
+  residual_rise_predicted?: number | null;
+  peak_temp_predicted?: number | null;
+  recovery_time_minutes?: number | null;
+  recovery_progress_pct?: number | null;
+  recovery_phase?: string | null;
   is_synthetic?: boolean;
 }
 
@@ -431,3 +455,131 @@ export interface ManagerOverview {
   zones: ManagerZone[];
   action_items: Alert[];
 }
+
+export interface TelemetrySourceStatus {
+  source: "dataset" | "simulator";
+  dataset_name: string | null;
+  playback_index: number;
+  total_timestamps: number;
+  progress_pct: number;
+  current_timestamp: string | null;
+}
+
+export interface TelemetrySourceChangeRequest {
+  source: "dataset" | "simulator";
+  dataset_type?: "test" | "train" | "val" | "full";
+}
+
+export interface IntegrityStatusResponse {
+  mqtt: {
+    broker_host: string;
+    broker_port: number;
+    topic: string;
+    is_connected: boolean;
+    is_running: boolean;
+    use_tls: boolean;
+    mode: "live_broker" | "internal_bridge";
+  };
+  metrics: {
+    total_messages_received: number;
+    verified_count: number;
+    tampered_count: number;
+    duplicate_count: number;
+    sequence_anomaly_count: number;
+    anchored_count: number;
+    pending_anchor_count: number;
+    total_blocks_anchored: number;
+    latest_block_height: number;
+    latest_block_hash: string | null;
+    latest_merkle_root: string | null;
+    hash_chain_status: "intact" | "broken";
+  };
+  blockchain: {
+    ledger_type: string;
+    total_blocks: number;
+    chain_valid: boolean;
+    difficulty: number;
+    latest_block_hash: string | null;
+    latest_merkle_root: string | null;
+  };
+  timestamp: string;
+}
+
+export interface VerificationRecord {
+  id: number;
+  reading_id: number | null;
+  zone_id: string;
+  device_id: string;
+  sequence_number: number;
+  timestamp: string;
+  payload_hash: string;
+  prev_hash: string;
+  canonical_payload: string;
+  verification_status: "verified" | "tampered" | "duplicate" | "sequence_anomaly";
+  verification_message: string | null;
+  anchor_status: "anchored" | "unanchored";
+  block_height: number | null;
+  block_hash: string | null;
+  tx_hash: string | null;
+  merkle_root: string | null;
+  merkle_proof: string | null;
+  merkle_index: number | null;
+  verified_at: string;
+  current_temperature?: number | null;
+  current_humidity?: number | null;
+}
+
+export interface BlockchainBlockItem {
+  block_height: number;
+  block_hash: string;
+  prev_block_hash: string;
+  merkle_root: string;
+  timestamp: string;
+  nonce: number;
+  difficulty: number;
+  tx_count: number;
+  tx_hashes: string[];
+  status: string;
+}
+
+export interface AuditReadingResponse {
+  reading_id: number;
+  tamper_detected: boolean;
+  status: string;
+  current_reading: {
+    id: number;
+    zone_id: string;
+    sensor_id: string;
+    timestamp: string;
+    temperature: number;
+    humidity: number;
+    door_status: string;
+    compressor_status: string;
+  } | null;
+  cryptographic_audit: {
+    stored_hash: string;
+    recomputed_hash: string;
+    hash_match: boolean;
+    canonical_payload: string;
+  };
+  blockchain_audit: {
+    anchor_status: string;
+    block_height: number | null;
+    block_hash: string | null;
+    tx_hash: string | null;
+    merkle_root: string | null;
+    merkle_proof_valid: boolean;
+    proof_steps_count: number;
+    ledger_chain_intact: boolean;
+  };
+  audit_timestamp: string;
+}
+
+export interface TamperDemoResponse {
+  message: string;
+  reading_id: number;
+  original_temperature: number;
+  tampered_temperature: number;
+  audit_result: AuditReadingResponse;
+}
+

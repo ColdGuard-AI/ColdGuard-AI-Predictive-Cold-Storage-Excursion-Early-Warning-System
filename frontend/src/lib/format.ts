@@ -37,6 +37,15 @@ export function fmtMinutes(minutes: number | null | undefined): string {
   return m ? `${h} h ${m} min` : `${h} h`;
 }
 
+/** Formats elapsed real-time door open duration accurately without fake minutes (e.g. "5s", "45s", "1m 30s") */
+export function fmtDoorDuration(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined || seconds <= 0) return "0s";
+  if (seconds < 60) return `${Math.max(1, Math.round(seconds))}s`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return s > 0 ? `${m}m ${s}s` : `${m}m`;
+}
+
 /** Signed value, e.g. "+1.2°C" / "−0.4°C". */
 export function fmtDelta(value: number | null | undefined, digits = 1, unit = "°C"): string {
   if (value === null || value === undefined) return "—";

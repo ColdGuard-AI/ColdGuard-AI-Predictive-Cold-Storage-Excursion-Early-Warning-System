@@ -7,6 +7,7 @@ import {
   FileText,
   Layers,
   LayoutDashboard,
+  Lock,
   LogOut,
   Menu,
   Radio,
@@ -15,9 +16,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Snowflake,
-  Sparkles,
   Thermometer,
-  TrendingUp,
   X,
   XCircle,
 } from "lucide-react";
@@ -29,14 +28,13 @@ import { SimulatedBadge, StatusDot } from "./ui";
 
 const NAV = [
   { to: "/", label: "Live Monitoring", icon: LayoutDashboard },
+  { to: "/blockchain", label: "Blockchain Ledger", icon: Lock },
+  { to: "/twin", label: "Digital Twin", icon: Layers },
   { to: "/excursion", label: "Excursion Monitor", icon: ShieldAlert },
-  { to: "/predictions", label: "Predictions", icon: TrendingUp },
-  { to: "/ai-explanation", label: "AI Explanation", icon: Sparkles },
   { to: "/alerts", label: "Alerts & Events", icon: BellRing },
   { to: "/what-if", label: "What-If Simulator", icon: SlidersHorizontal },
   { to: "/reports", label: "Reports", icon: FileText },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
-  { to: "/twin", label: "Digital Twin", icon: Layers },
 ];
 
 function Brand() {

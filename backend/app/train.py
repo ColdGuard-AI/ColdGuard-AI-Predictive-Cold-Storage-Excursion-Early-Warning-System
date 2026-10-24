@@ -13,12 +13,13 @@ from app.models.registry import train_all
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train ColdGuard AI models on simulated data")
+    parser = argparse.ArgumentParser(description="Train ColdGuard AI models on simulated or custom CSV data")
+    parser.add_argument("--csv", type=str, default=None, help="Path to custom CSV dataset to train on")
     parser.add_argument("--days", type=int, default=12, help="Days of simulated history per zone")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    bundle = train_all(settings.artifacts_dir, days=args.days, seed=args.seed)
+    bundle = train_all(settings.artifacts_dir, days=args.days, seed=args.seed, csv_path=args.csv)
     m = bundle.forecaster.metrics if bundle.forecaster else {}
     print("\nHeld-out MAE (°C) on SIMULATED data:")
     print(f"{'horizon':>8} {'model':>8} {'persist':>8} {'trend':>8}")

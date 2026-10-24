@@ -58,6 +58,16 @@ class Settings:
     alert_horizon_minutes: int = field(default_factory=lambda: _env_int("COLDGUARD_ALERT_HORIZON", 30))
     # Simulated minutes before an identical alert can be re-raised after it cleared.
     alert_cooldown_minutes: int = field(default_factory=lambda: _env_int("COLDGUARD_ALERT_COOLDOWN", 20))
+    # MQTT broker settings
+    mqtt_broker_host: str = field(default_factory=lambda: os.getenv("MQTT_BROKER_HOST", "127.0.0.1"))
+    mqtt_broker_port: int = field(default_factory=lambda: _env_int("MQTT_BROKER_PORT", 1883))
+    mqtt_topic: str = field(default_factory=lambda: os.getenv("MQTT_TOPIC", "coldguard/telemetry/+"))
+    mqtt_username: str | None = field(default_factory=lambda: os.getenv("MQTT_USERNAME"))
+    mqtt_password: str | None = field(default_factory=lambda: os.getenv("MQTT_PASSWORD"))
+    mqtt_use_tls: bool = field(default_factory=lambda: _env_bool("MQTT_USE_TLS", False))
+    # Blockchain settings
+    blockchain_difficulty: int = field(default_factory=lambda: _env_int("BLOCKCHAIN_DIFFICULTY", 1))
+    blockchain_batch_size: int = field(default_factory=lambda: _env_int("BLOCKCHAIN_BATCH_SIZE", 5))
 
 
 settings = Settings()

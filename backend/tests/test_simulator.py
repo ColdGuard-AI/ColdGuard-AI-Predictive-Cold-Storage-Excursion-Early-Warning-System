@@ -119,7 +119,23 @@ def test_invalid_scenario_rejected():
         "cooling_degradation",
         "abnormal_humidity",
         "fire_runaway",
+        "fan_off",
     }
+
+
+def test_fan_off_stops_fans_and_causes_warming():
+    sim = make_sim()
+    before = sim.run(30)[-1]
+    assert before["fans_active"] is True
+    assert before["fan_status"] == "running"
+
+    sim.set_scenario("fan_off")
+    readings = sim.run(45)
+    assert all(r["fans_active"] is False for r in readings)
+    assert all(r["fan_status"] == "stopped" for r in readings)
+    assert readings[-1]["fan_off_seconds"] >= 45 * 60
+    assert readings[-1]["true_temperature"] > before["true_temperature"] + 1.0
+
 
 
 def test_history_generator_contains_episodes():

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import joblib
+import pandas as pd
 from sklearn.ensemble import IsolationForest
 
 from app.simulator.history import generate_training_dataset
@@ -24,14 +25,24 @@ class ModelBundle:
     error: str | None = None
 
 
-def train_all(artifacts_dir: Path, days: int = 12, seed: int = 42) -> ModelBundle:
-    log.info("Generating %d days of simulated training data...", days)
-    df = generate_training_dataset(days=days, seed=seed)
+def train_all(artifacts_dir: Path, days: int = 12, seed: int = 42, csv_path: Path | str | None = None) -> ModelBundle:
     artifacts_dir.mkdir(parents=True, exist_ok=True)
-    df.to_csv(artifacts_dir / TRAINING_CSV, index=False)
+    if csv_path:
+        csv_file = Path(csv_path)
+        log.info("Loading training data from custom CSV: %s...", csv_file)
+        df = pd.read_csv(csv_file)
+        df.to_csv(artifacts_dir / TRAINING_CSV, index=False)
+        training_source = f"Custom CSV ({csv_file.name})"
+    else:
+        log.info("Generating %d days of simulated training data...", days)
+        df = generate_training_dataset(days=days, seed=seed)
+        df.to_csv(artifacts_dir / TRAINING_CSV, index=False)
+        training_source = f"Simulated {days} days"
+
     log.info("Training forecaster on %d rows...", len(df))
     forecaster = train_and_evaluate(df, seed=seed)
     forecaster.metrics["training_days_simulated"] = days
+    forecaster.metrics["data_source"] = training_source
     forecaster.save(artifacts_dir)
     iforest = train_isolation_forest(df, seed=seed)
     joblib.dump(iforest, artifacts_dir / IFOREST_FILE)

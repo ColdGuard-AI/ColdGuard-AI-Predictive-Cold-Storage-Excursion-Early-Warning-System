@@ -86,8 +86,11 @@ class TemperatureForecaster:
 
 def _zone_frames(df: pd.DataFrame) -> list[tuple[ZoneConfig, pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
     out = []
-    for zone_id, group in df.groupby("zone_id"):
-        config = ZONES[str(zone_id)]
+    frame = df.copy()
+    if "zone_id" not in frame.columns:
+        frame["zone_id"] = "zone-a"
+    for zone_id, group in frame.groupby("zone_id"):
+        config = ZONES.get(str(zone_id), list(ZONES.values())[0])
         prepared = prepare_readings(group)
         out.append((config, prepared, build_features(prepared, config), build_targets(prepared)))
     return out

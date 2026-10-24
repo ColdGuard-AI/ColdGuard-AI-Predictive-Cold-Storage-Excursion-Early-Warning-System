@@ -13,11 +13,13 @@ import {
   DoorClosed,
   DoorOpen,
   Droplets,
+  Fan,
   Flame,
   Info,
   Layers,
   Lightbulb,
   LineChart as LineChartIcon,
+  Package,
   Radio,
   RefreshCw,
   Server,
@@ -47,7 +49,7 @@ import {
 } from "recharts";
 import { useApp } from "../hooks/AppContext";
 import { usePolling } from "../hooks/usePolling";
-import { fmtDelta, fmtTemp, fmtTime, POLL_MS } from "../lib/format";
+import { fmtDelta, fmtDoorDuration, fmtTemp, fmtTime, POLL_MS } from "../lib/format";
 import { api } from "../services/api";
 import type {
   DoorEventItem,
@@ -151,6 +153,10 @@ export default function Dashboard() {
     totalPowerKw,
     streamConnected,
     notify,
+    doorSimulations,
+    isDoorOpen: isDoorOpenContext,
+    getDoorOpenSeconds,
+    toggleDoor,
   } = useApp();
 
   const [focusedZoneId, setFocusedZoneId] = useState<string>("zone-b");
@@ -234,21 +240,15 @@ export default function Dashboard() {
   const handleDoorAction = async (action: "open" | "close", durationMinutes?: number) => {
     setActionLoading(true);
     try {
-      const res = await api.controlDoor(focusedZoneId, action, durationMinutes);
+      const openNow = isDoorOpenContext(focusedZoneId);
+      if (action === "open" && !openNow) {
+        await toggleDoor(focusedZoneId, durationMinutes);
+      } else if (action === "close" && openNow) {
+        await toggleDoor(focusedZoneId);
+      }
       recoveryQuery.refresh();
       predictionQuery.refresh();
       doorEventsQuery.refresh();
-      if (action === "open") {
-        notify(
-          "error",
-          `Door opened for ${currentZone?.name || focusedZoneId} (${durationMinutes || "unspecified"}m). Heat ingress active.`
-        );
-      } else {
-        notify(
-          "success",
-          `Door closed. Residual thermal rise (+${(res.residual_rise_predicted ?? 0).toFixed(2)}°C) tracking and recovery pull-down active.`
-        );
-      }
     } catch (err: any) {
       notify("error", err?.message || "Failed to trigger door action.");
     } finally {
@@ -382,7 +382,8 @@ export default function Dashboard() {
   const recommendedActions = aiExplanation?.recommended_actions ?? [];
 
   // Determine stateful door & recovery status styling
-  const isDoorOpen = recoveryData?.door_status === "open" || currentZone?.door_status === "open";
+  const isDoorOpen = isDoorOpenContext(focusedZoneId) || recoveryData?.door_status === "open" || currentZone?.door_status === "open";
+  const focusedDoorSeconds = getDoorOpenSeconds(focusedZoneId);
   const isRecovering =
     !isDoorOpen &&
     (recoveryData?.recovery_phase === "residual_rise" ||
@@ -520,7 +521,7 @@ export default function Dashboard() {
                   }`}
                 >
                   {isDoorOpen
-                    ? `DOOR OPEN (${Math.max(1, Math.round(recoveryData?.door_open_minutes ?? 1))} min)`
+                    ? `DOOR OPEN (${fmtDoorDuration(focusedDoorSeconds)})`
                     : isRecovering
                     ? `DOOR CLOSED (Pull-Down Recovery Active)`
                     : `DOOR CLOSED (Thermal Equilibrium)`}
@@ -551,7 +552,7 @@ export default function Dashboard() {
             </div>
             <div className="text-[10px] text-slate-400 font-mono mt-0.5">
               {isDoorOpen
-                ? `${(recoveryData?.door_open_minutes ?? currentZone?.door_open_minutes ?? 0).toFixed(1)}m open`
+                ? `${fmtDoorDuration(focusedDoorSeconds)} open`
                 : `${(recoveryData?.time_since_closure_minutes ?? 0).toFixed(0)}m since close`}
             </div>
           </div>
@@ -663,43 +664,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Interactive Door Control & Fault Trigger Buttons */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-300 mr-1 flex items-center gap-1">
-              <Sparkles size={14} className="text-cyan-400" />
-              <span>Door Tests:</span>
-            </span>
-
-            <button
-              disabled={actionLoading}
-              onClick={() => handleDoorAction("open", 2)}
-              className="px-3 py-1.5 rounded-lg bg-rose-950/40 border border-rose-500/40 text-rose-300 hover:bg-rose-900/60 hover:text-white text-xs font-semibold transition disabled:opacity-50 flex items-center gap-1.5 shadow cursor-pointer"
-            >
-              <DoorOpen size={14} />
-              <span>Open Door (2m)</span>
-            </button>
-
-            <button
-              disabled={actionLoading}
-              onClick={() => handleDoorAction("open", 5)}
-              className="px-3 py-1.5 rounded-lg bg-rose-950/60 border border-rose-500/60 text-rose-200 hover:bg-rose-900/80 hover:text-white text-xs font-semibold transition disabled:opacity-50 flex items-center gap-1.5 shadow cursor-pointer"
-            >
-              <DoorOpen size={14} />
-              <span>Open Door (5m)</span>
-            </button>
-
-            <button
-              disabled={actionLoading}
-              onClick={() => handleDoorAction("close")}
-              className="px-3 py-1.5 rounded-lg bg-emerald-950/50 border border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/70 hover:text-white text-xs font-semibold transition disabled:opacity-50 flex items-center gap-1.5 shadow cursor-pointer"
-            >
-              <DoorClosed size={14} />
-              <span>Close Door (Retain Consequences)</span>
-            </button>
-          </div>
-
-          {/* Fault Scenario Quick Switcher */}
+        {/* Fault Scenario Quick Switcher */}
+        <div className="flex flex-wrap items-center justify-end gap-3 pt-3 border-t border-slate-800/80">
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400">Trigger Fault:</span>
             <select
@@ -709,6 +675,7 @@ export default function Dashboard() {
             >
               <option value="normal">Normal Operation</option>
               <option value="door_open">Door Left Open</option>
+              <option value="fan_off">Cooling Fan Off (Evaporator Trip)</option>
               <option value="compressor_failure">Compressor Failure (0 kW)</option>
               <option value="cooling_degradation">Cooling Degradation (50%)</option>
               <option value="sensor_anomaly">Sensor Anomaly (Spike/Stuck)</option>
@@ -759,7 +726,7 @@ export default function Dashboard() {
           <div className={`grid gap-3.5 ${filteredZones.length === 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-3"}`}>
             {filteredZones.map((z) => {
               const isSelected = focusedZoneId === z.zone_id;
-              const isDoor = z.door_status === "open" || z.scenario === "door_open";
+              const isDoor = isDoorOpenContext(z.zone_id) || z.door_status === "open" || z.scenario === "door_open";
               const isCritical =
                 isDoor ||
                 z.temperature_status === "critical" ||
@@ -808,7 +775,7 @@ export default function Dashboard() {
                       }`}
                     >
                       {isDoor
-                        ? `Door Open (${Math.max(1, Math.round(z.door_open_minutes || 1))}m)`
+                        ? `Door Open (${fmtDoorDuration(getDoorOpenSeconds(z.zone_id))})`
                         : z.scenario === "normal"
                         ? "Nominal"
                         : z.scenario_label}
@@ -1168,6 +1135,66 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+
+          {/* Perishable Inventory Spoilage Risk Analysis */}
+          {aiExplanation?.inventory_spoilage_risk && (
+            <div className="rounded-xl bg-gradient-to-br from-slate-900/90 via-slate-950/80 to-slate-900/90 border border-purple-500/30 p-3.5 mb-2 shadow-lg">
+              <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-white/10">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-white font-mono">
+                  <Package size={14} className="text-purple-400" />
+                  <span>PERISHABLE INVENTORY AT RISK</span>
+                </div>
+                <span
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                    aiExplanation.inventory_spoilage_risk.spoilage_status.includes("Critical")
+                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse"
+                      : aiExplanation.inventory_spoilage_risk.spoilage_status.includes("Warning")
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                      : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                  }`}
+                >
+                  {aiExplanation.inventory_spoilage_risk.spoilage_status}
+                </span>
+              </div>
+
+              {/* Inventory Metrics */}
+              <div className="grid grid-cols-2 gap-2 mb-2.5 text-[11px] font-mono">
+                <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                  <div className="text-[10px] text-slate-400">Total Lot Value:</div>
+                  <div className="text-emerald-400 font-bold">{aiExplanation.inventory_spoilage_risk.total_inventory_value_usd}</div>
+                </div>
+                <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                  <div className="text-[10px] text-slate-400">Est. Time to Spoilage:</div>
+                  <div className={`font-bold ${aiExplanation.inventory_spoilage_risk.time_to_spoilage_minutes != null ? "text-amber-400" : "text-slate-300"}`}>
+                    {aiExplanation.inventory_spoilage_risk.time_to_spoilage_minutes != null
+                      ? `${aiExplanation.inventory_spoilage_risk.time_to_spoilage_minutes} min`
+                      : "Nominal (Safe)"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Vulnerable Items List */}
+              <div className="mb-2">
+                <div className="text-[10px] uppercase font-mono text-slate-400 mb-1 font-semibold">
+                  Vulnerable Products Stored in Chamber:
+                </div>
+                <div className="space-y-1">
+                  {aiExplanation.inventory_spoilage_risk.vulnerable_items.map((item, idx) => (
+                    <div key={idx} className="flex items-start gap-1.5 text-[11px] text-slate-300">
+                      <span className="text-purple-400 font-bold">•</span>
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Degradation Mechanism */}
+              <div className="p-2 rounded-lg bg-purple-950/20 border border-purple-500/20 text-[11px] text-purple-200/90 leading-relaxed">
+                <span className="font-bold text-purple-300">Spoilage Mechanism: </span>
+                {aiExplanation.inventory_spoilage_risk.spoilage_mechanism}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
