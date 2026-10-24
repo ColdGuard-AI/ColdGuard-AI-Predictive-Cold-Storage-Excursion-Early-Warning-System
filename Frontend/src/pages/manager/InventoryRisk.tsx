@@ -168,13 +168,29 @@ export default function InventoryRisk() {
     };
 
     const risk = z.risk_score ?? 0;
-    const exposurePct = risk / 100;
-    const grossValInr = profile.massKg * profile.unitCostInr;
-    const financialExposureInr = grossValInr * exposurePct;
     const currentTemp = z.temperature ?? z.setpoint ?? 0;
     const threshold = profile.spoilageThresholdC;
     const isExcursion = currentTemp > threshold;
     const deltaToThreshold = threshold - currentTemp;
+    const grossValInr = profile.massKg * profile.unitCostInr;
+
+    // Realistic GxP financial exposure logic matching backend monitor.py:
+    let financialExposureInr = 0;
+    let exposureNote = "100% Protected";
+
+    if (isExcursion || z.temperature_status === "critical") {
+      // Active thermal breach — total batch quarantine required under GxP
+      financialExposureInr = grossValInr;
+      exposureNote = "Critical Lot Loss";
+    } else if (z.temperature_status === "warning" || (z.time_to_breach_minutes && z.time_to_breach_minutes <= 60) || risk >= 50) {
+      // Projected excursion or active warning — capital at risk proportional to breach probability
+      financialExposureInr = grossValInr * (risk / 100);
+      exposureNote = `${risk}% Projected Risk`;
+    } else {
+      // Nominal operation — storage within validated limits, zero active loss
+      financialExposureInr = 0;
+      exposureNote = "Safe (0% Loss)";
+    }
 
     return {
       ...profile,
@@ -183,6 +199,7 @@ export default function InventoryRisk() {
       risk,
       grossValInr,
       financialExposureInr,
+      exposureNote,
       isExcursion,
       deltaToThreshold,
       activeAlerts: z.active_alert_count || 0,
@@ -508,7 +525,9 @@ export default function InventoryRisk() {
                               ₹{r.financialExposureInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                             </div>
                             <div className="text-xs sm:text-sm font-medium text-[#64748B]">
-                              {((r.financialExposureInr / r.grossValInr) * 100).toFixed(1)}% of lot value
+                              {r.financialExposureInr > 0
+                                ? `${((r.financialExposureInr / r.grossValInr) * 100).toFixed(1)}% of lot value`
+                                : "100% Protected (₹0 loss)"}
                             </div>
                           </td>
 
