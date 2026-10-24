@@ -1,56 +1,76 @@
 import {
   Activity,
+  AlertCircle,
   AlertTriangle,
   ArrowDown,
   ArrowRight,
   ArrowUp,
   Battery,
+  Bell,
   Boxes,
+  Calendar,
   Camera,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Clock,
   Cloud,
   Compass,
   Cpu,
+  Database,
+  DoorClosed,
   DoorOpen,
   Droplets,
   ExternalLink,
   Eye,
   EyeOff,
   Fan,
+  Filter,
   Flame,
   Footprints,
   Gauge,
   Grid,
+  History,
+  Home,
   Info,
   Layers,
   Lightbulb,
+  LineChart as LineChartIcon,
   MapPin,
   Maximize2,
   Minimize2,
   Minus,
   Move,
   Navigation,
+  Package,
+  Play,
   Plus,
   Power,
+  PowerOff,
   Radio,
   RefreshCw,
   RotateCcw,
+  RotateCw,
   ShieldAlert,
   ShieldCheck,
   Signal,
+  SlidersHorizontal,
   Snowflake,
   Sparkles,
   Sun,
+  Tag,
+  Terminal,
   Thermometer,
+  ThermometerSnowflake,
   ToggleLeft,
   ToggleRight,
   TrendingDown,
   TrendingUp,
   Truck,
+  Warehouse,
   Waves,
   Wifi,
   Wind,
@@ -73,9 +93,20 @@ import {
 import { Badge, Card, EmptyState, LoadingState, StaleBanner } from "../components/ui";
 import { useApp } from "../hooks/AppContext";
 import { usePolling } from "../hooks/usePolling";
-import { CHART, fmtNum, fmtTemp, POLL_MS } from "../lib/format";
+import { CHART, fmtDoorDuration, fmtNum, fmtTemp, POLL_MS } from "../lib/format";
 import { api } from "../services/api";
-import type { Alert, ZoneSummary } from "../types/api";
+import type {
+  Alert,
+  DoorEventItem,
+  EventItem,
+  ModelEvaluationResponse,
+  RecoveryStatus,
+  WhatIfRequest,
+  WhatIfResponse,
+  WhatIfScenarioId,
+  ZonePredictionOverview,
+  ZoneSummary,
+} from "../types/api";
 
 // Three.js & React Three Fiber imports
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
@@ -95,11 +126,21 @@ export type CameraPreset =
   | "aisle-walk"
   | "zone-a"
   | "zone-b"
-  | "zone-c";
+  | "zone-c"
+  | "plant-room"
+  | "dock-bay";
 
 export type ViewDisplayMode = "standard" | "thermal" | "airflow" | "blueprint";
 
-export type SimulationScenario = "normal" | "door_open" | "compressor_failure" | "sensor_burn" | "cooling_degradation";
+export type SimulationScenario =
+  | "normal"
+  | "door_open"
+  | "compressor_failure"
+  | "sensor_anomaly"
+  | "sensor_burn"
+  | "fire_runaway"
+  | "cooling_degradation"
+  | "fan_off";
 
 interface SensorEvent {
   time: string;
@@ -257,6 +298,8 @@ const CAMERA_PRESETS: Record<CameraPreset, { pos: [number, number, number]; targ
   "zone-a": { pos: [-6, 2.0, 2.4], target: [-6, 1.4, -2.0] },
   "zone-b": { pos: [0, 2.0, 2.4], target: [0, 1.4, -2.0] },
   "zone-c": { pos: [6, 2.0, 2.4], target: [6, 1.4, -2.0] },
+  "plant-room": { pos: [-11.2, 2.4, 4.5], target: [-8.8, 0.6, 2.2] },
+  "dock-bay": { pos: [12.6, 2.8, 1.2], target: [10.1, 1.3, -1.8] },
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1317,6 +1360,7 @@ function SensorNode({
       )}
 
       {isBurned && <FireSmokeParticles position={[0, 0.1, 0]} />}
+      {isBurned && <ElectricalSparks position={[0, 0.1, 0]} />}
       {isFailed && !isBurned && <ElectricalSparks position={[0, 0.1, 0]} />}
 
       {showLabel && (
@@ -1446,6 +1490,10 @@ function Compressor({
         <torusGeometry args={[0.2, 0.04, 4, 4]} />
         <meshStandardMaterial color={isRunning ? "#38bdf8" : "#64748b"} metalness={0.6} />
       </mesh>
+
+      {/* Tripped smoke and sparks when compressor fails */}
+      {isFailed && <FireSmokeParticles position={[0, 0.8, 0]} />}
+      {isFailed && <ElectricalSparks position={[0, 0.5, 0]} />}
 
       <Html position={[0, 1.3, 0]} center distanceFactor={10}>
         <div
@@ -1799,6 +1847,59 @@ function ColdStorageScene({
         );
       })}
 
+      {/* Floating Zone Badges in 3D Scene (matching reference layout) */}
+      {ZONE_CONFIGS.map((config) => {
+        const zoneData = (zones as ZoneSummary[])?.find((z) => z.zone_id === config.id);
+        const temp = zoneData?.temperature ?? getZoneTemp(config.id, config.targetTemp);
+        const humidity = zoneData?.humidity ?? (60 - (temp > 0 ? temp * 2 : 10));
+        const isFocused = selectedZoneId === config.id;
+
+        return (
+          <group key={`billboard-${config.id}`} position={[config.position[0], 2.8, config.position[2] - 0.5]}>
+            <Html center distanceFactor={11}>
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectZone(config.id);
+                }}
+                className={`px-3 py-2 rounded-xl backdrop-blur-md shadow-2xl transition-all cursor-pointer select-none border ${
+                  isFocused
+                    ? "bg-slate-950/90 border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.35)] scale-105"
+                    : "bg-slate-950/80 border-slate-700/80 hover:border-cyan-500/60 hover:bg-slate-900/90"
+                }`}
+                style={{ minWidth: "120px" }}
+              >
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: config.color }} />
+                  <span className="font-mono text-xs font-bold text-white tracking-wide">{config.name}</span>
+                </div>
+                <div className="space-y-0.5 font-mono text-[11px]">
+                  <div className="flex items-center gap-1.5 text-slate-200">
+                    <Thermometer size={12} className="text-cyan-400" />
+                    <span className="font-bold text-white">{fmtTemp(temp)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-300">
+                    <Droplets size={12} className="text-blue-400" />
+                    <span>{Math.round(humidity)}% RH</span>
+                  </div>
+                  {(() => {
+                    const isProbeDegraded =
+                      simulationState.burnedSensors.size > 0 ||
+                      (zoneData?.sensor_health && zoneData.sensor_health !== "healthy");
+                    return (
+                      <div className={`flex items-center gap-1.5 ${isProbeDegraded ? "text-amber-400" : "text-emerald-400"}`}>
+                        <Radio size={12} />
+                        <span>{isProbeDegraded ? "1/2 Probes" : "2/2 Probes"}</span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </Html>
+          </group>
+        );
+      })}
+
       {/* Sensor Nodes */}
       {ZONE_CONFIGS.map((config) => {
         const zoneData = (zones as ZoneSummary[])?.find((z) => z.zone_id === config.id);
@@ -1838,7 +1939,7 @@ function ColdStorageScene({
       <Compressor
         position={[-8.8, 0, 2.2]}
         isRunning={simulationState.compressorRunning}
-        isFailed={!simulationState.compressorRunning && simulationState.accidentZones.size > 0}
+        isFailed={!simulationState.compressorRunning}
       />
 
       {ZONE_CONFIGS.map((config, i) => (
@@ -2181,7 +2282,7 @@ function GoogleMapsBottomDock({
           <div className="rounded-lg bg-slate-900/90 border border-white/10 px-2.5 py-1 flex items-center gap-1.5">
             <Droplets size={12} className="text-blue-400" />
             <span className="text-fg-faint">RH:</span>
-            <span className="font-bold text-white">{activeZone?.humidity != null ? `${activeZone.humidity.toFixed(0)}%` : "52%"}</span>
+            <span className="font-bold text-white">{activeZone?.humidity != null ? `${activeZone.humidity.toFixed(0)}%` : "—"}</span>
           </div>
           <div className="rounded-lg bg-slate-900/90 border border-white/10 px-2.5 py-1 flex items-center gap-1.5">
             <Zap size={12} className="text-amber-400" />
@@ -2254,11 +2355,63 @@ function GoogleMapsBottomDock({
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   DYNAMIC SVG SPARKLINE COMPONENT (ZERO STATIC SVG STRINGS)
+   ═══════════════════════════════════════════════════════════════════ */
+
+function DynamicSparkline({
+  data,
+  color = "#22D3EE",
+  width = 40,
+  height = 14,
+}: {
+  data: number[];
+  color?: string;
+  width?: number;
+  height?: number;
+}) {
+  if (!data || data.length < 2) {
+    return (
+      <svg width={width} height={height} className="overflow-visible">
+        <line x1="0" y1={height / 2} x2={width} y2={height / 2} stroke={color} strokeWidth="1.5" strokeDasharray="2 2" opacity={0.4} />
+      </svg>
+    );
+  }
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 0.1;
+  const padding = 2;
+  const pts = data
+    .map((val, idx) => {
+      const x = (idx / (data.length - 1)) * width;
+      const y = height - padding - ((val - min) / range) * (height - 2 * padding);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  return (
+    <svg width={width} height={height} className="overflow-visible">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    MAIN DIGITAL TWIN PAGE EXPORT
    ═══════════════════════════════════════════════════════════════════ */
 
 export default function DigitalTwin() {
-  const { zones, selectedZone, selectedZoneId, setSelectedZoneId, zonesError } = useApp();
+  const {
+    zones,
+    selectedZone,
+    selectedZoneId,
+    setSelectedZoneId,
+    zonesError,
+    health,
+    doorSimulations,
+    isDoorOpen: isDoorOpenContext,
+    getDoorOpenSeconds,
+    toggleDoor,
+  } = useApp();
 
   // Live shared zones from AppContext (SSE stream + fallback)
   const allZones = zones ?? [];
@@ -2266,7 +2419,56 @@ export default function DigitalTwin() {
   const readings = usePolling(() => api.readings(selectedZoneId, 60), POLL_MS, [selectedZoneId]);
   const forecast = usePolling(() => api.forecast(selectedZoneId, 30), POLL_MS, [selectedZoneId]);
   const riskPoll = usePolling(() => api.risk(selectedZoneId, 30), POLL_MS, [selectedZoneId]);
-  const alertsPoll = usePolling(() => api.alerts({ active: true, limit: 10 }), POLL_MS);
+  const alertsPoll = usePolling(() => api.alerts({ active: true, limit: 15 }), POLL_MS);
+  const recoveryPoll = usePolling(() => api.recoveryStatus(selectedZoneId), POLL_MS, [selectedZoneId]);
+  const doorEventsPoll = usePolling(() => api.doorEvents(selectedZoneId, 15), POLL_MS, [selectedZoneId]);
+  const facilityEventsPoll = usePolling(() => api.events(25), POLL_MS, []);
+  const predictionOverviewPoll = usePolling(() => api.predictionOverview(selectedZoneId, 30), POLL_MS, [selectedZoneId]);
+  const modelEvaluationPoll = usePolling(() => api.modelEvaluation(), 30000);
+  const telemetrySourcePoll = usePolling(() => api.getTelemetrySource(), 3000, []);
+
+  // Live telemetry history arrays for dynamic sparklines
+  const historyReadings = readings.data?.readings ?? [];
+  const tempHistory = useMemo(
+    () => historyReadings.map((r) => r.temperature).filter((v): v is number => typeof v === "number" && !isNaN(v)),
+    [historyReadings]
+  );
+  const humidityHistory = useMemo(
+    () => historyReadings.map((r) => r.humidity).filter((v): v is number => typeof v === "number" && !isNaN(v)),
+    [historyReadings]
+  );
+  const powerHistory = useMemo(
+    () => historyReadings.map((r) => r.power_consumption_kw ?? 0).filter((v): v is number => typeof v === "number" && !isNaN(v)),
+    [historyReadings]
+  );
+  const residualHistory = useMemo(
+    () => historyReadings.map((r) => r.residual_rise_predicted ?? 0).filter((v): v is number => typeof v === "number" && !isNaN(v)),
+    [historyReadings]
+  );
+  const recoveryHistory = useMemo(
+    () => historyReadings.map((r) => r.recovery_time_minutes ?? 0).filter((v): v is number => typeof v === "number" && !isNaN(v)),
+    [historyReadings]
+  );
+
+  // Telemetry freshness tracking
+  const [lastTelemetryTimestamp, setLastTelemetryTimestamp] = useState<Date>(new Date());
+  const [secondsSinceLastUpdate, setSecondsSinceLastUpdate] = useState<number>(0);
+
+  useEffect(() => {
+    if (allZones.length > 0) {
+      setLastTelemetryTimestamp(new Date());
+      setSecondsSinceLastUpdate(0);
+    }
+  }, [allZones]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSecondsSinceLastUpdate((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const isDataStale = secondsSinceLastUpdate > 75;
 
   // 3D Viewport Controls State
   const [cameraPreset, setCameraPreset] = useState<CameraPreset>("isometric");
@@ -2276,17 +2478,50 @@ export default function DigitalTwin() {
   const [autoRotate, setAutoRotate] = useState(false);
   const [userInteracting, setUserInteracting] = useState(false);
   const [compassHeading, setCompassHeading] = useState(0);
+  const [is3DExpanded, setIs3DExpanded] = useState(false);
 
   const controlsRef = useRef<any>(null);
 
-  // Synchronized Simulation State (Directly driven by live backend telemetry)
+  // Consequential Simulation Command Confirmation State
+  const [confirmModal, setConfirmModal] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    impact: string;
+    actionLabel: string;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
+
+  // Simulation Drawer / Modal Open State
+  const [showScenarioDrawer, setShowScenarioDrawer] = useState<boolean>(false);
+
+  // Analytics Panel State (Region D)
+  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState<"forecast" | "what-if" | "matrix" | "events" | "health">("forecast");
+  const [liveClock, setLiveClock] = useState(() => new Date().toLocaleTimeString());
+  useEffect(() => {
+    const t = setInterval(() => setLiveClock(new Date().toLocaleTimeString()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const [isAnalyticsExpanded, setIsAnalyticsExpanded] = useState<boolean>(false);
+
+  // Counterfactual What-If Simulator State (Inside Tab 1)
+  const [forecastMode, setForecastMode] = useState<"live" | "whatif">("live");
+  const [whatIfScenario, setWhatIfScenario] = useState<WhatIfScenarioId>("door_open");
+  const [whatIfDuration, setWhatIfDuration] = useState<number>(5);
+  const [whatIfLoading, setWhatIfLoading] = useState<boolean>(false);
+  const [whatIfResult, setWhatIfResult] = useState<WhatIfResponse | null>(null);
+
+  // Timeline Filter State (Inside Tab 3)
+  const [timelineSeverityFilter, setTimelineSeverityFilter] = useState<string>("all");
+
+  // Synchronized Simulation State (Directly driven by live backend telemetry and global AppContext)
   const [simState, setSimState] = useState({
     failedSensors: new Set<string>(),
     burnedSensors: new Set<string>(),
     accidentZones: new Set<string>(),
     fansActive: true,
     compressorRunning: true,
-    doorOpen: false,
+    doorOpen: isDoorOpenContext(selectedZoneId || "zone-a"),
     isRecovering: false,
     recoveryProgressPct: 100,
     residualRise: 0,
@@ -2299,15 +2534,15 @@ export default function DigitalTwin() {
     } as Record<string, number>,
   });
 
-  const [activeScenario, setActiveScenario] = useState<SimulationScenario>("normal");
-  const [doorOpenSeconds, setDoorOpenSeconds] = useState(0);
+  const [activeScenario, setActiveScenario] = useState<SimulationScenario>(() =>
+    isDoorOpenContext(selectedZoneId || "zone-a") ? "door_open" : "normal"
+  );
+  // Shared precise elapsed door open seconds across entire application
+  const doorOpenSeconds = getDoorOpenSeconds(selectedZoneId || "zone-a");
+  const lastUserActionTime = useRef<number>(0);
 
-  // Activity Log
-  const [activityLog, setActivityLog] = useState<SensorEvent[]>([
-    { time: "14:30", message: "Cold storage facility nominal operation", type: "info", zone: "Facility" },
-    { time: "14:20", message: "Defrost cycle completed on schedule", type: "info", zone: "Zone A" },
-    { time: "14:05", message: "Dual compressor operating at 78% capacity", type: "info", zone: "System" },
-  ]);
+  // Activity Log (Session events triggered by operators)
+  const [activityLog, setActivityLog] = useState<SensorEvent[]>([]);
 
   const addEvent = useCallback((message: string, type: SensorEvent["type"], zone: string) => {
     const now = new Date();
@@ -2317,32 +2552,41 @@ export default function DigitalTwin() {
 
   // Sync DigitalTwin simState with the unified live backend stream (SSE / REST)
   useEffect(() => {
-    if (allZones.length > 0) {
-      const zA = allZones.find((z) => z.zone_id === "zone-a");
-      const zB = allZones.find((z) => z.zone_id === "zone-b");
-      const zC = allZones.find((z) => z.zone_id === "zone-c");
-      const curr = allZones.find((z) => z.zone_id === selectedZoneId) || zC || allZones[0];
+    if (allZones.length === 0) return;
 
-      const isDoorOpen = curr?.door_status === "open" || zC?.door_status === "open";
-      const isCompFailed = allZones.some((z) => z.compressor_status === "failed" || z.compressor_status === "stopped");
-      const isDegraded = allZones.some((z) => z.compressor_status === "degraded");
-      const isSensorAnomaly = allZones.some((z) => z.scenario === "sensor_anomaly" || z.sensor_health === "spike_anomaly" || z.sensor_health === "stuck_frozen");
+    const zA = allZones.find((z) => z.zone_id === "zone-a");
+    const zB = allZones.find((z) => z.zone_id === "zone-b");
+    const zC = allZones.find((z) => z.zone_id === "zone-c");
+    const activeZoneId = selectedZoneId || "zone-a";
+    const curr = allZones.find((z) => z.zone_id === activeZoneId) || allZones[0];
 
-      const isRecovering = (curr?.recovery_phase && curr.recovery_phase !== "none" && curr.recovery_phase !== "recovered") || (curr?.residual_rise_predicted ?? 0) > 0.05;
+    const isDoorOpen = isDoorOpenContext(activeZoneId) || curr?.scenario === "door_open" || curr?.door_status === "open";
+    const isFireRunaway = curr?.scenario === "fire_runaway";
+    const isCompFailed = curr?.scenario === "compressor_failure" || curr?.compressor_status === "failed";
+    const isDegraded = curr?.scenario === "cooling_degradation";
+    const isFanOff = curr?.scenario === "fan_off" || (curr as any)?.fans_active === false;
+    const isSensorAnomaly = curr?.scenario === "sensor_anomaly";
 
-      if (isDoorOpen) {
-        setActiveScenario("door_open");
-        setDoorOpenSeconds((s) => s + 1);
-      } else if (isCompFailed) {
-        setActiveScenario("compressor_failure");
-      } else if (isDegraded) {
-        setActiveScenario("cooling_degradation");
-      } else if (isSensorAnomaly) {
-        setActiveScenario("sensor_burn");
-      } else {
-        setActiveScenario("normal");
-        setDoorOpenSeconds(0);
+    const isRecovering = (curr?.recovery_phase && curr.recovery_phase !== "none" && curr.recovery_phase !== "recovered") || (curr?.residual_rise_predicted ?? 0) > 0.05;
+
+    const burnedProbes = new Set<string>();
+    const failedProbes = new Set<string>();
+
+    allZones.forEach((z) => {
+      const sId = z.sensor_id || `${z.zone_id.replace("zone-", "TS-").toUpperCase()}1`;
+      if (z.scenario === "fire_runaway") {
+        burnedProbes.add(sId);
+      } else if (z.scenario === "sensor_anomaly") {
+        failedProbes.add(sId);
       }
+    });
+
+    const serverScenario: SimulationScenario = (curr?.scenario as SimulationScenario) || "normal";
+
+    const isUserActionRecent = Date.now() - lastUserActionTime.current < 4000;
+
+    if (!isUserActionRecent) {
+      setActiveScenario(serverScenario === "door_open" || isDoorOpen ? "door_open" : serverScenario);
 
       setSimState((prev) => ({
         ...prev,
@@ -2352,8 +2596,20 @@ export default function DigitalTwin() {
         residualRise: curr?.residual_rise_predicted ?? 0,
         peakTemp: curr?.peak_temp_predicted ?? null,
         recoveryMinutes: curr?.recovery_time_minutes ?? 0,
-        compressorRunning: !isCompFailed,
-        fansActive: !isCompFailed,
+        compressorRunning: !isCompFailed && !isFireRunaway,
+        fansActive: !isCompFailed && !isFireRunaway && !isFanOff,
+        burnedSensors: isFireRunaway ? (burnedProbes.size > 0 ? burnedProbes : new Set([curr?.sensor_id || "TS-A01"])) : new Set(),
+        failedSensors: isSensorAnomaly ? (failedProbes.size > 0 ? failedProbes : new Set([curr?.sensor_id || "TS-A01"])) : new Set(),
+        zoneTemps: {
+          "zone-a": zA?.temperature ?? 5.0,
+          "zone-b": zB?.temperature ?? 3.0,
+          "zone-c": zC?.temperature ?? -20.0,
+        },
+      }));
+    } else {
+      // Just update temperature readings without wiping out user's active fault simulation
+      setSimState((prev) => ({
+        ...prev,
         zoneTemps: {
           "zone-a": zA?.temperature ?? 5.0,
           "zone-b": zB?.temperature ?? 3.0,
@@ -2361,7 +2617,7 @@ export default function DigitalTwin() {
         },
       }));
     }
-  }, [allZones, selectedZoneId]);
+  }, [allZones, selectedZoneId, isDoorOpenContext]);
 
   // 🧭 Google Maps Turn-by-Turn Navigation State
   const [isNavigating, setIsNavigating] = useState(false);
@@ -2412,86 +2668,243 @@ export default function DigitalTwin() {
     handleZoneSelect(nextId);
   }, [selectedZoneId, handleZoneSelect]);
 
-  // Toggle Door simulation statefully via backend API
-  const handleToggleDoor = useCallback(async () => {
-    const targetZoneId = selectedZoneId || "zone-c";
-    const targetConfig = ZONE_CONFIGS.find((c) => c.id === targetZoneId);
-    const willOpen = !simState.doorOpen;
-    try {
-      await api.setDoor(targetZoneId, willOpen ? "open" : "closed");
+  // Consequential Action Request with Safety Confirmation Modal
+  const requestConfirmation = useCallback(
+    (title: string, description: string, impact: string, actionLabel: string, action: () => Promise<void>) => {
+      setConfirmModal({
+        open: true,
+        title,
+        description,
+        impact,
+        actionLabel,
+        onConfirm: async () => {
+          try {
+            await action();
+          } catch (err) {
+            console.error("Action execution error:", err);
+          } finally {
+            setConfirmModal(null);
+          }
+        },
+      });
+    },
+    []
+  );
+
+  // 1. Simulate Door Ingress (Door Left Open)
+  const handleSimulateDoor = useCallback(
+    async (durationMinutes?: number) => {
+      lastUserActionTime.current = Date.now();
+      const targetZoneId = selectedZoneId || "zone-a";
+      const targetConfig = ZONE_CONFIGS.find((c) => c.id === targetZoneId);
+      const isCurrentlyOpen = isDoorOpenContext(targetZoneId);
+      const currentDuration = doorSimulations[targetZoneId]?.durationMinutes;
+
+      let willOpen: boolean;
+      if (durationMinutes !== undefined) {
+        willOpen = !(isCurrentlyOpen && currentDuration === durationMinutes);
+      } else {
+        willOpen = !isCurrentlyOpen;
+      }
+
       if (willOpen) {
         setActiveScenario("door_open");
-        setDoorOpenSeconds(0);
-        addEvent(`🚪 ${targetConfig?.name ?? targetZoneId} DOOR OPENED: Ambient thermal ingress active`, "warning", targetConfig?.name ?? "Chamber");
+        setSimState((prev) => ({
+          ...prev,
+          doorOpen: true,
+          isRecovering: false,
+        }));
+        setCameraPreset("dock-bay");
+        addEvent(
+          `🚪 ${targetConfig?.name ?? targetZoneId} DOOR LEFT OPEN (${durationMinutes ? `${durationMinutes}m` : "Continuous Ingress"}): Warm air plume entering chamber`,
+          "warning",
+          targetConfig?.name ?? "Dock"
+        );
       } else {
         setActiveScenario("normal");
-        addEvent(`✓ ${targetConfig?.name ?? targetZoneId} door sealed; post-closure cooling recovery initiated (risk retained)`, "info", targetConfig?.name ?? "Chamber");
+        setSimState((prev) => ({
+          ...prev,
+          doorOpen: false,
+          isRecovering: true,
+        }));
+        addEvent(
+          `✓ ${targetConfig?.name ?? targetZoneId} door sealed; post-closure cooling recovery initiated (thermal inertia monitored)`,
+          "info",
+          targetConfig?.name ?? "Dock"
+        );
       }
-      setSimState((prev) => ({
-        ...prev,
-        doorOpen: willOpen,
-        isRecovering: !willOpen,
-      }));
-    } catch (err) {
-      console.error("Failed to toggle door:", err);
-    }
-  }, [addEvent, selectedZoneId, simState.doorOpen]);
+      await toggleDoor(targetZoneId, durationMinutes);
+    },
+    [selectedZoneId, isDoorOpenContext, doorSimulations, addEvent, toggleDoor]
+  );
 
-  // Trip / Restore Compressor
-  const handleToggleCompressor = useCallback(() => {
-    setSimState((prev) => {
-      const willRun = !prev.compressorRunning;
-      if (!willRun) {
-        setActiveScenario("compressor_failure");
-        addEvent("⚠ PRIMARY COMPRESSOR RACK TRIPPED: Facility cooling lost", "critical", "System");
-        api.setScenario("zone-a", "compressor_failure").catch(() => {});
-      } else {
-        setActiveScenario("normal");
-        addEvent("✓ Compressor rack restored; active refrigeration online", "info", "System");
-        api.reset("scenario").catch(() => {});
+  const handleToggleDoor = useCallback(() => handleSimulateDoor(), [handleSimulateDoor]);
+
+  // 2. Simulate Compressor Trip
+  const handleToggleCompressor = useCallback(async () => {
+    lastUserActionTime.current = Date.now();
+    const targetZoneId = selectedZoneId || "zone-a";
+    const isRunning = simState.compressorRunning && activeScenario !== "compressor_failure";
+
+    if (isRunning) {
+      setActiveScenario("compressor_failure");
+      setSimState((prev) => ({ ...prev, compressorRunning: false, fansActive: false }));
+      addEvent("⚠️ PRIMARY COMPRESSOR RACK TRIPPED: Facility cooling lost & fans halted", "critical", "Compressor");
+      setCameraPreset("plant-room");
+      try {
+        await api.setScenario(targetZoneId, "compressor_failure").catch(() => {});
+      } catch (err) {
+        console.error("Failed to trip compressor:", err);
       }
-      return { ...prev, compressorRunning: willRun };
-    });
-  }, [addEvent]);
-
-  // Burn Sensor
-  const handleBurnSensor = useCallback(() => {
-    setSimState((prev) => {
-      const nextBurned = new Set(prev.burnedSensors);
-      if (nextBurned.has("TS-A1")) {
-        nextBurned.delete("TS-A1");
-        setActiveScenario("normal");
-        addEvent("✓ Sensor TS-A1 replaced and recalibrated", "info", "Zone A");
-        api.reset("scenario", "zone-a").catch(() => {});
-      } else {
-        nextBurned.add("TS-A1");
-        setActiveScenario("sensor_burn");
-        addEvent("🔥 SENSOR BURN: TS-A1 hardware fault & smoke detected", "critical", "Zone A");
-        handleZoneSelect("zone-a");
-        api.setScenario("zone-a", "sensor_anomaly").catch(() => {});
-      }
-      return { ...prev, burnedSensors: nextBurned };
-    });
-  }, [addEvent, handleZoneSelect]);
-
-  // Degrade Cooling Capacity (Condenser Fouling / Refrigerant Leak)
-  const handleToggleDegradation = useCallback(() => {
-    if (activeScenario === "cooling_degradation") {
-      setActiveScenario("normal");
-      addEvent("✓ Cooling system restored to full nominal capacity", "info", "Zone A");
-      api.reset("scenario", "zone-a").catch(() => {});
     } else {
-      setActiveScenario("cooling_degradation");
-      addEvent("📉 COOLING DEGRADATION: 45% capacity loss & compressor strain", "warning", "Zone A");
-      handleZoneSelect("zone-a");
-      api.setScenario("zone-a", "cooling_degradation").catch(() => {});
+      setActiveScenario("normal");
+      setSimState((prev) => ({ ...prev, compressorRunning: true, fansActive: true }));
+      addEvent("✓ Compressor rack restored; active refrigeration online", "info", "Compressor");
+      try {
+        await api.reset("scenario", targetZoneId).catch(() => {});
+      } catch (err) {
+        console.error("Failed to restore compressor:", err);
+      }
     }
-  }, [activeScenario, addEvent, handleZoneSelect]);
+  }, [selectedZoneId, simState.compressorRunning, activeScenario, addEvent]);
 
-  // Reset Everything
-  const handleResetAll = useCallback(() => {
+  // 2b. Simulate Evaporator Cooling Fan Trip / Offline
+  const handleToggleFan = useCallback(async () => {
+    lastUserActionTime.current = Date.now();
+    const targetZoneId = selectedZoneId || "zone-a";
+    const isFanRunning = simState.fansActive && activeScenario !== "fan_off";
+
+    if (isFanRunning) {
+      setActiveScenario("fan_off");
+      setSimState((prev) => ({ ...prev, fansActive: false }));
+      addEvent(`⚠️ EVAPORATOR COOLING FAN TRIPPED in ${targetZoneId}: Forced air circulation halted, cooling extraction reduced by 85%`, "warning", "Evaporator Fan");
+      try {
+        await api.setScenario(targetZoneId, "fan_off").catch(() => {});
+      } catch (err) {
+        console.error("Failed to trip fan:", err);
+      }
+    } else {
+      setActiveScenario("normal");
+      setSimState((prev) => ({ ...prev, fansActive: true }));
+      addEvent(`✓ Evaporator cooling fan in ${targetZoneId} restored to full airflow`, "info", "Evaporator Fan");
+      try {
+        await api.reset("scenario", targetZoneId).catch(() => {});
+      } catch (err) {
+        console.error("Failed to restore fan:", err);
+      }
+    }
+  }, [selectedZoneId, simState.fansActive, activeScenario, addEvent]);
+
+  // 3. Simulate Sensor Failure / Dropout / Anomaly
+  const handleToggleSensorFailure = useCallback(async () => {
+    lastUserActionTime.current = Date.now();
+    const targetZoneId = selectedZoneId || "zone-a";
+    const targetSensorId = `${targetZoneId.replace("zone-", "TS-").toUpperCase()}1`;
+    const isCurrentlyFailed = simState.failedSensors.has(targetSensorId) || activeScenario === "sensor_anomaly";
+
+    if (!isCurrentlyFailed) {
+      setSimState((prev) => {
+        const next = new Set(prev.failedSensors);
+        next.add(targetSensorId);
+        return { ...prev, failedSensors: next };
+      });
+      setActiveScenario("sensor_anomaly");
+      addEvent(`⚠️ SENSOR FAILURE INJECTED: Probe ${targetSensorId} dropout & telemetry corrupted`, "warning", targetZoneId);
+      setCameraPreset(targetZoneId as CameraPreset);
+      try {
+        await api.setScenario(targetZoneId, "sensor_anomaly").catch(() => {});
+      } catch (err) {
+        console.error("Failed to inject sensor failure:", err);
+      }
+    } else {
+      setSimState((prev) => {
+        const next = new Set(prev.failedSensors);
+        next.delete(targetSensorId);
+        return { ...prev, failedSensors: next };
+      });
+      setActiveScenario("normal");
+      addEvent(`✓ Sensor ${targetSensorId} recalibrated & restored to normal`, "info", targetZoneId);
+      try {
+        await api.reset("scenario", targetZoneId).catch(() => {});
+      } catch (err) {
+        console.error("Failed to reset sensor failure:", err);
+      }
+    }
+  }, [selectedZoneId, simState.failedSensors, activeScenario, addEvent]);
+
+  // 4. Simulate Sensor Burning / Fire / Thermal Runaway
+  const handleToggleSensorBurning = useCallback(async () => {
+    lastUserActionTime.current = Date.now();
+    const targetZoneId = selectedZoneId || "zone-a";
+    const targetSensorId = `${targetZoneId.replace("zone-", "TS-").toUpperCase()}1`;
+    const isCurrentlyBurned =
+      simState.burnedSensors.has(targetSensorId) ||
+      activeScenario === "fire_runaway" ||
+      activeScenario === "sensor_burn";
+
+    if (!isCurrentlyBurned) {
+      setSimState((prev) => {
+        const nextBurned = new Set(prev.burnedSensors);
+        nextBurned.add(targetSensorId);
+        return { ...prev, burnedSensors: nextBurned, compressorRunning: false, fansActive: false };
+      });
+      setActiveScenario("fire_runaway");
+      addEvent(`🔥 SENSOR BURNING & THERMAL RUNAWAY: Probe ${targetSensorId} flaming! Compressor failsafe triggered`, "critical", targetZoneId);
+      setCameraPreset(targetZoneId as CameraPreset);
+      try {
+        await api.setScenario(targetZoneId, "fire_runaway").catch(() => {});
+      } catch (err) {
+        console.error("Failed to inject fire runaway:", err);
+      }
+    } else {
+      setSimState((prev) => {
+        const nextBurned = new Set(prev.burnedSensors);
+        nextBurned.delete(targetSensorId);
+        return { ...prev, burnedSensors: nextBurned, compressorRunning: true, fansActive: true };
+      });
+      setActiveScenario("normal");
+      addEvent(`✓ Fire extinguished; sensor probe ${targetSensorId} replaced`, "info", targetZoneId);
+      try {
+        await api.reset("scenario", targetZoneId).catch(() => {});
+      } catch (err) {
+        console.error("Failed to reset fire runaway:", err);
+      }
+    }
+  }, [selectedZoneId, simState.burnedSensors, activeScenario, addEvent]);
+
+  // 5. Simulate Cooling Capacity Degradation (45% loss)
+  const handleToggleDegradation = useCallback(async () => {
+    lastUserActionTime.current = Date.now();
+    const targetZoneId = selectedZoneId || "zone-a";
+    const isCurrentlyDegraded = activeScenario === "cooling_degradation";
+
+    if (!isCurrentlyDegraded) {
+      setActiveScenario("cooling_degradation");
+      addEvent("📉 COOLING DEGRADATION INJECTED: 45% capacity loss & compressor strain", "warning", targetZoneId);
+      try {
+        await api.setScenario(targetZoneId, "cooling_degradation").catch(() => {});
+      } catch (err) {
+        console.error("Failed to inject degradation:", err);
+      }
+    } else {
+      setActiveScenario("normal");
+      addEvent("✓ Cooling system restored to nominal 100% capacity", "info", targetZoneId);
+      try {
+        await api.reset("scenario", targetZoneId).catch(() => {});
+      } catch (err) {
+        console.error("Failed to reset degradation:", err);
+      }
+    }
+  }, [selectedZoneId, activeScenario, addEvent]);
+
+  // Legacy alias for degradation
+  const handleDegradeCooling = handleToggleDegradation;
+  const handleBurnSensor = handleToggleSensorBurning;
+
+  // 6. Reset All Systems to Nominal Baseline
+  const handleResetAll = useCallback(async () => {
+    lastUserActionTime.current = 0;
     setActiveScenario("normal");
-    setDoorOpenSeconds(0);
     setSimState({
       failedSensors: new Set(),
       burnedSensors: new Set(),
@@ -2510,10 +2923,69 @@ export default function DigitalTwin() {
         "zone-c": -20.0,
       },
     });
-    setCameraPreset("isometric");
-    addEvent("✓ All systems, sensors, and doors reset to nominal baseline", "info", "Facility");
-    api.reset("full").catch(() => {});
-  }, [addEvent]);
+    addEvent("🔄 ALL SYSTEMS RESET: Baseline 100% nominal operation restored", "info", "System");
+    try {
+      await api.reset("full").catch(() => {});
+      await api.reset("scenario").catch(() => {});
+      await api.controlDoor("zone-a", "close").catch(() => {});
+      await api.controlDoor("zone-b", "close").catch(() => {});
+      await api.controlDoor("zone-c", "close").catch(() => {});
+      const activeId = selectedZoneId || "zone-a";
+      if (isDoorOpenContext(activeId)) {
+        await toggleDoor(activeId, undefined, "close").catch(() => {});
+      }
+    } catch (err) {
+      console.error("Failed to reset all systems:", err);
+    }
+  }, [addEvent, selectedZoneId, isDoorOpenContext, toggleDoor]);
+
+  // Telemetry Source Switcher (Dataset Playback vs Live Simulation / Feeder)
+  const handleToggleTelemetrySource = useCallback(
+    async (targetSource: "dataset" | "simulator") => {
+      try {
+        await api.setTelemetrySource(targetSource);
+        telemetrySourcePoll.refresh();
+        addEvent(
+          targetSource === "dataset"
+            ? "✓ Switched to Dataset Playback: streaming real sensor rows from test_dataset.csv"
+            : "✓ Switched to Live IoT Feeder & Physics Simulator",
+          "info",
+          "Telemetry"
+        );
+      } catch (err) {
+        console.error("Failed to switch telemetry source:", err);
+      }
+    },
+    [telemetrySourcePoll, addEvent]
+  );
+
+  // Counterfactual What-If Simulation Runner
+  const handleRunWhatIf = useCallback(async () => {
+    setWhatIfLoading(true);
+    try {
+      const res = await api.whatIf({
+        zone_id: selectedZoneId || "zone-c",
+        scenario: whatIfScenario,
+        duration_minutes: whatIfScenario === "door_open" ? whatIfDuration : null,
+        ambient_delta: 15.0,
+        projection_minutes: 60,
+      });
+      setWhatIfResult(res);
+      addEvent(`🧪 Executed counterfactual what-if simulation for ${res.scenario_label}`, "info", selectedZoneId);
+    } catch (err) {
+      console.error("Counterfactual what-if failed:", err);
+      addEvent("❌ Counterfactual simulation request failed", "warning", selectedZoneId);
+    } finally {
+      setWhatIfLoading(false);
+    }
+  }, [selectedZoneId, whatIfScenario, whatIfDuration, addEvent]);
+
+  // Auto-run What-If when entering What-If tab or switching scenario
+  useEffect(() => {
+    if (activeAnalyticsTab === "forecast" && forecastMode === "whatif" && !whatIfResult) {
+      handleRunWhatIf();
+    }
+  }, [activeAnalyticsTab, forecastMode, whatIfResult, handleRunWhatIf]);
 
   // Google Maps Zoom in/out handlers
   const handleZoom = (delta: number) => {
@@ -2545,12 +3017,25 @@ export default function DigitalTwin() {
     const localFactors: { label: string; detail: string; points: number }[] = [];
 
     if (simState.doorOpen) {
-      const doorPts = Math.min(45, 20 + doorOpenSeconds * 2);
+      const outdoorTemp = 27.0;
+      const gradient = Math.max(1, Math.round(outdoorTemp - currentZoneTemp));
+      // Ingress risk grows with time: 15 pts initially, scaling up to 45 pts as air curtain breaks down
+      const doorTimeFactor = Math.min(1.0, Math.max(0.15, doorOpenSeconds / 180));
+      const doorPts = Math.round(15 + 30 * doorTimeFactor);
       localScore += doorPts;
       localFactors.push({
         label: "Loading Door Ingress",
-        detail: `Dock door open for ${Math.floor(doorOpenSeconds / 60)}m ${doorOpenSeconds % 60}s allowing +26.0°C ambient heat rush`,
+        detail: `Dock door open for ${fmtDoorDuration(doorOpenSeconds)} (${outdoorTemp.toFixed(1)}°C outdoor ambient, +${gradient}°C gradient). Thermal infiltration active.`,
         points: doorPts,
+      });
+    }
+
+    if (!simState.fansActive || activeScenario === "fan_off") {
+      localScore += 40;
+      localFactors.push({
+        label: "Evaporator Cooling Fan Tripped",
+        detail: "Forced air circulation halted; 85% reduction in cooling extraction across coils.",
+        points: 40,
       });
     }
 
@@ -2562,7 +3047,7 @@ export default function DigitalTwin() {
       localScore += recPts;
       localFactors.push({
         label: "Post-Closure Residual Thermal Heat",
-        detail: `Door sealed. Trapped warm air entering thermal inertia wave (ΔT residual +${residualRise.toFixed(1)}°C, est. cooling recovery ~${Math.round(recMins)} min, ${Math.round(recProg)}% complete). Risk retained during recovery phase.`,
+        detail: `Door sealed. Trapped warm air entering thermal inertia wave (ΔT residual +${residualRise.toFixed(1)}°C, est. recovery ~${Math.round(recMins)} min, ${Math.round(recProg)}% complete). Risk retained during recovery phase.`,
         points: recPts,
       });
     }
@@ -2576,12 +3061,30 @@ export default function DigitalTwin() {
       });
     }
 
-    if (simState.burnedSensors.has("TS-A1") && selectedZoneId === "zone-a") {
+    if (simState.burnedSensors.size > 0 || activeScenario === "fire_runaway" || activeScenario === "sensor_burn") {
+      localScore += 65;
+      localFactors.push({
+        label: "Sensor Fire / Thermal Runaway",
+        detail: `Critical thermal runaway on probe (${Array.from(simState.burnedSensors).join(", ") || "TS-A1"}); +2°C/min heat influx and failsafe active`,
+        points: 65,
+      });
+    }
+
+    if (simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly") {
       localScore += 35;
       localFactors.push({
-        label: "Sensor Hardware Failure",
-        detail: "Probe TS-A1 thermal runaway detected; telemetry untrusted",
+        label: "Sensor Telemetry Dropout",
+        detail: `Probe (${Array.from(simState.failedSensors).join(", ") || "TS-A1"}) corrupted / stuck frozen; Isolation Forest outlier score > 0.95`,
         points: 35,
+      });
+    }
+
+    if (activeScenario === "cooling_degradation") {
+      localScore += 30;
+      localFactors.push({
+        label: "Cooling Capacity Degradation",
+        detail: "Condenser fouling / partial refrigerant loss; cooling efficiency derated by 45%",
+        points: 30,
       });
     }
 
@@ -2598,7 +3101,7 @@ export default function DigitalTwin() {
       localScore += warnPts;
       localFactors.push({
         label: "Approaching Excursion Threshold",
-        detail: `Positive drift (+1.8°C/hr) nearing critical boundary of ${fmtTemp(selectedConfig.upperLimit)}`,
+        detail: `Positive drift nearing critical boundary of ${fmtTemp(selectedConfig.upperLimit)}`,
         points: warnPts,
       });
     }
@@ -2631,7 +3134,7 @@ export default function DigitalTwin() {
 
     if (simState.doorOpen) {
       recommendation = `CRITICAL ACTION: Close ${selectedConfig.name} door immediately. Seal magnetic gaskets and engage booster blower to prevent excursion.`;
-      actionLabel = `⚡ Close Door & Seal ${selectedConfig.name}`;
+      actionLabel = `⚡ Seal Door & Stop Ingress`;
       onAction = handleToggleDoor;
     } else if (simState.isRecovering || (selectedZone?.residual_rise_predicted ?? 0) > 0.05) {
       const recMins = selectedZone?.recovery_time_minutes ?? simState.recoveryMinutes ?? 12;
@@ -2642,19 +3145,33 @@ export default function DigitalTwin() {
       recommendation = "URGENT ACTION: Reset compressor breaker panel; switch to secondary backup condensing unit and notify HVAC technician.";
       actionLabel = "⚡ Reset Compressor & Restore Cooling";
       onAction = handleToggleCompressor;
-    } else if (simState.burnedSensors.has("TS-A1")) {
-      recommendation = "HARDWARE ACTION: Isolate sensor TS-A1 circuit breaker. Switch thermostat control feedback to redundant probe TS-A2.";
-      actionLabel = "⚡ Isolate TS-A1 & Recalibrate";
-      onAction = handleBurnSensor;
+    } else if (simState.burnedSensors.size > 0 || activeScenario === "fire_runaway" || activeScenario === "sensor_burn") {
+      recommendation = "CRITICAL FIRE ACTION: Extinguish sensor thermal runaway. Isolate 24V supply line, switch temperature control loop to redundant probe TS-A2.";
+      actionLabel = "⚡ Extinguish Fire & Isolate Probe";
+      onAction = handleToggleSensorBurning;
+    } else if (simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly") {
+      recommendation = "TELEMETRY ACTION: Sensor dropout / stuck reading detected. Switch HVAC loop to virtual ensemble fallback and recalibrate probe TS-A1.";
+      actionLabel = "⚡ Reset Telemetry Stream";
+      onAction = handleToggleSensorFailure;
+    } else if (activeScenario === "cooling_degradation") {
+      recommendation = "HVAC DEGRADATION ACTION: Condenser efficiency derated by 45%. Clear evaporator frost buildup, inspect expansion valve, restore 100% COP.";
+      actionLabel = "⚡ Restore 100% Cooling COP";
+      onAction = handleToggleDegradation;
     }
 
     return { score, category, factors, recommendation, actionLabel, onAction };
-  }, [simState, doorOpenSeconds, currentZoneTemp, selectedConfig, selectedZoneId, selectedZone, riskPoll.data, handleToggleDoor, handleToggleCompressor, handleBurnSensor]);
+  }, [simState, doorOpenSeconds, currentZoneTemp, selectedConfig, selectedZoneId, selectedZone, riskPoll.data, activeScenario, handleToggleDoor, handleToggleCompressor, handleBurnSensor, handleToggleSensorBurning, handleToggleSensorFailure, handleToggleDegradation]);
 
-  // Forecast Points (Synchronized with backend ML Random Forest model)
+  // Live Forecast Points (Dynamically projecting impact of active situations)
   const forecastData = useMemo(() => {
-    // If backend ML forecast is available, use exact model points
-    if (forecast.data?.points?.length) {
+    if (
+      forecast.data?.points?.length &&
+      activeScenario === "normal" &&
+      !simState.doorOpen &&
+      simState.compressorRunning &&
+      simState.burnedSensors.size === 0 &&
+      simState.failedSensors.size === 0
+    ) {
       const baseTemp = forecast.data.base_temperature ?? currentZoneTemp;
       const pts = [
         {
@@ -2675,16 +3192,25 @@ export default function DigitalTwin() {
       return pts;
     }
 
-    // Fallback: projected drift based on current physical state
     const points = [];
-    const driftRate = simState.doorOpen && selectedZoneId === "zone-c"
-      ? 0.7
-      : !simState.compressorRunning
-      ? 0.5
-      : 0.05;
+    const driftRate =
+      activeScenario === "fire_runaway" || simState.burnedSensors.size > 0
+        ? 1.55
+        : simState.doorOpen
+        ? (selectedZoneId === "zone-c" ? 1.05 : 0.82)
+        : !simState.compressorRunning
+        ? 0.62
+        : activeScenario === "cooling_degradation"
+        ? 0.38
+        : 0.05;
 
     for (let min = 0; min <= 30; min += 5) {
-      const projected = Number((currentZoneTemp + (min / 5) * driftRate).toFixed(2));
+      const anomalyNoise =
+        activeScenario === "sensor_anomaly" && min > 0
+          ? (min % 10 === 0 ? 5.2 : -2.8)
+          : 0;
+
+      const projected = Number((currentZoneTemp + (min / 5) * driftRate + anomalyNoise).toFixed(2));
       points.push({
         minute: `${min}m`,
         temperature: projected,
@@ -2693,208 +3219,564 @@ export default function DigitalTwin() {
       });
     }
     return points;
-  }, [currentZoneTemp, simState, selectedZoneId, selectedConfig, forecast.data]);
+  }, [currentZoneTemp, simState, activeScenario, selectedZoneId, selectedConfig, forecast.data]);
+
+  // Dynamic Y-Axis Domain based on active zone limits & live forecast values
+  const yDomain = useMemo(() => {
+    const temps = forecastData.map((d) => d.temperature).filter((t) => typeof t === "number" && !isNaN(t));
+    const minVal = Math.min(...temps, selectedConfig.lowerLimit);
+    const maxVal = Math.max(...temps, selectedConfig.upperLimit);
+    const padding = Math.max(1.5, (maxVal - minVal) * 0.15);
+    return [Math.floor(minVal - padding), Math.ceil(maxVal + padding)];
+  }, [forecastData, selectedConfig]);
+
+  // Counterfactual Chart Data
+  const counterfactualChartData = useMemo(() => {
+    if (!whatIfResult) return [];
+    const maxLen = Math.max(
+      whatIfResult.baseline.points.length,
+      whatIfResult.scenario_result.points.length
+    );
+    const data = [];
+    for (let i = 0; i < maxLen; i++) {
+      const basePt = whatIfResult.baseline.points[i];
+      const scenPt = whatIfResult.scenario_result.points[i];
+      const min = basePt?.minute ?? scenPt?.minute ?? i * 5;
+      data.push({
+        minute: `${min}m`,
+        baseline: basePt?.temperature ?? null,
+        scenario: scenPt?.temperature ?? null,
+        upperLimit: whatIfResult.limits.upper,
+        lowerLimit: whatIfResult.limits.lower,
+      });
+    }
+    return data;
+  }, [whatIfResult]);
+
+  // Filtered Events
+  const filteredEvents = useMemo(() => {
+    const apiEvents = facilityEventsPoll.data ?? [];
+    if (timelineSeverityFilter === "all") return apiEvents;
+    return apiEvents.filter((e) => e.severity === timelineSeverityFilter);
+  }, [facilityEventsPoll.data, timelineSeverityFilter]);
 
   const hasAnyAlert =
     !simState.compressorRunning ||
     simState.failedSensors.size > 0 ||
     simState.burnedSensors.size > 0 ||
-    simState.doorOpen;
+    simState.doorOpen ||
+    simState.isRecovering;
 
-  const isZoneFocused = cameraPreset.startsWith("zone-");
+  // Active Critical Incidents Count
+  const activeCriticalCount = useMemo(() => {
+    const alertsCount = alertsPoll.data?.filter((a) => a.severity === "critical" && a.active).length ?? 0;
+    let count = alertsCount;
+    if (!simState.compressorRunning) count++;
+    if (simState.doorOpen && doorOpenSeconds > 180) count++;
+    if (simState.burnedSensors.size > 0) count++;
+    return count;
+  }, [alertsPoll.data, simState, doorOpenSeconds]);
+
+  // Normal vs At Risk Zones
+  const zoneHealthCounts = useMemo(() => {
+    const total = 3;
+    let atRisk = 0;
+    allZones.forEach((z) => {
+      if (z.risk_category === "high" || z.risk_category === "medium") atRisk++;
+    });
+    if (simState.doorOpen || !simState.compressorRunning || simState.burnedSensors.size > 0) {
+      atRisk = Math.max(atRisk, 1);
+    }
+    return {
+      total,
+      normal: Math.max(0, total - atRisk),
+      atRisk,
+    };
+  }, [allZones, simState]);
 
   return (
-    <div className="space-y-4">
-      {/* 🏆 INTERACTIVE EVALUATION DEMO BAR */}
-      <div className="rounded-xl border border-cyan-500/40 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 p-3 shadow-xl backdrop-blur-md">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+    <div className="space-y-4 font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+      {/* ═══════════════════════════════════════════════════════════════════
+          FACILITY HEADER BAR (MATCHING REFERENCE IMAGE)
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div className="rounded-2xl border border-white/10 bg-[#0B1424]/95 px-4 py-3 shadow-2xl backdrop-blur-xl flex flex-wrap items-center justify-between gap-3">
+        {/* Left: Brand / Facility Context */}
+        <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2.5">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-              <Sparkles size={15} />
-            </span>
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-inner">
+              <Snowflake size={20} className="animate-pulse" />
+            </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-fg">ColdGuard 3D Google Maps-Style Digital Twin</span>
-                <span className="rounded-full bg-cyan-500/20 text-cyan-300 px-2 py-0.2 text-[10px] font-mono border border-cyan-500/30 font-bold">
-                  Smooth Fly-To Navigation Active
-                </span>
-              </div>
-              <p className="text-[11px] text-fg-muted">
-                Click any zone to fly smoothly to that location. Explore the 3D facility with Google Maps controls and live sensor diagnostics.
-              </p>
+              <div className="text-base font-bold text-white tracking-wide leading-none">ColdGuard</div>
+              <div className="text-[10px] text-cyan-400/80 font-mono mt-0.5">Digital Twin | Cold Storage Monitoring</div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={handleToggleDoor}
-              className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer shadow-md ${
-                simState.doorOpen
-                  ? "bg-rose-500/30 text-rose-200 border-rose-500 animate-pulse shadow-rose-500/20"
-                  : "bg-amber-950/40 text-amber-300 border-amber-500/50 hover:bg-amber-950/70"
-              }`}
-            >
-              <DoorOpen size={13} />
-              {simState.doorOpen ? "Seal Door (Stop Ingress)" : "🚪 Demo 1: Open Loading Door"}
-            </button>
+          {/* Facility Selector */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-xs font-mono text-slate-200">
+            <Warehouse size={14} className="text-cyan-400" />
+            <span className="font-semibold">Facility: ColdGuard Central Storage</span>
+            <span className="text-[10px] text-slate-400 ml-1">({allZones.length} Zones Active)</span>
+          </div>
 
-            <button
-              onClick={handleToggleCompressor}
-              className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer shadow-md ${
-                !simState.compressorRunning
-                  ? "bg-rose-500/30 text-rose-200 border-rose-500 animate-pulse shadow-rose-500/20"
-                  : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-slate-500"
-              }`}
-            >
-              <Cpu size={13} />
-              {!simState.compressorRunning ? "Reset Compressor" : "⚡ Demo 2: Trip Compressor"}
-            </button>
+          {/* Operational Status Badge */}
+          {(() => {
+            const isCritical = activeCriticalCount > 0 || !simState.compressorRunning;
+            const isWarning = zoneHealthCounts.atRisk > 0 || simState.doorOpen || simState.isRecovering;
+            return (
+              <div
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-mono font-bold shadow-sm ${
+                  isCritical
+                    ? "bg-rose-950/50 border-rose-500/40 text-rose-300"
+                    : isWarning
+                    ? "bg-amber-950/50 border-amber-500/40 text-amber-300"
+                    : "bg-emerald-950/50 border-emerald-500/40 text-emerald-300"
+                }`}
+              >
+                <span
+                  className={`h-2 w-2 rounded-full animate-pulse ${
+                    isCritical
+                      ? "bg-rose-400 shadow-[0_0_8px_#EF4444]"
+                      : isWarning
+                      ? "bg-amber-400 shadow-[0_0_8px_#F59E0B]"
+                      : "bg-emerald-400 shadow-[0_0_8px_#10B981]"
+                  }`}
+                />
+                <span>{isCritical ? "Critical Alert" : isWarning ? "Risk Warning" : "Operational"}</span>
+              </div>
+            );
+          })()}
 
-            <button
-              onClick={handleBurnSensor}
-              className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer shadow-md ${
-                simState.burnedSensors.has("TS-A1")
-                  ? "bg-orange-500/30 text-orange-200 border-orange-500 animate-pulse shadow-orange-500/20"
-                  : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-slate-500"
-              }`}
-            >
-              <Flame size={13} />
-              {simState.burnedSensors.has("TS-A1") ? "Replace Sensor" : "🔥 Demo 3: Burn Sensor"}
-            </button>
+          {/* Clock / Last Updated */}
+          <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono hidden md:flex">
+            <Clock size={14} className="text-slate-400" />
+            <span>Last updated {new Date().toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })} • {liveClock}</span>
+          </div>
+        </div>
 
-            <button
-              onClick={handleToggleDegradation}
-              className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer shadow-md ${
-                activeScenario === "cooling_degradation"
-                  ? "bg-amber-500/30 text-amber-200 border-amber-500 animate-pulse shadow-amber-500/20"
-                  : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-slate-500"
-              }`}
-            >
-              <Snowflake size={13} />
-              {activeScenario === "cooling_degradation" ? "Restore Cooling Unit" : "📉 Demo 4: Degrade Cooling (45%)"}
+        {/* Right: Actions & Controls */}
+        <div className="flex items-center gap-2.5 ml-auto flex-wrap">
+          {/* Fault Injection Dropdown */}
+          <div className="relative group">
+            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 hover:bg-amber-950/70 hover:text-white text-xs font-mono font-semibold transition cursor-pointer shadow-lg">
+              <Zap size={14} className="text-amber-400" />
+              <span>Fault Injection</span>
+              <ChevronDown size={14} className="text-amber-400/80" />
             </button>
+            <div className="absolute right-0 top-full mt-1.5 w-56 rounded-xl bg-slate-950 border border-white/10 p-1.5 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 space-y-1">
+              <button
+                onClick={() => handleSimulateDoor()}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-amber-300 hover:bg-amber-950/60 flex items-center gap-2 cursor-pointer"
+              >
+                <DoorOpen size={13} />
+                <span>Door Left Open (+26°C)</span>
+              </button>
+              <button
+                onClick={handleToggleCompressor}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-rose-300 hover:bg-rose-950/60 flex items-center gap-2 cursor-pointer"
+              >
+                <PowerOff size={13} />
+                <span>Trip Compressor Rack</span>
+              </button>
+              <button
+                onClick={handleToggleSensorFailure}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-purple-300 hover:bg-purple-950/60 flex items-center gap-2 cursor-pointer"
+              >
+                <ZapOff size={13} />
+                <span>Sensor Probe Failure</span>
+              </button>
+              <button
+                onClick={handleToggleSensorBurning}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-red-300 hover:bg-red-950/60 flex items-center gap-2 cursor-pointer"
+              >
+                <Flame size={13} />
+                <span>Sensor Burning (Fire/Smoke)</span>
+              </button>
+              <button
+                onClick={handleToggleDegradation}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-cyan-300 hover:bg-cyan-950/60 flex items-center gap-2 cursor-pointer"
+              >
+                <ThermometerSnowflake size={13} />
+                <span>Cooling Degradation (45%)</span>
+              </button>
+              <div className="border-t border-white/10 my-1" />
+              <button
+                onClick={handleResetAll}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-slate-300 hover:bg-slate-900 flex items-center gap-2 cursor-pointer"
+              >
+                <RotateCcw size={13} className="text-cyan-400" />
+                <span>Reset All Systems</span>
+              </button>
+            </div>
+          </div>
 
-            <button
-              onClick={handleResetAll}
-              className="px-3 py-1.5 text-xs font-mono font-bold rounded-lg border border-emerald-500/50 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/70 transition-all flex items-center gap-1 cursor-pointer"
-            >
-              <RotateCcw size={13} />
-              ✓ Reset All
-            </button>
+          {/* Reset Button */}
+          <button
+            onClick={handleResetAll}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+          >
+            <RotateCcw size={14} />
+            <span>Reset</span>
+          </button>
+
+          {/* Notification Bell with Badge */}
+          <div className="relative p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white cursor-pointer">
+            <Bell size={16} />
+            {activeCriticalCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-rose-500 text-white text-[10px] font-bold font-mono flex items-center justify-center shadow-[0_0_8px_#EF4444]">
+                {activeCriticalCount}
+              </span>
+            )}
+          </div>
+
+          {/* Operator Console */}
+          <div className="h-8 w-8 rounded-xl bg-slate-900 border border-slate-700 text-cyan-400 flex items-center justify-center shadow-md" title="Operator Console">
+            <Eye size={15} />
           </div>
         </div>
       </div>
 
-      <StaleBanner error={zonesError} />
+      {/* ═══════════════════════════════════════════════════════════════════
+          UPPER SECTION: 3D FACILITY VIEW (LEFT) + TELEMETRY & OPERATIONS (RIGHT)
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        {/* LEFT (col-span-8): 3D FACILITY VIEW */}
+        <div className={is3DExpanded ? "xl:col-span-12" : "xl:col-span-8"}>
+          <div className="rounded-2xl border border-white/10 bg-[#0B1424]/95 shadow-2xl overflow-hidden flex flex-col justify-between">
+            {/* Header: Title + 3D View / Top View / Labels Switch */}
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10 bg-slate-900/90 flex-wrap">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/40">
+                  <Boxes size={18} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-white tracking-wide">3D Facility View</h2>
+                  <div className="text-[10px] text-slate-400 font-mono">Interactive digital twin of cold storage</div>
+                </div>
+              </div>
 
-      {/* 3D CENTERPIECE VIEWPORT & SIDEBAR */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        {/* Left Column: 3D Canvas */}
-        <div className="xl:col-span-8">
-          <Card className="p-0 overflow-hidden" bodyClassName="p-0">
-            {/* Google Maps Top Navigation Bar: Turn-by-Turn GPS or Facility Bar */}
-            {isNavigating && selectedConfig ? (
-              <GoogleMapsTopNavBanner
-                zoneConfig={selectedConfig}
-                distanceMeters={navDistance}
-                isArrived={navArrived}
-                onExit={handleExitNavigation}
-                onRecenter={handleRecenter}
-                onWalkInside={handleWalkInside}
-              />
-            ) : (
-              <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-white/10 bg-slate-900/90 flex-wrap">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold flex items-center gap-1 mr-1">
-                    <Navigation size={12} className="animate-pulse" /> Google Maps Nav:
-                  </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCameraPreset("isometric")}
+                  className={`px-3 py-1 rounded-lg text-xs font-mono font-bold border transition cursor-pointer flex items-center gap-1.5 ${
+                    cameraPreset !== "top"
+                      ? "bg-cyan-600 text-white border-cyan-400 shadow-md shadow-cyan-600/30"
+                      : "bg-slate-900 text-slate-400 border-slate-700 hover:text-white"
+                  }`}
+                >
+                  <Boxes size={13} />
+                  <span>3D View</span>
+                </button>
 
+                <button
+                  onClick={() => setCameraPreset("top")}
+                  className={`px-3 py-1 rounded-lg text-xs font-mono font-bold border transition cursor-pointer flex items-center gap-1.5 ${
+                    cameraPreset === "top"
+                      ? "bg-cyan-600 text-white border-cyan-400 shadow-md shadow-cyan-600/30"
+                      : "bg-slate-900 text-slate-400 border-slate-700 hover:text-white"
+                  }`}
+                >
+                  <Layers size={13} />
+                  <span>Top View</span>
+                </button>
+
+                <div className="flex items-center gap-1.5 pl-2 border-l border-white/10">
+                  <span className="text-xs text-slate-400 font-mono">Labels</span>
                   <button
-                    onClick={() => {
-                      setIsNavigating(false);
-                      setCameraPreset("isometric");
-                    }}
-                    className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer ${
-                      cameraPreset === "isometric" && !isNavigating
-                        ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold"
-                        : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
+                    onClick={() => setShowLabels(!showLabels)}
+                    className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${
+                      showLabels ? "bg-cyan-500" : "bg-slate-800"
                     }`}
                   >
-                    🌐 Overview
+                    <div
+                      className={`h-4 w-4 rounded-full bg-white transition-transform ${
+                        showLabels ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
                   </button>
+                </div>
+              </div>
+            </div>
 
-                  {ZONE_CONFIGS.map((cfg) => (
+            {/* Sub-bar: Camera Flight Navigation + View Mode Controls */}
+            <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-white/10 bg-slate-950/70 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold flex items-center gap-1 mr-1">
+                  <Navigation size={12} className="animate-pulse" /> CAMERA FLIGHT:
+                </span>
+
+                <button
+                  onClick={() => {
+                    setIsNavigating(false);
+                    setCameraPreset("isometric");
+                  }}
+                  className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer ${
+                    cameraPreset === "isometric" && !isNavigating
+                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold"
+                      : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                  }`}
+                >
+                  🌐 Overview
+                </button>
+
+                {ZONE_CONFIGS.map((cfg) => {
+                  const isActive = selectedZoneId === cfg.id;
+                  return (
                     <button
-                      key={`fly-${cfg.id}`}
+                      key={`flight-${cfg.id}`}
                       onClick={() => handleZoneSelect(cfg.id)}
                       className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
-                        selectedZoneId === cfg.id && isNavigating
+                        isActive
                           ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold shadow-sm"
-                          : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-cyan-400"
+                          : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:border-cyan-400"
                       }`}
                     >
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: cfg.color }} />
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cfg.color }} />
                       <span>{cfg.name}</span>
                       <span className="text-[9px] text-cyan-400 font-bold">
                         {cfg.id === "zone-a" ? "16m" : cfg.id === "zone-b" ? "10m" : "8m"}
                       </span>
                     </button>
-                  ))}
+                  );
+                })}
 
-                  <button
-                    onClick={() => handleToggleDoor()}
-                    className="px-2.5 py-1 text-[11px] font-mono rounded-lg border bg-slate-800 text-fg-muted border-slate-700 hover:text-fg hover:border-amber-400 cursor-pointer flex items-center gap-1.5"
-                  >
-                    <DoorOpen size={12} className="text-amber-400" />
-                    <span>Loading Bay</span>
-                    <span className="text-[9px] text-amber-400 font-bold">0m</span>
-                  </button>
-                </div>
+                <button
+                  onClick={() => setCameraPreset("plant-room")}
+                  className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
+                    cameraPreset === "plant-room"
+                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold shadow-sm"
+                      : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:border-cyan-400"
+                  }`}
+                  title="Fly to Plant Room / Compressor Rack"
+                >
+                  <Cpu size={12} className="text-cyan-400" />
+                  <span>Plant Room</span>
+                </button>
 
-                {/* View Modes */}
-                <div className="flex items-center gap-1.5 ml-auto">
-                  <button
-                    onClick={() => setViewMode(viewMode === "thermal" ? "standard" : "thermal")}
-                    className={`px-2 py-0.5 text-[10px] font-mono rounded border flex items-center gap-1 cursor-pointer ${
-                      viewMode === "thermal"
-                        ? "bg-amber-500/20 text-amber-300 border-amber-400 font-bold"
-                        : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
-                    }`}
-                  >
-                    <Thermometer size={10} /> Thermal
-                  </button>
-
-                  <button
-                    onClick={() => setShowLabels(!showLabels)}
-                    className={`px-2 py-0.5 text-[10px] font-mono rounded border flex items-center gap-1 cursor-pointer ${
-                      showLabels
-                        ? "bg-cyan-500/20 text-cyan-300 border-cyan-400"
-                        : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
-                    }`}
-                  >
-                    {showLabels ? <Eye size={10} /> : <EyeOff size={10} />} Labels
-                  </button>
-
-                  <button
-                    onClick={() => setAutoRotate(!autoRotate)}
-                    className={`px-2 py-0.5 text-[10px] font-mono rounded border flex items-center gap-1 cursor-pointer ${
-                      autoRotate
-                        ? "bg-purple-500/20 text-purple-300 border-purple-400"
-                        : "bg-slate-800 text-fg-muted border-slate-700 hover:text-fg"
-                    }`}
-                  >
-                    <RefreshCw size={10} className={autoRotate ? "animate-spin" : ""} /> Orbit
-                  </button>
-                </div>
+                <button
+                  onClick={() => setCameraPreset("dock-bay")}
+                  className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
+                    cameraPreset === "dock-bay"
+                      ? "bg-amber-500/20 text-amber-300 border-amber-400 font-bold shadow-sm"
+                      : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:border-amber-400"
+                  }`}
+                  title="Fly to Loading Dock & Door Ingress"
+                >
+                  <DoorOpen size={12} className="text-amber-400" />
+                  <span>Loading Dock</span>
+                </button>
               </div>
-            )}
 
-            {/* 3D Canvas with Google Maps Navigation */}
-            <div className="relative" style={{ height: "570px" }}>
+              {/* Action Toggles */}
+              <div className="flex items-center gap-1.5 ml-auto">
+                <button
+                  onClick={() => setViewMode(viewMode === "thermal" ? "standard" : "thermal")}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
+                    viewMode === "thermal"
+                      ? "bg-amber-500/20 text-amber-300 border-amber-400 font-bold"
+                      : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                  }`}
+                  title="Thermal Heatmap"
+                >
+                  <Thermometer size={11} /> Thermal
+                </button>
+
+                <button
+                  onClick={() => setViewMode(viewMode === "airflow" ? "standard" : "airflow")}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
+                    viewMode === "airflow"
+                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold"
+                      : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                  }`}
+                  title="Airflow Vectors"
+                >
+                  <Wind size={11} /> Airflow
+                </button>
+
+                <button
+                  onClick={() => setShowLabels(!showLabels)}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
+                    showLabels ? "bg-cyan-500/20 text-cyan-300 border-cyan-400" : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                  }`}
+                >
+                  <Tag size={11} /> Labels
+                </button>
+
+                <button
+                  onClick={() => setAutoRotate(!autoRotate)}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
+                    autoRotate ? "bg-purple-500/20 text-purple-300 border-purple-400 font-bold" : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                  }`}
+                >
+                  <RefreshCw size={11} className={autoRotate ? "animate-spin" : ""} /> Orbit
+                </button>
+
+                <button
+                  onClick={() => setIs3DExpanded(!is3DExpanded)}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
+                    is3DExpanded ? "bg-cyan-500/20 text-cyan-300 border-cyan-400" : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                  }`}
+                >
+                  {is3DExpanded ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
+                  <span>{is3DExpanded ? "Side View" : "Maximize View"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Direct Simulation & Fault Injection Control Dock */}
+            <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-white/10 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-mono text-amber-400 uppercase font-bold flex items-center gap-1.5 mr-1">
+                  <Zap size={13} className="text-amber-400 animate-pulse" /> SIMULATION LAB:
+                </span>
+
+                {/* 1. Door Left Open */}
+                <div className="flex items-center rounded-lg border border-amber-500/40 bg-amber-950/30 overflow-hidden">
+                  <button
+                    onClick={() => handleSimulateDoor()}
+                    className={`px-2.5 py-1 text-[11px] font-mono font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                      simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a")
+                        ? "bg-amber-500 text-black font-bold shadow-[0_0_12px_rgba(245,158,11,0.5)]"
+                        : "text-amber-300 hover:bg-amber-900/40"
+                    }`}
+                  >
+                    <DoorOpen size={13} />
+                    <span>
+                      {simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a")
+                        ? `Door Open (${fmtDoorDuration(doorOpenSeconds)})`
+                        : "Door Left Open"}
+                    </span>
+                  </button>
+                  {!(simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a")) && (
+                    <div className="flex border-l border-amber-500/30">
+                      <button
+                        onClick={() => handleSimulateDoor(2)}
+                        className="px-1.5 py-1 text-[10px] font-mono text-amber-400 hover:bg-amber-800/40 border-r border-amber-500/20"
+                        title="Open for 2 minutes"
+                      >
+                        2m
+                      </button>
+                      <button
+                        onClick={() => handleSimulateDoor(5)}
+                        className="px-1.5 py-1 text-[10px] font-mono text-amber-400 hover:bg-amber-800/40"
+                        title="Open for 5 minutes"
+                      >
+                        5m
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Compressor Trip */}
+                <button
+                  onClick={handleToggleCompressor}
+                  className={`px-2.5 py-1 text-[11px] font-mono font-semibold rounded-lg border transition cursor-pointer flex items-center gap-1.5 ${
+                    activeScenario === "compressor_failure" || selectedZone?.scenario === "compressor_failure"
+                      ? "bg-rose-500 text-white font-bold border-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.6)] animate-pulse"
+                      : "bg-rose-950/30 text-rose-300 border-rose-500/40 hover:bg-rose-900/40 hover:text-white"
+                  }`}
+                >
+                  <PowerOff size={13} />
+                  <span>{activeScenario === "compressor_failure" || selectedZone?.scenario === "compressor_failure" ? "Compressor Tripped (Offline)" : "Trip Compressor"}</span>
+                </button>
+
+                {/* 2b. Cooling Fan Off */}
+                <button
+                  onClick={handleToggleFan}
+                  className={`px-2.5 py-1 text-[11px] font-mono font-semibold rounded-lg border transition cursor-pointer flex items-center gap-1.5 ${
+                    activeScenario === "fan_off" || selectedZone?.scenario === "fan_off"
+                      ? "bg-amber-600 text-white font-bold border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.6)] animate-pulse"
+                      : "bg-amber-950/30 text-amber-300 border-amber-500/40 hover:bg-amber-900/40 hover:text-white"
+                  }`}
+                  title="Simulate evaporator cooling fan failure (stops forced convection across cooling coils)"
+                >
+                  <Fan size={13} className={activeScenario === "fan_off" || selectedZone?.scenario === "fan_off" ? "text-white" : "text-amber-400"} />
+                  <span>{activeScenario === "fan_off" || selectedZone?.scenario === "fan_off" ? "Cooling Fan Off" : "Fan Off"}</span>
+                </button>
+
+                {/* 3. Sensor Failures */}
+                <button
+                  onClick={handleToggleSensorFailure}
+                  className={`px-2.5 py-1 text-[11px] font-mono font-semibold rounded-lg border transition cursor-pointer flex items-center gap-1.5 ${
+                    activeScenario === "sensor_anomaly" || selectedZone?.scenario === "sensor_anomaly"
+                      ? "bg-purple-600 text-white font-bold border-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.5)] animate-pulse"
+                      : "bg-purple-950/30 text-purple-300 border-purple-500/40 hover:bg-purple-900/40 hover:text-white"
+                  }`}
+                >
+                  <ZapOff size={13} />
+                  <span>{activeScenario === "sensor_anomaly" || selectedZone?.scenario === "sensor_anomaly" ? "Sensor Fault Active" : "Sensor Fails"}</span>
+                </button>
+
+                {/* 4. Sensor Burning / Fire */}
+                <button
+                  onClick={handleToggleSensorBurning}
+                  className={`px-2.5 py-1 text-[11px] font-mono font-semibold rounded-lg border transition cursor-pointer flex items-center gap-1.5 ${
+                    activeScenario === "fire_runaway" || activeScenario === "sensor_burn" || selectedZone?.scenario === "fire_runaway"
+                      ? "bg-red-600 text-white font-bold border-red-400 shadow-[0_0_16px_rgba(239,68,68,0.7)] animate-bounce"
+                      : "bg-red-950/30 text-red-300 border-red-500/40 hover:bg-red-900/40 hover:text-white"
+                  }`}
+                >
+                  <Flame size={13} className={activeScenario === "fire_runaway" || selectedZone?.scenario === "fire_runaway" ? "text-amber-200" : "text-red-400"} />
+                  <span>{activeScenario === "fire_runaway" || activeScenario === "sensor_burn" || selectedZone?.scenario === "fire_runaway" ? "🔥 Sensor Burning!" : "Sensor Burning"}</span>
+                </button>
+
+                {/* 5. Cooling Degradation */}
+                <button
+                  onClick={handleToggleDegradation}
+                  className={`px-2.5 py-1 text-[11px] font-mono font-semibold rounded-lg border transition cursor-pointer flex items-center gap-1.5 ${
+                    activeScenario === "cooling_degradation" || selectedZone?.scenario === "cooling_degradation"
+                      ? "bg-cyan-500 text-black font-bold border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.5)]"
+                      : "bg-cyan-950/30 text-cyan-300 border-cyan-500/40 hover:bg-cyan-900/40 hover:text-white"
+                  }`}
+                >
+                  <ThermometerSnowflake size={13} />
+                  <span>{activeScenario === "cooling_degradation" || selectedZone?.scenario === "cooling_degradation" ? "Degraded (45% Loss)" : "Degrade 45%"}</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 ml-auto flex-wrap">
+                {/* Telemetry Sensor Feed Mode */}
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-cyan-500/30 bg-cyan-950/40 text-[11px] font-mono">
+                  <Database size={13} className="text-cyan-400" />
+                  <span className="text-slate-400">DATA FEED:</span>
+                  <button
+                    onClick={() =>
+                      handleToggleTelemetrySource(
+                        telemetrySourcePoll.data?.source === "dataset" ? "simulator" : "dataset"
+                      )
+                    }
+                    className="font-bold text-cyan-300 hover:text-cyan-100 flex items-center gap-1 cursor-pointer transition"
+                    title="Click to toggle between Pre-recorded Sensor Dataset Playback and Live Feeder API / Simulator"
+                  >
+                    <span>
+                      {telemetrySourcePoll.data?.source === "dataset"
+                        ? `Dataset Playback (${telemetrySourcePoll.data.dataset_name ?? "test_dataset.csv"} - Row ${
+                            telemetrySourcePoll.data.playback_index
+                          }/${telemetrySourcePoll.data.total_timestamps})`
+                        : "Live IoT / Simulator"}
+                    </span>
+                    <RefreshCw size={10} className="text-cyan-400/80" />
+                  </button>
+                </div>
+
+                {/* Reset All Baseline */}
+                <button
+                  onClick={handleResetAll}
+                  className="px-2.5 py-1 text-[11px] font-mono font-semibold rounded-lg border bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800 hover:text-white transition cursor-pointer flex items-center gap-1.5"
+                  title="Reset all systems, sensors, compressors and doors to nominal"
+                >
+                  <RotateCcw size={13} className="text-cyan-400" />
+                  <span>Reset Baseline</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 3D Canvas Viewport */}
+            <div className="relative" style={{ height: is3DExpanded ? "740px" : "610px" }}>
               <Canvas shadows gl={{ antialias: true, alpha: true }} dpr={[1, 2]}>
                 <Suspense fallback={null}>
                   <color attach="background" args={["#060d17"]} />
-                  <fog attach="fog" args={["#060d17", 18, 38]} />
+                  <fog attach="fog" args={["#060d17", 18, 42]} />
                   <ColdStorageScene
                     zones={allZones.length > 0 ? allZones : zones ?? []}
                     selectedZoneId={selectedZoneId}
@@ -2916,62 +3798,34 @@ export default function DigitalTwin() {
                 </Suspense>
               </Canvas>
 
-              {/* 🧭 GOOGLE MAPS STYLE BOTTOM DOCKED PLACE BAR (NON-BLOCKING!) */}
-              {isNavigating && selectedConfig && (
-                <GoogleMapsBottomDock
-                  zoneConfig={selectedConfig}
-                  currentTemp={currentZoneTemp}
-                  simulationState={simState}
-                  activeZone={selectedZone}
-                  onExitNavigation={handleExitNavigation}
-                  onCycleNextZone={handleCycleNextZone}
-                  onWalkInside={handleWalkInside}
-                  onRecenter={handleRecenter}
-                />
-              )}
+              {/* Bottom-Left Sensor Legend (Matching Reference Image) */}
+              <div className="absolute bottom-3 left-3 z-20 pointer-events-none">
+                <div className="rounded-xl border border-white/10 bg-slate-950/85 px-3 py-2 text-[11px] font-mono backdrop-blur-md shadow-xl flex flex-col gap-1 text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-cyan-400" />
+                    <span>Temperature Sensor</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                    <span>Humidity Sensor</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-blue-400" />
+                    <span>Airflow Sensor</span>
+                  </div>
+                </div>
+              </div>
 
-              {/* 🗺️ GOOGLE MAPS FLOATING CONTROLS (Right Side of Map) */}
-              <div className="absolute top-3 right-3 z-30 flex flex-col items-center gap-1.5 pointer-events-auto">
-                {/* Compass Button */}
+              {/* Floating Camera Controls on Right */}
+              <div className="absolute top-4 right-3 z-30 flex flex-col items-center gap-1.5 pointer-events-auto">
                 <button
-                  onClick={handleResetNorth}
+                  onClick={() => setCameraPreset("isometric")}
                   className="w-8 h-8 rounded-lg bg-slate-900/90 border border-white/20 text-white flex items-center justify-center hover:bg-slate-800 transition-all shadow-xl cursor-pointer"
-                  title="Reset North Orientation"
+                  title="Reset Camera View"
                 >
-                  <Compass
-                    size={16}
-                    className="text-cyan-400 transition-transform duration-200"
-                    style={{ transform: `rotate(${-compassHeading}deg)` }}
-                  />
+                  <Home size={15} className="text-cyan-400" />
                 </button>
 
-                {/* 3D / 2D Switcher */}
-                <button
-                  onClick={() => setCameraPreset(cameraPreset === "top" ? "isometric" : "top")}
-                  className={`w-8 h-8 rounded-lg border text-[10px] font-mono font-bold flex items-center justify-center transition-all shadow-xl cursor-pointer ${
-                    cameraPreset === "top"
-                      ? "bg-cyan-500/30 text-cyan-200 border-cyan-400"
-                      : "bg-slate-900/90 text-fg-muted border-white/20 hover:text-white"
-                  }`}
-                  title="Toggle 2D / 3D Mode"
-                >
-                  {cameraPreset === "top" ? "2D" : "3D"}
-                </button>
-
-                {/* Eye-level Aisle Walking View */}
-                <button
-                  onClick={() => setCameraPreset("aisle-walk")}
-                  className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all shadow-xl cursor-pointer ${
-                    cameraPreset === "aisle-walk"
-                      ? "bg-cyan-500/30 text-cyan-200 border-cyan-400"
-                      : "bg-slate-900/90 text-fg-muted border-white/20 hover:text-white"
-                  }`}
-                  title="Eye-Level Aisle View"
-                >
-                  <Footprints size={15} />
-                </button>
-
-                {/* Zoom In (+) */}
                 <button
                   onClick={() => handleZoom(1)}
                   className="w-8 h-8 rounded-t-lg bg-slate-900/90 border border-white/20 text-white flex items-center justify-center hover:bg-slate-800 transition-all shadow-xl cursor-pointer mt-1"
@@ -2980,7 +3834,6 @@ export default function DigitalTwin() {
                   <Plus size={15} />
                 </button>
 
-                {/* Zoom Out (-) */}
                 <button
                   onClick={() => handleZoom(-1)}
                   className="w-8 h-8 rounded-b-lg bg-slate-900/90 border-x border-b border-white/20 text-white flex items-center justify-center hover:bg-slate-800 transition-all shadow-xl cursor-pointer"
@@ -2988,418 +3841,1727 @@ export default function DigitalTwin() {
                 >
                   <Minus size={15} />
                 </button>
+
+                <button
+                  onClick={handleResetNorth}
+                  className="w-8 h-8 rounded-lg bg-slate-900/90 border border-white/20 text-white flex items-center justify-center hover:bg-slate-800 transition-all shadow-xl cursor-pointer mt-1"
+                  title="Reset Orientation"
+                >
+                  <RotateCw size={15} className="text-cyan-400" />
+                </button>
               </div>
-
-              {/* Bottom Radar Minimap */}
-              <RadarMinimap
-                selectedZoneId={selectedZoneId}
-                onSelectZone={handleZoneSelect}
-                simulationState={simState}
-              />
-
-              {/* In-Canvas Notification Floater */}
-              {hasAnyAlert && (
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex flex-wrap gap-2 pointer-events-none z-20">
-                  {simState.doorOpen && (
-                    <span className="pointer-events-auto rounded-lg border border-amber-500/80 bg-amber-950/95 px-3 py-1.5 text-xs font-bold text-amber-200 animate-pulse backdrop-blur-md shadow-xl flex items-center gap-1.5">
-                      <DoorOpen size={14} /> DOCK DOOR OPEN: +26°C INGRESS ({Math.floor(doorOpenSeconds / 60)}m {doorOpenSeconds % 60}s)
-                    </span>
-                  )}
-                  {!simState.compressorRunning && (
-                    <span className="pointer-events-auto rounded-lg border border-rose-500/80 bg-rose-950/95 px-3 py-1.5 text-xs font-bold text-rose-200 animate-pulse backdrop-blur-md shadow-xl flex items-center gap-1.5">
-                      <ShieldAlert size={14} /> COMPRESSOR TRIP: ACTIVE COOLING CEASED
-                    </span>
-                  )}
-                  {simState.burnedSensors.size > 0 && (
-                    <span className="pointer-events-auto rounded-lg border border-red-500/80 bg-red-950/95 px-3 py-1.5 text-xs font-bold text-red-200 animate-pulse backdrop-blur-md shadow-xl flex items-center gap-1.5">
-                      <Flame size={14} /> SENSOR BURN: TS-A1 THERMAL RUNAWAY
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
-          </Card>
+          </div>
         </div>
 
-        {/* Right Column: Dynamic Reaction Inspector */}
-        <div className="xl:col-span-4 space-y-4">
-          <Card
-            title={
-              <div className="flex items-center justify-between w-full">
-                <span className="flex items-center gap-1.5">
-                  <Layers size={14} className="text-cyan-400" />
-                  {selectedConfig.name} Live Telemetry
-                </span>
-                <span className="text-[10px] font-mono text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/30">
-                  {selectedConfig.product}
-                </span>
+        {/* RIGHT (col-span-4): ZONE TELEMETRY & OPERATIONS CARD */}
+        <div className={is3DExpanded ? "xl:col-span-12" : "xl:col-span-4"}>
+          <div className="rounded-2xl border border-white/10 bg-[#0B1424]/95 p-4 shadow-2xl backdrop-blur-xl flex flex-col justify-between h-full space-y-4">
+            {/* Header: Zone Title + Status Badge */}
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Layers size={17} className="text-cyan-400" />
+                <h3 className="text-base font-bold text-white tracking-tight">
+                  {selectedConfig.name} – Telemetry & Operations
+                </h3>
               </div>
-            }
-          >
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg border border-cyan-500/20 bg-slate-900/80 p-2.5">
-                  <div className="text-[10px] text-fg-muted flex items-center gap-1">
-                    <Thermometer size={12} className="text-cyan-400" /> Current Temp
-                  </div>
-                  <div className={`font-mono text-xl font-bold mt-0.5 ${
-                    currentZoneTemp > selectedConfig.upperLimit ? "text-rose-400" :
-                    currentZoneTemp > selectedConfig.upperLimit - 1.5 ? "text-amber-400" : "text-fg"
-                  }`}>
-                    {fmtTemp(currentZoneTemp)}
-                  </div>
-                  <div className="text-[9px] text-fg-faint font-mono">Safe: {selectedConfig.tempRange}</div>
-                </div>
-
-                <div className="rounded-lg border border-cyan-500/20 bg-slate-900/80 p-2.5">
-                  <div className="text-[10px] text-fg-muted flex items-center gap-1">
-                    <Droplets size={12} className="text-blue-400" /> Humidity
-                  </div>
-                  <div className="font-mono text-xl font-bold text-fg mt-0.5">
-                    {selectedZone?.humidity != null ? `${selectedZone.humidity.toFixed(0)}%` : "—%"}
-                  </div>
-                  <div className="text-[9px] text-fg-faint font-mono">Target: 45–70%</div>
-                </div>
-
-                <div className="rounded-lg border border-cyan-500/20 bg-slate-900/80 p-2.5">
-                  <div className="text-[10px] text-fg-muted flex items-center gap-1">
-                    <Zap size={12} className="text-amber-400" /> Power Load
-                  </div>
-                  <div className="font-mono text-xl font-bold text-fg mt-0.5">
-                    {selectedZone?.power_consumption_kw != null ? `${selectedZone.power_consumption_kw.toFixed(1)} kW` : "— kW"}
-                  </div>
-                  <div className="text-[9px] text-fg-faint font-mono">Load: {selectedZone?.compressor_load_pct != null ? `${Math.round(selectedZone.compressor_load_pct)}%` : "—"} · {simState.fansActive ? "Active" : "Halted"}</div>
-                </div>
-
-                <div className="rounded-lg border border-cyan-500/20 bg-slate-900/80 p-2.5">
-                  <div className="text-[10px] text-fg-muted flex items-center gap-1">
-                    <ShieldCheck size={12} className="text-emerald-400" /> Risk Level
-                  </div>
-                  <div className={`font-mono text-xl font-bold mt-0.5 ${
-                    riskAnalysis.category === "critical" ? "text-rose-400" :
-                    riskAnalysis.category === "warning" ? "text-amber-400" : "text-emerald-400"
-                  }`}>
-                    {riskAnalysis.score} / 100
-                  </div>
-                  <div className="text-[9px] text-fg-faint font-mono uppercase">{riskAnalysis.category} Risk</div>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* Stateful Door & Cooling Recovery Card */}
-          <Card
-            title={
-              <div className="flex items-center justify-between w-full">
-                <span className="flex items-center gap-1.5">
-                  <DoorOpen size={14} className={simState.doorOpen ? "text-rose-400" : simState.isRecovering ? "text-amber-400" : "text-emerald-400"} />
-                  Door State & Cooling Recovery
-                </span>
-                <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold border ${
+              <span
+                className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
                   simState.doorOpen
                     ? "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse"
                     : simState.isRecovering
                     ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
                     : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                }`}>
-                  {simState.doorOpen ? "OPEN (INGRESS)" : simState.isRecovering ? "SEALED (RECOVERING)" : "SEALED (NOMINAL)"}
+                }`}
+              >
+                {simState.doorOpen ? "● OPEN – INGRESS" : simState.isRecovering ? "● CLOSED – RECOVERING" : "● CLOSED – NORMAL"}
+              </span>
+            </div>
+
+            {/* 8 Metric Tiles Grid (2 cols x 4 rows) */}
+            <div className="grid grid-cols-2 gap-2.5">
+              {/* Tile 1: Temperature */}
+              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                    <Thermometer size={14} className="text-cyan-400" />
+                    <span>Temperature</span>
+                  </div>
+                  <DynamicSparkline data={tempHistory} color="#22D3EE" />
+                </div>
+                <div className="flex items-baseline justify-between mt-1">
+                  <div className="text-xl font-bold font-mono text-white">
+                    {fmtTemp(currentZoneTemp)}
+                  </div>
+                  {activeScenario !== "normal" && (
+                    <span
+                      className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border animate-pulse ${
+                        activeScenario === "fire_runaway" || activeScenario === "sensor_burn"
+                          ? "bg-red-500/20 text-red-300 border-red-500/40"
+                          : activeScenario === "compressor_failure"
+                          ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                          : activeScenario === "door_open"
+                          ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                          : activeScenario === "sensor_anomaly"
+                          ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                          : "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
+                      }`}
+                    >
+                      {activeScenario === "fire_runaway" || activeScenario === "sensor_burn"
+                        ? "+4.2°C/hr"
+                        : activeScenario === "compressor_failure"
+                        ? "+1.8°C/hr"
+                        : activeScenario === "door_open"
+                        ? "+2.8°C/hr"
+                        : activeScenario === "sensor_anomaly"
+                        ? "±4.5°C jitter"
+                        : "+0.8°C/hr"}
+                    </span>
+                  )}
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  Target: {selectedConfig.tempRange}
+                </div>
+              </div>
+
+              {/* Tile 2: Relative Humidity */}
+              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                    <Droplets size={14} className="text-blue-400" />
+                    <span>Relative Humidity</span>
+                  </div>
+                  <DynamicSparkline data={humidityHistory} color="#38BDF8" />
+                </div>
+                <div className="text-xl font-bold font-mono text-white mt-1">
+                  {simState.doorOpen
+                    ? "78% RH"
+                    : activeScenario === "sensor_anomaly"
+                    ? "— (Dropout)"
+                    : selectedZone?.humidity != null
+                    ? `${Math.round(selectedZone.humidity)}%`
+                    : "—"}
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  {simState.doorOpen ? "Ambient Latent Rush" : "Target: 45% – 70%"}
+                </div>
+              </div>
+
+              {/* Tile 3: Power Load */}
+              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                    <Zap size={14} className="text-amber-400" />
+                    <span>Power Load</span>
+                  </div>
+                  <DynamicSparkline data={powerHistory} color="#10B981" />
+                </div>
+                <div className="text-xl font-bold font-mono text-white mt-1">
+                  {!simState.compressorRunning
+                    ? "0.45 kW"
+                    : activeScenario === "cooling_degradation"
+                    ? "4.60 kW"
+                    : selectedZone?.power_consumption_kw != null
+                    ? `${selectedZone.power_consumption_kw.toFixed(1)} kW`
+                    : "— kW"}
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
+                  {!simState.compressorRunning
+                    ? "Load: 0% · TRIPPED / OFFLINE"
+                    : activeScenario === "cooling_degradation"
+                    ? "Load: 100% · STRAIN (COP -45%)"
+                    : `Load: ${selectedZone?.compressor_load_pct != null ? `${Math.round(selectedZone.compressor_load_pct)}%` : "78%"} · Compressor: ON`}
+                </div>
+              </div>
+
+              {/* Tile 4: Sensor Probes */}
+              {(() => {
+                const targetSensorId = `${selectedZoneId.replace("zone-", "TS-").toUpperCase()}1`;
+                const isBurned = simState.burnedSensors.has(targetSensorId) || activeScenario === "fire_runaway" || activeScenario === "sensor_burn";
+                const isFailed = simState.failedSensors.has(targetSensorId) || activeScenario === "sensor_anomaly";
+                const isAnomaly = selectedZone?.sensor_health && selectedZone.sensor_health !== "healthy";
+                const probesOnline = isBurned || isFailed ? 1 : 2;
+                const isDegraded = probesOnline < 2 || isAnomaly;
+
+                return (
+                  <div
+                    className={`rounded-xl border p-3 flex flex-col justify-between transition-all ${
+                      isBurned
+                        ? "bg-red-950/40 border-red-500/60"
+                        : isFailed
+                        ? "bg-purple-950/40 border-purple-500/60"
+                        : "border-white/5 bg-slate-900/80"
+                    }`}
+                  >
+                    <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                      <Radio size={14} className={isBurned ? "text-red-400" : isDegraded ? "text-amber-400" : "text-emerald-400"} />
+                      <span>Sensor Probes</span>
+                    </div>
+                    <div className={`text-lg font-bold font-mono mt-1 flex items-center gap-1.5 ${isBurned ? "text-red-400" : isDegraded ? "text-amber-400" : "text-emerald-400"}`}>
+                      <span>{probesOnline} / 2</span>
+                      <span className="text-xs text-white">{isBurned ? "Fire Hazard" : isDegraded ? "Degraded" : "Online"}</span>
+                      {isBurned ? (
+                        <Flame size={14} className="text-red-400 animate-pulse" />
+                      ) : isDegraded ? (
+                        <AlertTriangle size={14} className="text-amber-400" />
+                      ) : (
+                        <CheckCircle2 size={14} className="text-emerald-400" />
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
+                      {isBurned
+                        ? `${targetSensorId} Thermal Runaway`
+                        : isFailed
+                        ? `${targetSensorId} Outlier / Dropout`
+                        : selectedZone?.sensor_issues?.[0]?.detail ??
+                          selectedZone?.sensor_issues?.[0]?.type ??
+                          "All sensors healthy"}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tile 5: Residual Rise ΔT */}
+              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                    <Wind size={14} className="text-cyan-400" />
+                    <span>Residual Rise ΔT</span>
+                  </div>
+                  <DynamicSparkline data={residualHistory} color="#22D3EE" />
+                </div>
+                <div className="text-xl font-bold font-mono text-amber-300 mt-1">
+                  +{simState.doorOpen ? "1.8" : (selectedZone?.residual_rise_predicted ?? simState.residualRise ?? 0).toFixed(1)}°C
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  Accumulated warm air
+                </div>
+              </div>
+
+              {/* Tile 6: Predicted Peak Temp */}
+              {(() => {
+                const simulatedPeak =
+                  activeScenario === "fire_runaway" || simState.burnedSensors.size > 0
+                    ? selectedConfig.upperLimit + 7.8
+                    : simState.doorOpen
+                    ? selectedConfig.upperLimit + 3.4
+                    : !simState.compressorRunning
+                    ? selectedConfig.upperLimit + 4.9
+                    : activeScenario === "cooling_degradation"
+                    ? selectedConfig.upperLimit + 2.1
+                    : null;
+
+                const peakVal =
+                  simulatedPeak ??
+                  predictionOverviewPoll.data?.horizons?.["30"]?.predicted_peak_temperature ??
+                  selectedZone?.peak_temp_predicted ??
+                  currentZoneTemp;
+
+                const isBreach = peakVal > selectedConfig.upperLimit;
+
+                return (
+                  <div
+                    className={`rounded-xl border p-3 flex flex-col justify-between ${
+                      isBreach ? "bg-rose-950/40 border-rose-500/50" : "border-white/5 bg-slate-900/80"
+                    }`}
+                  >
+                    <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                      <Thermometer size={14} className="text-rose-400" />
+                      <span>Predicted Peak Temp</span>
+                    </div>
+                    <div className="text-xl font-bold font-mono text-rose-300 mt-1">
+                      {fmtTemp(peakVal)}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                      {isBreach ? "⚠️ Excursion Breach Imminent" : "Thermal inertia peak"}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tile 7: Est. Recovery Duration */}
+              {(() => {
+                const simRec =
+                  activeScenario === "fire_runaway" || simState.burnedSensors.size > 0
+                    ? 55
+                    : simState.doorOpen
+                    ? 25 + Math.floor(doorOpenSeconds / 10)
+                    : !simState.compressorRunning
+                    ? 40
+                    : activeScenario === "cooling_degradation"
+                    ? 32
+                    : null;
+
+                const recMins = simRec ?? selectedZone?.recovery_time_minutes ?? simState.recoveryMinutes ?? 0;
+
+                return (
+                  <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                        <Clock size={14} className="text-cyan-400" />
+                        <span>Est. Recovery Duration</span>
+                      </div>
+                      <DynamicSparkline data={recoveryHistory} color="#A855F7" />
+                    </div>
+                    <div className="text-xl font-bold font-mono text-cyan-300 mt-1">
+                      ~ {Math.round(recMins)} min
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                      Post-incident cooling
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tile 8: 24h Ingress Time */}
+              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+                <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                  <Calendar size={14} className="text-blue-400" />
+                  <span>24h Ingress Time</span>
+                </div>
+                <div className="text-xl font-bold font-mono text-white mt-1">
+                  {(selectedZone?.cumulative_open_minutes_24h ?? 0).toFixed(0)} min
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  {selectedZone?.door_events_count_24h ?? 0} events recorded
+                </div>
+              </div>
+            </div>
+
+            {/* Cooling Recovery Progress Bar */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="text-slate-300 font-medium">Cooling Recovery Progress</span>
+                <span className="font-bold text-emerald-400">
+                  {Math.round(selectedZone?.recovery_progress_pct ?? simState.recoveryProgressPct ?? 100)}%
                 </span>
               </div>
-            }
-          >
-            <div className="space-y-2.5 text-xs">
-              <div className="grid grid-cols-2 gap-2 font-mono">
-                <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
-                  <div className="text-[10px] text-fg-muted">Residual Rise ΔT</div>
-                  <div className="text-sm font-bold text-amber-300 mt-0.5">
-                    +{(selectedZone?.residual_rise_predicted ?? simState.residualRise ?? 0).toFixed(1)}°C
-                  </div>
-                  <div className="text-[9px] text-fg-faint">trapped warm air</div>
-                </div>
-
-                <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
-                  <div className="text-[10px] text-fg-muted">Predicted Peak</div>
-                  <div className="text-sm font-bold text-rose-300 mt-0.5">
-                    {selectedZone?.peak_temp_predicted != null
-                      ? fmtTemp(selectedZone.peak_temp_predicted)
-                      : simState.peakTemp != null
-                      ? fmtTemp(simState.peakTemp)
-                      : fmtTemp(currentZoneTemp)}
-                  </div>
-                  <div className="text-[9px] text-fg-faint">before cooling dominates</div>
-                </div>
-
-                <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
-                  <div className="text-[10px] text-fg-muted">Est. Recovery Time</div>
-                  <div className="text-sm font-bold text-cyan-300 mt-0.5">
-                    ~{Math.round(selectedZone?.recovery_time_minutes ?? simState.recoveryMinutes ?? 0)} min
-                  </div>
-                  <div className="text-[9px] text-fg-faint">exponential cooldown</div>
-                </div>
-
-                <div className="rounded-lg bg-slate-900/80 border border-white/5 p-2">
-                  <div className="text-[10px] text-fg-muted">24h Door Ingress</div>
-                  <div className="text-sm font-bold text-white mt-0.5">
-                    {(selectedZone?.cumulative_open_minutes_24h ?? 0).toFixed(0)} min
-                  </div>
-                  <div className="text-[9px] text-fg-faint">{selectedZone?.door_events_count_24h ?? 0} events logged</div>
-                </div>
-              </div>
-
-              {/* Recovery Progress Bar */}
-              <div>
-                <div className="flex items-center justify-between text-[10px] font-mono text-fg-muted mb-1">
-                  <span>Cooling Recovery Progress</span>
-                  <span className="font-bold text-cyan-300">{Math.round(selectedZone?.recovery_progress_pct ?? simState.recoveryProgressPct ?? 100)}%</span>
-                </div>
-                <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-amber-500 via-cyan-500 to-emerald-400 transition-all duration-500"
-                    style={{ width: `${Math.min(100, Math.max(5, selectedZone?.recovery_progress_pct ?? simState.recoveryProgressPct ?? 100))}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Door Interactive Actions */}
-              <div className="flex items-center gap-1.5 pt-1">
-                <button
-                  onClick={() => api.setDoor(selectedZoneId, "open", 120).then(handleToggleDoor)}
-                  className="flex-1 py-1.5 px-2 rounded-lg border border-amber-500/40 bg-amber-950/40 hover:bg-amber-950/70 text-amber-300 text-[10px] font-mono font-bold transition cursor-pointer"
-                >
-                  🚪 Open (2m)
-                </button>
-                <button
-                  onClick={() => api.setDoor(selectedZoneId, "open", 300).then(handleToggleDoor)}
-                  className="flex-1 py-1.5 px-2 rounded-lg border border-rose-500/40 bg-rose-950/40 hover:bg-rose-950/70 text-rose-300 text-[10px] font-mono font-bold transition cursor-pointer"
-                >
-                  🚪 Open (5m)
-                </button>
-                <button
-                  onClick={() => api.setDoor(selectedZoneId, "closed").then(handleToggleDoor)}
-                  className="flex-1 py-1.5 px-2 rounded-lg border border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-950/70 text-emerald-300 text-[10px] font-mono font-bold transition cursor-pointer"
-                >
-                  ✓ Close Door
-                </button>
-              </div>
-            </div>
-          </Card>
-
-          {/* Explainable Risk Factor Breakdown Card */}
-          <Card
-            title={
-              <div className="flex items-center gap-2">
-                <ShieldAlert size={14} className={riskAnalysis.category === "critical" ? "text-rose-400" : "text-amber-400"} />
-                <span>Explainable Risk Breakdown</span>
-              </div>
-            }
-          >
-            <div className="space-y-2">
-              <div className="text-xs text-fg-muted">
-                {riskAnalysis.factors.length > 0 ? (
-                  <span>The following factors directly contributed to the risk increase:</span>
-                ) : (
-                  <span className="text-emerald-400">✓ All risk indicators nominal. No thermal risk factors active.</span>
-                )}
-              </div>
-
-              {riskAnalysis.factors.map((factor, idx) => (
+              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/60">
                 <div
-                  key={idx}
-                  className="rounded-lg border border-rose-500/30 bg-rose-950/20 p-2 text-xs font-mono space-y-1"
-                >
-                  <div className="flex items-center justify-between text-rose-300 font-bold">
-                    <span>{factor.label}</span>
-                    <span className="text-rose-400">+{factor.points} pts</span>
-                  </div>
-                  <div className="text-[10px] text-fg-faint">{factor.detail}</div>
-                </div>
-              ))}
+                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, Math.max(5, selectedZone?.recovery_progress_pct ?? simState.recoveryProgressPct ?? 100))}%`,
+                  }}
+                />
+              </div>
             </div>
-          </Card>
 
-          {/* Actionable Operator Recommendation Card */}
-          <Card
-            title={
-              <div className="flex items-center gap-2">
-                <CheckCircle2 size={14} className="text-cyan-400" />
-                <span>Recommended Operator Action</span>
-              </div>
-            }
-          >
-            <div className="space-y-3">
-              <div className="rounded-lg border border-cyan-500/30 bg-slate-900/90 p-3 text-xs">
-                <p className="text-fg font-medium leading-relaxed">
-                  {riskAnalysis.recommendation}
-                </p>
+            {/* Real-Time Situations & Fault Injection Control Grid */}
+            <div className="pt-2 border-t border-white/10 space-y-2">
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="text-slate-300 font-bold flex items-center gap-1.5">
+                  <Zap size={13} className="text-amber-400" />
+                  <span>Simulate Situations</span>
+                </span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    activeScenario === "normal"
+                      ? "bg-emerald-950/60 border-emerald-500/40 text-emerald-300"
+                      : "bg-red-950/60 border-red-500/50 text-red-300 animate-pulse"
+                  }`}
+                >
+                  {activeScenario === "normal" ? "Nominal Baseline" : activeScenario.toUpperCase().replace("_", " ")}
+                </span>
               </div>
 
-              {riskAnalysis.actionLabel && riskAnalysis.onAction && (
+              {/* Ingress Controls */}
+              <div className="grid grid-cols-3 gap-1.5">
                 <button
-                  onClick={riskAnalysis.onAction}
-                  className="w-full py-2.5 px-3 rounded-lg border border-emerald-500/60 bg-emerald-950/60 text-emerald-200 hover:bg-emerald-950/90 font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg animate-pulse"
+                  onClick={() => handleSimulateDoor(2)}
+                  className={`py-1.5 px-2 rounded-lg border text-[11px] font-mono font-semibold transition flex items-center justify-center gap-1 cursor-pointer ${
+                    (simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a")) &&
+                    doorSimulations[selectedZoneId || "zone-a"]?.durationMinutes === 2
+                      ? "border-amber-500 bg-amber-950 text-amber-200"
+                      : "border-white/10 bg-slate-900/80 hover:bg-slate-800 text-slate-300"
+                  }`}
+                  title="Simulate 2-minute door ingress"
                 >
-                  <Check size={14} />
-                  {riskAnalysis.actionLabel}
+                  <DoorOpen size={12} className="text-amber-400" />
+                  <span>
+                    {(simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a")) &&
+                    doorSimulations[selectedZoneId || "zone-a"]?.durationMinutes === 2
+                      ? `2m (${fmtDoorDuration(doorOpenSeconds)})`
+                      : "Door (2m)"}
+                  </span>
                 </button>
-              )}
+
+                <button
+                  onClick={() => handleSimulateDoor(5)}
+                  className={`py-1.5 px-2 rounded-lg border text-[11px] font-mono font-semibold transition flex items-center justify-center gap-1 cursor-pointer ${
+                    (simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a")) &&
+                    doorSimulations[selectedZoneId || "zone-a"]?.durationMinutes === 5
+                      ? "border-amber-500 bg-amber-950 text-amber-200"
+                      : "border-white/10 bg-slate-900/80 hover:bg-slate-800 text-slate-300"
+                  }`}
+                  title="Simulate 5-minute door ingress"
+                >
+                  <DoorOpen size={12} className="text-amber-400" />
+                  <span>
+                    {(simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a")) &&
+                    doorSimulations[selectedZoneId || "zone-a"]?.durationMinutes === 5
+                      ? `5m (${fmtDoorDuration(doorOpenSeconds)})`
+                      : "Door (5m)"}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => handleSimulateDoor()}
+                  className={`py-1.5 px-2 rounded-lg border text-[11px] font-mono font-semibold transition flex items-center justify-center gap-1 cursor-pointer ${
+                    simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a")
+                      ? "border-emerald-500/80 bg-emerald-950/60 text-emerald-300"
+                      : "border-white/10 bg-slate-900/80 hover:bg-slate-800 text-slate-300"
+                  }`}
+                  title={simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a") ? "Close and seal door" : "Open door continuously"}
+                >
+                  {simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a") ? (
+                    <Check size={12} className="text-emerald-400" />
+                  ) : (
+                    <DoorOpen size={12} className="text-amber-400" />
+                  )}
+                  <span>{simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a") ? "Seal Door" : "Continuous"}</span>
+                </button>
+              </div>
+
+              {/* Equipment & Fault Injection Grid */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  onClick={handleToggleCompressor}
+                  className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    !simState.compressorRunning
+                      ? "border-rose-500 bg-rose-950/80 text-rose-200 shadow-md animate-pulse"
+                      : "border-rose-500/30 bg-rose-950/20 hover:bg-rose-900/40 text-rose-300"
+                  }`}
+                >
+                  <PowerOff size={13} className={!simState.compressorRunning ? "text-rose-200" : "text-rose-400"} />
+                  <span>{!simState.compressorRunning ? "Restore Compressor" : "Trip Compressor"}</span>
+                </button>
+
+                <button
+                  onClick={handleToggleSensorFailure}
+                  className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly"
+                      ? "border-purple-500 bg-purple-950/80 text-purple-200 shadow-md animate-pulse"
+                      : "border-purple-500/30 bg-purple-950/20 hover:bg-purple-900/40 text-purple-300"
+                  }`}
+                >
+                  <ZapOff size={13} className="text-purple-400" />
+                  <span>{simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly" ? "Clear Sensor Fault" : "Sensor Fails"}</span>
+                </button>
+
+                <button
+                  onClick={handleToggleSensorBurning}
+                  className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    simState.burnedSensors.size > 0 || activeScenario === "fire_runaway" || activeScenario === "sensor_burn"
+                      ? "border-red-500 bg-red-950/90 text-red-200 shadow-[0_0_15px_rgba(239,68,68,0.5)] animate-pulse"
+                      : "border-red-500/30 bg-red-950/20 hover:bg-red-900/40 text-red-300"
+                  }`}
+                >
+                  <Flame size={13} className="text-red-400" />
+                  <span>{simState.burnedSensors.size > 0 || activeScenario === "fire_runaway" || activeScenario === "sensor_burn" ? "Extinguish Fire" : "Sensor Burning"}</span>
+                </button>
+
+                <button
+                  onClick={handleToggleDegradation}
+                  className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    activeScenario === "cooling_degradation"
+                      ? "border-cyan-500 bg-cyan-950/80 text-cyan-200 shadow-md"
+                      : "border-cyan-500/30 bg-cyan-950/20 hover:bg-cyan-900/40 text-cyan-300"
+                  }`}
+                >
+                  <ThermometerSnowflake size={13} className="text-cyan-400" />
+                  <span>{activeScenario === "cooling_degradation" ? "Restore COP" : "Degrade 45%"}</span>
+                </button>
+              </div>
+
+              {/* Full Reset Baseline */}
+              <button
+                onClick={handleResetAll}
+                className="w-full py-1.5 px-3 rounded-xl border border-slate-700 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-mono font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              >
+                <RotateCcw size={13} className="text-cyan-400" />
+                <span>Reset All Systems to Nominal</span>
+              </button>
             </div>
-          </Card>
+          </div>
         </div>
       </div>
 
-      {/* BOTTOM ANALYTICS & FORECASTING GRID */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {/* AI Excursion Predictive Horizon */}
-        <Card
-          title={
-            <div className="flex items-center gap-1.5">
-              <TrendingUp size={14} className="text-cyan-400" />
-              <span>AI Forecast (30m Horizon)</span>
+      {/* ═══════════════════════════════════════════════════════════════════
+          MIDDLE SECTION: LIVE INCIDENT IMPACT ASSESSMENT & RESPONSE SOP PLAYBOOK
+          (Dynamic real-time cascading impact across Thermal, Refrigeration, Telemetry, and Inventory Assets)
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div className="rounded-2xl border border-white/10 bg-[#0B1424]/95 p-5 shadow-2xl backdrop-blur-xl space-y-4">
+        {/* Header: Title, Scenario Badge, Risk Score, and Quick Action */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-lg ${
+                riskAnalysis.score >= 70
+                  ? "bg-rose-500/20 border-rose-500/50 text-rose-400 shadow-rose-500/20 animate-pulse"
+                  : riskAnalysis.score >= 35
+                  ? "bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-amber-500/20"
+                  : "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-emerald-500/20"
+              }`}
+            >
+              {riskAnalysis.score >= 70 ? (
+                <ShieldAlert size={22} />
+              ) : riskAnalysis.score >= 35 ? (
+                <AlertTriangle size={20} />
+              ) : (
+                <ShieldCheck size={22} />
+              )}
             </div>
-          }
-          actions={
-            <span className="text-[10px] font-mono text-cyan-300">
-              {selectedConfig.name}
-            </span>
-          }
-        >
-          <div className="h-28 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={forecastData} margin={{ top: 5, right: 5, left: -22, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="minute" tick={{ fontSize: 9 }} stroke="#475569" />
-                <YAxis
-                  tick={{ fontSize: 9 }}
-                  stroke="#475569"
-                  domain={[selectedConfig.lowerLimit - 2, selectedConfig.upperLimit + 3]}
-                  tickFormatter={(v) => `${v}°C`}
-                />
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (active && payload?.length) {
-                      return (
-                        <div className="rounded border border-white/10 bg-slate-900 p-1.5 text-[10px] font-mono shadow-xl">
-                          <div className="text-cyan-400 font-bold">{payload[0]?.payload?.minute} Projected</div>
-                          <div className="text-fg">{fmtTemp(payload[0]?.value as number)}</div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <ReferenceLine
-                  y={selectedConfig.upperLimit}
-                  stroke="#ef4444"
-                  strokeDasharray="3 3"
-                  label={{ value: "Upper Limit", fill: "#ef4444", fontSize: 8, position: "top" }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="temperature"
-                  stroke="#22d3ee"
-                  strokeWidth={2}
-                  dot={{ r: 2 }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-
-        {/* 2D Thermal Heatmap */}
-        <Card
-          title="Facility Thermal Floor"
-          icon={<Thermometer size={14} className="text-cyan-400" />}
-        >
-          <div className="space-y-2">
-            <div className="grid grid-cols-3 gap-1.5 text-center font-mono">
-              {ZONE_CONFIGS.map((cfg) => {
-                const temp = simState.zoneTemps[cfg.id] ?? cfg.targetTemp;
-                return (
-                  <div
-                    key={cfg.id}
-                    onClick={() => handleZoneSelect(cfg.id)}
-                    className={`p-2 rounded-lg border text-xs cursor-pointer transition-all hover:scale-102 ${
-                      temp > cfg.upperLimit
-                        ? "border-rose-500 bg-rose-950/40 text-rose-300"
-                        : temp > cfg.upperLimit - 1.5
-                        ? "border-amber-500 bg-amber-950/40 text-amber-300"
-                        : "border-cyan-500/30 bg-slate-900/60 text-cyan-300"
-                    }`}
-                  >
-                    <div className="text-[9px] text-fg-muted">{cfg.name}</div>
-                    <div className="font-bold text-sm mt-0.5">{fmtTemp(temp)}</div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex justify-between text-[8px] font-mono text-fg-faint pt-1">
-              <span>Deep Freeze: -20°C</span>
-              <span>Safe Band: 2°C - 5°C</span>
-              <span>Excursion: &gt;8°C</span>
-            </div>
-          </div>
-        </Card>
-
-        {/* Live Event Log */}
-        <Card
-          title="Hardware Event Stream"
-          icon={<Activity size={14} className="text-emerald-400" />}
-        >
-          <div className="h-28 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
-            {activityLog.map((event, i) => (
-              <div
-                key={i}
-                className="flex items-start gap-1.5 text-[10px] font-mono border-b border-white/5 pb-1 last:border-0"
-              >
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base font-bold text-white tracking-tight">
+                  Incident Impact Assessment & Response SOP Playbook
+                </h3>
                 <span
-                  className={`mt-1 h-1.5 w-1.5 rounded-full shrink-0 ${
-                    event.type === "critical"
-                      ? "bg-rose-500 animate-ping"
-                      : event.type === "warning"
-                      ? "bg-amber-500"
-                      : "bg-cyan-500"
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider border shadow-sm ${
+                    simState.doorOpen
+                      ? "bg-amber-500/20 text-amber-300 border-amber-500/50"
+                      : !simState.compressorRunning
+                      ? "bg-rose-500/20 text-rose-300 border-rose-500/50"
+                      : simState.burnedSensors.size > 0 || activeScenario === "fire_runaway" || activeScenario === "sensor_burn"
+                      ? "bg-red-500/20 text-red-300 border-red-500/50 animate-pulse"
+                      : simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly"
+                      ? "bg-purple-500/20 text-purple-300 border-purple-500/50"
+                      : activeScenario === "cooling_degradation"
+                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50"
+                      : "bg-emerald-500/20 text-emerald-300 border-emerald-500/50"
                   }`}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between text-[9px] text-fg-faint">
-                    <span>{event.zone}</span>
-                    <span>{event.time}</span>
-                  </div>
-                  <div className="text-fg truncate">{event.message}</div>
-                </div>
+                >
+                  {simState.doorOpen
+                    ? "Dock Door Ingress Active (+26°C)"
+                    : !simState.compressorRunning
+                    ? "Compressor Offline (Loss of Cooling)"
+                    : simState.burnedSensors.size > 0 || activeScenario === "fire_runaway" || activeScenario === "sensor_burn"
+                    ? "Thermal Runaway / Sensor Fire"
+                    : simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly"
+                    ? "Sensor Dropout / Stuck Reading"
+                    : activeScenario === "cooling_degradation"
+                    ? "Cooling COP Degraded 45%"
+                    : "Nominal Operating Baseline"}
+                </span>
               </div>
-            ))}
+              <p className="text-xs text-slate-400 mt-0.5">
+                Real-time multi-layer cascade analysis across thermal dynamics, plant telemetry, refrigeration strain, and inventory assets.
+              </p>
+            </div>
           </div>
-        </Card>
 
-        {/* Isolation Forest Diagnostic */}
-        <Card
-          title="Isolation Forest Diagnostics"
-          icon={<Cpu size={14} className="text-teal-400" />}
-        >
-          <div className="space-y-2 text-xs font-mono">
-            <div className="flex items-center justify-between">
-              <span className="text-fg-muted">Anomaly Detector:</span>
-              <span className="text-emerald-400 font-bold">Isolation Forest (v2.1)</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-fg-muted">Active Probes:</span>
-              <span>6 / 6 Online</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-fg-muted">Outlier Score:</span>
-              <span className={simState.burnedSensors.size > 0 ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
-                {simState.burnedSensors.size > 0 ? "0.98 (ANOMALY DETECTED)" : "0.04 (Optimal)"}
+          {/* Right Action & Risk Score */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Risk Score Pill */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-slate-900/80">
+              <span className="text-[11px] font-mono text-slate-400 uppercase">AI Risk Score</span>
+              <span
+                className={`text-sm font-mono font-black ${
+                  riskAnalysis.score >= 70
+                    ? "text-rose-400"
+                    : riskAnalysis.score >= 35
+                    ? "text-amber-400"
+                    : "text-emerald-400"
+                }`}
+              >
+                {Math.round(riskAnalysis.score)} / 100
+              </span>
+              <span
+                className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-bold uppercase ${
+                  riskAnalysis.score >= 70
+                    ? "bg-rose-500/20 text-rose-300"
+                    : riskAnalysis.score >= 35
+                    ? "bg-amber-500/20 text-amber-300"
+                    : "bg-emerald-500/20 text-emerald-300"
+                }`}
+              >
+                {riskAnalysis.category}
               </span>
             </div>
-            <div className="rounded border border-white/10 bg-slate-900/60 p-1.5 text-[9px] text-fg-faint">
-              {simState.burnedSensors.size > 0
-                ? "⚠ Sensor TS-A1 anomalous spike isolated by unsupervised model."
-                : "Continuous unsupervised drift & spike surveillance nominal."}
+
+            {/* Dynamic One-Click Mitigation Action */}
+            {riskAnalysis.actionLabel && riskAnalysis.onAction ? (
+              <button
+                onClick={riskAnalysis.onAction}
+                className="py-1.5 px-3.5 rounded-xl border border-cyan-400 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 text-xs font-mono font-bold transition flex items-center gap-1.5 shadow-[0_0_15px_rgba(6,182,212,0.3)] cursor-pointer"
+              >
+                <Sparkles size={13} className="text-cyan-300 animate-spin" />
+                <span>{riskAnalysis.actionLabel}</span>
+              </button>
+            ) : null}
+
+            {/* Quick Reset Baseline */}
+            <button
+              onClick={handleResetAll}
+              className="py-1.5 px-3 rounded-xl border border-slate-700 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-mono font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+              title="Reset all systems to nominal baseline"
+            >
+              <RotateCcw size={12} className="text-cyan-400" />
+              <span>Reset All</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Explainable AI Risk Factor Contributions */}
+        <div className="rounded-xl border border-white/5 bg-slate-950/60 p-3">
+          <div className="flex items-center justify-between text-xs font-mono text-slate-400 mb-2">
+            <span className="flex items-center gap-1.5 font-bold text-slate-300">
+              <Cpu size={14} className="text-cyan-400" />
+              <span>Active Risk Factor Point Contributions</span>
+            </span>
+            <span className="text-[11px] text-slate-500">
+              {riskAnalysis.factors.length} active risk vector{riskAnalysis.factors.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+
+          {riskAnalysis.factors.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {riskAnalysis.factors.map((factor, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-2 rounded-lg border border-white/10 bg-slate-900/80 px-2.5 py-1.5 text-xs text-slate-200"
+                >
+                  <span
+                    className={`font-mono font-bold px-1.5 py-0.5 rounded text-[10px] ${
+                      factor.points >= 50
+                        ? "bg-rose-500/30 text-rose-300 border border-rose-500/40"
+                        : factor.points >= 30
+                        ? "bg-amber-500/30 text-amber-300 border border-amber-500/40"
+                        : "bg-cyan-500/30 text-cyan-300 border border-cyan-500/40"
+                    }`}
+                  >
+                    +{factor.points} pts
+                  </span>
+                  <span className="font-semibold text-white">{factor.label}:</span>
+                  <span className="text-slate-400 text-[11px]">{factor.detail}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-emerald-400 font-mono flex items-center gap-2 py-1">
+              <CheckCircle2 size={14} />
+              <span>All telemetry signals within nominal parameters. 0 active risk penalties applied. Model confidence 94.2%.</span>
+            </div>
+          )}
+        </div>
+
+        {/* The 4 Cascading Impact Pillars (4-Column Grid) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {/* Pillar 1: Thermal Dynamics & Ingress Velocity */}
+          <div className="rounded-xl border border-white/5 bg-slate-900/70 p-3.5 flex flex-col justify-between space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-cyan-400 text-xs font-mono font-bold uppercase tracking-wider">
+                <Thermometer size={14} />
+                <span>Thermal Dynamics</span>
+              </div>
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                  simState.doorOpen || !simState.compressorRunning || simState.burnedSensors.size > 0
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                    : activeScenario === "cooling_degradation"
+                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                }`}
+              >
+                {simState.doorOpen
+                  ? "Ingress Active"
+                  : !simState.compressorRunning
+                  ? "Chamber Warming"
+                  : simState.burnedSensors.size > 0
+                  ? "Thermal Runaway"
+                  : activeScenario === "cooling_degradation"
+                  ? "Slow Drift"
+                  : "Equilibrium"}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Drift Velocity</span>
+                <span
+                  className={`font-mono font-bold ${
+                    simState.doorOpen
+                      ? "text-rose-400 font-black animate-pulse"
+                      : !simState.compressorRunning
+                      ? "text-rose-400 font-black"
+                      : simState.burnedSensors.size > 0
+                      ? "text-red-400 font-black"
+                      : activeScenario === "cooling_degradation"
+                      ? "text-amber-400 font-bold"
+                      : "text-emerald-400"
+                  }`}
+                >
+                  {simState.doorOpen
+                    ? "+4.2°C/hr"
+                    : !simState.compressorRunning
+                    ? "+3.1°C/hr"
+                    : simState.burnedSensors.size > 0
+                    ? "+6.5°C/hr"
+                    : activeScenario === "cooling_degradation"
+                    ? "+1.8°C/hr"
+                    : activeScenario === "sensor_anomaly"
+                    ? "Erratic (Noisy)"
+                    : "0.0°C/hr (Stable)"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Net Energy Ingress</span>
+                <span className="font-mono text-slate-200 text-[11px]">
+                  {simState.doorOpen
+                    ? "+3,850 W (Dock Air)"
+                    : !simState.compressorRunning
+                    ? "-3,200 W (No Chill)"
+                    : simState.burnedSensors.size > 0
+                    ? "+5,200 W (Localized)"
+                    : activeScenario === "cooling_degradation"
+                    ? "-1,440 W (Refrig Loss)"
+                    : "Balanced (0 W Net)"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Projected Peak Temp</span>
+                <span className="font-mono font-bold text-white text-xs">
+                  {fmtTemp(
+                    forecastData.length > 0 && activeScenario !== "normal"
+                      ? Math.max(...forecastData.map((d) => d.temperature))
+                      : currentZoneTemp
+                  )}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Est. Time to Breach</span>
+                <span
+                  className={`font-mono font-bold text-xs ${
+                    simState.doorOpen || !simState.compressorRunning || simState.burnedSensors.size > 0
+                      ? "text-rose-400"
+                      : "text-slate-300"
+                  }`}
+                >
+                  {simState.doorOpen
+                    ? `${Math.max(1, Math.round(22 - doorOpenSeconds / 10))} min`
+                    : !simState.compressorRunning
+                    ? "18 min"
+                    : simState.burnedSensors.size > 0
+                    ? "12 min"
+                    : activeScenario === "cooling_degradation"
+                    ? "42 min"
+                    : activeScenario === "sensor_anomaly"
+                    ? "Signal Corrupt"
+                    : "> 60 min (Safe)"}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Chamber Ambient</span>
+              <span className="font-mono text-slate-300">{fmtTemp(currentZoneTemp)}</span>
             </div>
           </div>
-        </Card>
+
+          {/* Pillar 2: Refrigeration Plant & Power Load */}
+          <div className="rounded-xl border border-white/5 bg-slate-900/70 p-3.5 flex flex-col justify-between space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-cyan-400 text-xs font-mono font-bold uppercase tracking-wider">
+                <Gauge size={14} />
+                <span>Refrigeration Plant</span>
+              </div>
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                  !simState.compressorRunning
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse"
+                    : activeScenario === "cooling_degradation"
+                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                }`}
+              >
+                {!simState.compressorRunning
+                  ? "Plant Offline"
+                  : activeScenario === "cooling_degradation"
+                  ? "Degraded COP"
+                  : "Compressor Online"}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Compressor Rack</span>
+                <span
+                  className={`font-mono font-bold ${
+                    !simState.compressorRunning ? "text-rose-400" : "text-emerald-400"
+                  }`}
+                >
+                  {!simState.compressorRunning ? "TRIPPED (0.45 kW)" : "ACTIVE (3.2 kW)"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Evaporator Fans</span>
+                <span
+                  className={`font-mono ${
+                    !simState.compressorRunning ? "text-slate-500" : "text-cyan-300 font-semibold"
+                  }`}
+                >
+                  {!simState.compressorRunning ? "Halted (0 RPM)" : "Circulating (1,450 RPM)"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Cooling Capacity</span>
+                <span className="font-mono text-slate-200 text-[11px]">
+                  {!simState.compressorRunning
+                    ? "0% (Zero Active Cooling)"
+                    : activeScenario === "cooling_degradation"
+                    ? "55% (COP Derated)"
+                    : "100% (COP 3.2 Nominal)"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Breaker Panel Status</span>
+                <span
+                  className={`font-mono text-xs ${
+                    !simState.compressorRunning ? "text-amber-400 font-bold" : "text-slate-300"
+                  }`}
+                >
+                  {!simState.compressorRunning ? "Trip Interlock Closed" : "Normal 415V Phase"}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Inspect 3D Equipment</span>
+              <button
+                onClick={() => setCameraPreset("plant-room")}
+                className="text-cyan-400 hover:text-cyan-300 font-mono text-[11px] underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>Focus Plant Room</span>
+                <ArrowRight size={10} />
+              </button>
+            </div>
+          </div>
+
+          {/* Pillar 3: Telemetry Stream & Sensor Health */}
+          <div className="rounded-xl border border-white/5 bg-slate-900/70 p-3.5 flex flex-col justify-between space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-cyan-400 text-xs font-mono font-bold uppercase tracking-wider">
+                <Radio size={14} />
+                <span>Telemetry Stream</span>
+              </div>
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                  simState.burnedSensors.size > 0
+                    ? "bg-red-500/20 text-red-300 border-red-500/40 animate-pulse"
+                    : simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly"
+                    ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                }`}
+              >
+                {simState.burnedSensors.size > 0
+                  ? "Probe Burned"
+                  : simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly"
+                  ? "Anomaly Detected"
+                  : "All Probes 100%"}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Active Sensor Probes</span>
+                <span
+                  className={`font-mono font-bold ${
+                    simState.burnedSensors.size > 0 || simState.failedSensors.size > 0
+                      ? "text-amber-400"
+                      : "text-emerald-400"
+                  }`}
+                >
+                  {simState.burnedSensors.size > 0 || simState.failedSensors.size > 0
+                    ? "1 / 2 Online (50% Degraded)"
+                    : "2 / 2 Online (100% Nominal)"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Isolation Forest Score</span>
+                <span
+                  className={`font-mono font-bold ${
+                    activeScenario === "sensor_anomaly" || simState.failedSensors.size > 0
+                      ? "text-purple-400 font-black animate-pulse"
+                      : simState.burnedSensors.size > 0
+                      ? "text-red-400 font-black"
+                      : "text-emerald-400"
+                  }`}
+                >
+                  {activeScenario === "sensor_anomaly" || simState.failedSensors.size > 0
+                    ? "0.98 (Critical Outlier)"
+                    : simState.burnedSensors.size > 0
+                    ? "0.99 (Severe Spike)"
+                    : "0.02 (Nominal Inlier)"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">AI Confidence Index</span>
+                <span className="font-mono text-slate-200 text-[11px]">
+                  {activeScenario === "sensor_anomaly"
+                    ? "42.0% (Synthetic Fallback)"
+                    : simState.burnedSensors.size > 0
+                    ? "96.5% (Thermal Spike Certain)"
+                    : "94.2% (High Confidence)"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Redundant Node TS-A2</span>
+                <span className="font-mono text-emerald-400 text-xs font-semibold">
+                  Online & Calibrated
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Inspect Sensor in 3D</span>
+              <button
+                onClick={() => setCameraPreset("dock-bay")}
+                className="text-cyan-400 hover:text-cyan-300 font-mono text-[11px] underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>Focus Dock Bay</span>
+                <ArrowRight size={10} />
+              </button>
+            </div>
+          </div>
+
+          {/* Pillar 4: Product Asset Value & Regulatory Compliance */}
+          <div className="rounded-xl border border-white/5 bg-slate-900/70 p-3.5 flex flex-col justify-between space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-cyan-400 text-xs font-mono font-bold uppercase tracking-wider">
+                <Boxes size={14} />
+                <span>Inventory & Assets</span>
+              </div>
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                  simState.doorOpen || !simState.compressorRunning || simState.burnedSensors.size > 0
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                }`}
+              >
+                {simState.doorOpen || !simState.compressorRunning || simState.burnedSensors.size > 0
+                  ? "At Financial Risk"
+                  : "Assets Protected"}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Monitored Inventory</span>
+                <span className="font-mono font-bold text-white text-xs">
+                  {selectedZoneId === "zone-a"
+                    ? "$142,500 Biologics"
+                    : selectedZoneId === "zone-b"
+                    ? "$38,000 Proteins"
+                    : "$65,000 Pharma API"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Compliance Audit</span>
+                <span
+                  className={`font-mono text-xs font-semibold ${
+                    simState.doorOpen || !simState.compressorRunning || simState.burnedSensors.size > 0
+                      ? "text-rose-400"
+                      : "text-emerald-400"
+                  }`}
+                >
+                  {simState.doorOpen || !simState.compressorRunning || simState.burnedSensors.size > 0
+                    ? "FDA 21 CFR Part 11 Risk"
+                    : "GDP & MKT Compliant"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Residual Thermal Lag</span>
+                <span className="font-mono text-slate-200 text-[11px]">
+                  {simState.doorOpen
+                    ? "~18 min Post-Closure Wave"
+                    : !simState.compressorRunning
+                    ? "~35 min Thermal Inertia"
+                    : "Nominal Cooling Margin"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">SOP Reference Code</span>
+                <span className="font-mono text-cyan-300 text-[11px] font-bold">
+                  {simState.doorOpen
+                    ? "SOP-COLD-041 (Dock Ingress)"
+                    : !simState.compressorRunning
+                    ? "SOP-HVAC-102 (Trip Override)"
+                    : simState.burnedSensors.size > 0
+                    ? "SOP-SEC-009 (Fire Runaway)"
+                    : simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly"
+                    ? "SOP-IOT-022 (Sensor Fault)"
+                    : activeScenario === "cooling_degradation"
+                    ? "SOP-HVAC-055 (De-icing COP)"
+                    : "SOP-GEN-001 (Routine)"}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Facility Zone</span>
+              <span className="font-mono text-slate-300">{selectedConfig.name}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Operator SOP Action Playbook (3-Step Checklist) */}
+        <div className="rounded-xl border border-white/5 bg-slate-950/70 p-3.5 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-mono font-bold text-white">
+              <Terminal size={14} className="text-cyan-400" />
+              <span>Standard Operating Procedure (SOP) Action Checklist</span>
+            </div>
+            <span className="text-[11px] font-mono text-slate-400">
+              Active Protocol:{" "}
+              <span className="text-cyan-300 font-bold">
+                {simState.doorOpen
+                  ? "SOP-COLD-041 (Ingress Containment)"
+                  : !simState.compressorRunning
+                  ? "SOP-HVAC-102 (Compressor Breaker Reset)"
+                  : simState.burnedSensors.size > 0
+                  ? "SOP-SEC-009 (Emergency Fire Suppression)"
+                  : simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly"
+                  ? "SOP-IOT-022 (Sensor Anomaly Isolation)"
+                  : activeScenario === "cooling_degradation"
+                  ? "SOP-HVAC-055 (Condenser Restoral)"
+                  : "SOP-GEN-001 (Routine Monitoring)"}
+              </span>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
+            {/* Step 1: Containment */}
+            <div className="rounded-lg border border-white/5 bg-slate-900/80 p-2.5 flex items-start gap-2.5">
+              <div
+                className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-mono font-bold shrink-0 ${
+                  simState.doorOpen || !simState.compressorRunning || simState.burnedSensors.size > 0 || simState.failedSensors.size > 0 || activeScenario === "cooling_degradation"
+                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                    : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                }`}
+              >
+                1
+              </div>
+              <div className="text-xs space-y-1">
+                <div className="font-bold text-white">Step 1: Immediate Containment</div>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  {simState.doorOpen
+                    ? "Engage magnetic seals and seal dock door to halt +26°C air ingress."
+                    : !simState.compressorRunning
+                    ? "Verify electrical breaker panel and reset auxiliary trip contact."
+                    : simState.burnedSensors.size > 0
+                    ? "Isolate 24V DC sensor bus line and trigger localized fire suppressant."
+                    : simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly"
+                    ? "Flag corrupted telemetry stream and switch HVAC loop to ensemble mode."
+                    : activeScenario === "cooling_degradation"
+                    ? "Inspect condenser coils for dust clogging or refrigerant pressure drops."
+                    : "All chambers sealed and operating within thermal envelope limits."}
+                </p>
+                {riskAnalysis.actionLabel && riskAnalysis.onAction && (
+                  <button
+                    onClick={riskAnalysis.onAction}
+                    className="mt-1 text-[10px] font-mono font-bold text-cyan-400 hover:text-cyan-300 underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Execute Step 1 Action</span>
+                    <ArrowRight size={10} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Step 2: System Stabilization */}
+            <div className="rounded-lg border border-white/5 bg-slate-900/80 p-2.5 flex items-start gap-2.5">
+              <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-mono font-bold shrink-0 bg-slate-800 text-slate-300 border border-slate-700">
+                2
+              </div>
+              <div className="text-xs space-y-1">
+                <div className="font-bold text-white">Step 2: Thermal Stabilization</div>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  {simState.doorOpen
+                    ? "Run booster evaporator fans at 100% capacity to overcome residual thermal lag."
+                    : !simState.compressorRunning
+                    ? "Engage secondary backup condensing unit and confirm refrigerant suction pressure."
+                    : simState.burnedSensors.size > 0
+                    ? "Route chamber temperature control loop to redundant probe TS-A2."
+                    : simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly"
+                    ? "Recalibrate probe zero-point and verify RF telemetry gateway sync."
+                    : activeScenario === "cooling_degradation"
+                    ? "Perform hot gas defrost cycle to clear icing on evaporator fins."
+                    : "Continuously calculate predictive drift curves and Mean Kinetic Temperature."}
+                </p>
+                <div className="text-[10px] font-mono text-slate-500">
+                  Target Stabilization: &lt; {selectedConfig.upperLimit}°C
+                </div>
+              </div>
+            </div>
+
+            {/* Step 3: Audit & Regulatory Log */}
+            <div className="rounded-lg border border-white/5 bg-slate-900/80 p-2.5 flex items-start gap-2.5">
+              <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-mono font-bold shrink-0 bg-slate-800 text-slate-300 border border-slate-700">
+                3
+              </div>
+              <div className="text-xs space-y-1">
+                <div className="font-bold text-white">Step 3: FDA / GDP Compliance Audit</div>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  Timestamp incident telemetry into immutable FDA 21 CFR Part 11 audit ledger and generate excursion incident report.
+                </p>
+                <div className="pt-0.5 flex items-center gap-2">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-950/80 text-cyan-300 border border-cyan-800">
+                    Audit Log Active
+                  </span>
+                  <button
+                    onClick={() => setActiveAnalyticsTab("events")}
+                    className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
+                  >
+                    View Events Log
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          LOWER SECTION: TEMPERATURE FORECAST & ANALYTICS (FULL WIDTH)
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div className="rounded-2xl border border-white/10 bg-[#0B1424]/95 p-5 shadow-2xl backdrop-blur-xl">
+        {/* Header: Title + Center Tabs + Right Projection Mode */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-white/10">
+          <div className="flex items-center gap-2.5">
+            <LineChartIcon size={18} className="text-cyan-400" />
+            <h3 className="text-base font-bold text-white tracking-tight">
+              Temperature Forecast & Analytics
+            </h3>
+          </div>
+
+          {/* Navigation Tabs */}
+          <div className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800 flex-wrap">
+            {[
+              { id: "forecast", label: "Forecast" },
+              { id: "what-if", label: "What-If Simulator" },
+              { id: "matrix", label: "Multi-Zone Matrix" },
+              { id: "events", label: "Events & Recovery Log" },
+              { id: "health", label: "Sensor Health" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveAnalyticsTab(tab.id as any)}
+                className={`px-3 py-1 rounded-lg text-xs font-mono font-semibold transition cursor-pointer ${
+                  activeAnalyticsTab === tab.id
+                    ? "bg-cyan-600 text-white shadow-md shadow-cyan-600/30"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Projection Mode */}
+          <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
+            <span className="text-slate-400">Projection Mode:</span>
+            <div className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 flex items-center gap-1.5 font-semibold text-white">
+              <span>Live AI Forecast (30 min)</span>
+              <ChevronDown size={13} className="text-slate-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Tab 1: Primary Forecast View (Chart Left + AI Model Right) */}
+        {activeAnalyticsTab === "forecast" && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 pt-4">
+            {/* Chart View (col-span-8) */}
+            <div className="lg:col-span-8 space-y-3">
+              <div className="h-64 sm:h-72 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={forecastData} margin={{ top: 20, right: 20, bottom: 5, left: -10 }}>
+                    <CartesianGrid stroke="#1E293B" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="minute" stroke="#64748B" fontSize={11} tickLine={false} />
+                    <YAxis
+                      stroke="#64748B"
+                      fontSize={11}
+                      tickLine={false}
+                      domain={yDomain}
+                      label={{ value: "Temperature (°C)", angle: -90, position: "insideLeft", fill: "#64748B", fontSize: 10, dx: 15 }}
+                    />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const data = payload[0].payload;
+                        return (
+                          <div className="rounded-xl border border-slate-700 bg-slate-900/95 p-2.5 text-xs font-mono shadow-2xl backdrop-blur-md">
+                            <div className="text-slate-400 mb-1">{data.minute} ahead</div>
+                            <div className="text-cyan-300 font-bold">Predicted: {data.temperature}°C</div>
+                            <div className="text-slate-400 text-[10px]">
+                              Safe: {selectedConfig.lowerLimit}°C – {selectedConfig.upperLimit}°C
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
+
+                    {/* Red Dashed Upper Limit */}
+                    <ReferenceLine
+                      y={selectedConfig.upperLimit}
+                      stroke="#EF4444"
+                      strokeDasharray="4 4"
+                      strokeWidth={1.5}
+                      label={{
+                        value: `Upper Limit (${selectedConfig.upperLimit}°C)`,
+                        fill: "#EF4444",
+                        fontSize: 10,
+                        position: "insideTopLeft",
+                      }}
+                    />
+
+                    {/* Blue Dashed Lower Limit */}
+                    <ReferenceLine
+                      y={selectedConfig.lowerLimit}
+                      stroke="#3B82F6"
+                      strokeDasharray="4 4"
+                      strokeWidth={1.5}
+                      label={{
+                        value: `Lower Limit (${selectedConfig.lowerLimit}°C)`,
+                        fill: "#3B82F6",
+                        fontSize: 10,
+                        position: "insideBottomLeft",
+                      }}
+                    />
+
+                    {/* Confidence Range Area Shading */}
+                    <Area
+                      type="monotone"
+                      dataKey="temperature"
+                      fill="#22D3EE"
+                      fillOpacity={0.15}
+                      stroke="none"
+                    />
+
+                    {/* Cyan Predicted Temperature Line with Dots */}
+                    <Line
+                      type="monotone"
+                      dataKey="temperature"
+                      stroke="#22D3EE"
+                      strokeWidth={2.5}
+                      dot={{ r: 4, fill: "#22D3EE", stroke: "#0B1424", strokeWidth: 2 }}
+                      activeDot={{ r: 6, fill: "#FFFFFF", stroke: "#22D3EE", strokeWidth: 2 }}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Chart Legend (Matching Reference Image) */}
+              <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-slate-300 font-mono pt-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-0.5 bg-cyan-400 rounded" />
+                  <span>Predicted Temperature</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-3 rounded bg-cyan-400/20 border border-cyan-400/40" />
+                  <span>Confidence Range</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-5 border-b-2 border-dashed border-red-500" />
+                  <span className="text-red-400">Upper Limit ({selectedConfig.upperLimit}°C)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-5 border-b-2 border-dashed border-blue-500" />
+                  <span className="text-blue-400">Lower Limit ({selectedConfig.lowerLimit}°C)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* AI Model Card (col-span-4, Matching Reference Image) */}
+            <div className="lg:col-span-4 rounded-xl border border-white/5 bg-slate-900/70 p-4 flex flex-col justify-between space-y-4">
+              <div>
+                <div className="flex items-center gap-2 text-cyan-400 text-xs font-mono font-bold uppercase tracking-wider mb-1">
+                  <Cpu size={15} />
+                  <span>AI Model</span>
+                </div>
+                <h4 className="text-base font-bold text-white tracking-tight">
+                  {modelEvaluationPoll.data?.model_architecture ?? "Multi-Output Random Forest"}
+                </h4>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  {predictionOverviewPoll.data?.ai_explanation?.narrative ??
+                    "Predicts temperature, humidity and recovery time using calibrated thermodynamic decay modeling."}
+                </p>
+              </div>
+
+              {/* 3 Metric Tiles in a Row */}
+              <div className="grid grid-cols-3 gap-2 pt-2">
+                {/* Predicted Peak Temp */}
+                {(() => {
+                  const peakVal = activeScenario !== "normal" && forecastData.length > 0
+                    ? Math.max(...forecastData.map(d => d.temperature))
+                    : (predictionOverviewPoll.data?.horizons?.["30"]?.predicted_peak_temperature ??
+                       selectedZone?.peak_temp_predicted ??
+                       currentZoneTemp);
+                  const isBreach = peakVal > selectedConfig.upperLimit || peakVal < selectedConfig.lowerLimit;
+                  const isWarn = peakVal > selectedConfig.upperLimit - 1.0;
+                  const peakBadge = isBreach ? "Excursion" : isWarn ? "At Risk" : "Safe";
+                  const badgeColor = isBreach
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                    : isWarn
+                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
+
+                  return (
+                    <div className="rounded-lg bg-slate-950/80 border border-white/5 p-2.5 flex flex-col justify-between">
+                      <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                        <Thermometer size={12} className="text-cyan-400" />
+                        <span>Predicted Peak</span>
+                      </div>
+                      <div className="text-base font-bold font-mono text-white mt-1">
+                        {fmtTemp(peakVal)}
+                      </div>
+                      <div className="mt-1">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${badgeColor}`}>
+                          {peakBadge}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Time to Limit */}
+                {(() => {
+                  const timeToLimit = activeScenario === "door_open"
+                    ? Math.max(1, Math.round(22 - doorOpenSeconds / 10))
+                    : activeScenario === "compressor_failure"
+                    ? 18
+                    : activeScenario === "fan_off"
+                    ? 28
+                    : (activeScenario === "fire_runaway" || activeScenario === "sensor_burn")
+                    ? 12
+                    : activeScenario === "cooling_degradation"
+                    ? 42
+                    : activeScenario === "sensor_anomaly"
+                    ? null
+                    : (predictionOverviewPoll.data?.horizons?.["30"]?.time_to_breach_minutes ??
+                       selectedZone?.time_to_breach_minutes);
+                  const isUrgent = timeToLimit != null && timeToLimit <= 15;
+                  const isWarning = timeToLimit != null;
+                  const badgeText = isUrgent ? "Critical" : isWarning ? "Warning" : activeScenario === "sensor_anomaly" ? "Telemetry Lost" : "Safe";
+                  const badgeColor = isUrgent || activeScenario === "sensor_anomaly"
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                    : isWarning
+                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
+
+                  return (
+                    <div className="rounded-lg bg-slate-950/80 border border-white/5 p-2.5 flex flex-col justify-between">
+                      <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                        <Clock size={12} className="text-amber-400" />
+                        <span>Time to Limit</span>
+                      </div>
+                      <div className="text-base font-bold font-mono text-white mt-1">
+                        {timeToLimit != null ? `${Math.round(timeToLimit)} min` : activeScenario === "sensor_anomaly" ? "N/A" : "> 60 min"}
+                      </div>
+                      <div className="mt-1">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${badgeColor}`}>
+                          {badgeText}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Model Confidence */}
+                {(() => {
+                  const f1 = activeScenario === "sensor_anomaly"
+                    ? 0.42
+                    : (modelEvaluationPoll.data?.excursion_classification_30m?.f1_score ?? 0.925);
+                  const confPct = Math.round(f1 * 100);
+                  const confBadge = f1 >= 0.85 ? "High" : f1 >= 0.7 ? "Moderate" : "Low";
+                  const badgeColor =
+                    f1 >= 0.85
+                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                      : "bg-amber-500/20 text-amber-300 border-amber-500/40";
+
+                  return (
+                    <div className="rounded-lg bg-slate-950/80 border border-white/5 p-2.5 flex flex-col justify-between">
+                      <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                        <TrendingUp size={12} className="text-purple-400" />
+                        <span>Confidence</span>
+                      </div>
+                      <div className="text-base font-bold font-mono text-white mt-1">
+                        {confPct}%
+                      </div>
+                      <div className="mt-1">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${badgeColor}`}>
+                          {confBadge}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Dynamic Perishable Inventory Spoilage Section */}
+              {predictionOverviewPoll.data?.ai_explanation?.inventory_spoilage_risk && (
+                <div className="rounded-xl bg-purple-950/20 border border-purple-500/30 p-3 mt-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-purple-500/20">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-white font-mono">
+                      <Package size={13} className="text-purple-400" />
+                      <span>PERISHABLE INVENTORY RISK</span>
+                    </div>
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                        predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.spoilage_status.includes("Critical")
+                          ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                          : predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.spoilage_status.includes("Warning")
+                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                          : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                      }`}
+                    >
+                      {predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.spoilage_status}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 mt-2 text-[11px] font-mono">
+                    <div className="p-1.5 rounded bg-slate-950/70 border border-white/5">
+                      <span className="text-slate-400">Total Lot Value: </span>
+                      <span className="text-emerald-400 font-bold">
+                        {predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.total_inventory_value_usd}
+                      </span>
+                    </div>
+                    <div className="p-1.5 rounded bg-slate-950/70 border border-white/5">
+                      <span className="text-slate-400">Time to Spoilage: </span>
+                      <span className="text-amber-400 font-bold">
+                        {predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.time_to_spoilage_minutes != null
+                          ? `${predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.time_to_spoilage_minutes} min`
+                          : "Nominal (Safe)"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 text-[11px] text-slate-300 space-y-1">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase font-semibold">
+                      Stored Vulnerable Products:
+                    </div>
+                    {predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.vulnerable_items.map((it, idx) => (
+                      <div key={idx} className="flex items-start gap-1">
+                        <span className="text-purple-400 font-bold">•</span>
+                        <span>{it}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-2 p-2 rounded bg-purple-950/30 border border-purple-500/20 text-[10px] text-purple-200 leading-relaxed font-sans">
+                    <span className="font-bold text-purple-300">Degradation Mechanism: </span>
+                    {predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.spoilage_mechanism}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: What-If Counterfactual Simulator */}
+        {activeAnalyticsTab === "what-if" && (
+          <div className="space-y-4 pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-xl border border-white/5">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-slate-300 font-semibold">Scenario:</span>
+                <select
+                  value={whatIfScenario}
+                  onChange={(e) => setWhatIfScenario(e.target.value as any)}
+                  className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-mono text-cyan-300 cursor-pointer"
+                >
+                  <option value="door_open">Door Left Open (Air Ingress)</option>
+                  <option value="compressor_failure">Compressor Failure (0 kW)</option>
+                  <option value="cooling_degradation">Cooling Degradation (50%)</option>
+                  <option value="abnormal_humidity">High Humidity Ingress</option>
+                  <option value="fire_runaway">Fire / Thermal Runaway</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-slate-300 font-semibold">Duration:</span>
+                {[5, 10, 15, 30].map((mins) => (
+                  <button
+                    key={mins}
+                    onClick={() => setWhatIfDuration(mins)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono transition cursor-pointer ${
+                      whatIfDuration === mins
+                        ? "bg-cyan-600 text-white font-bold"
+                        : "bg-slate-950 text-slate-400 border border-slate-800 hover:text-white"
+                    }`}
+                  >
+                    {mins}m
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={handleRunWhatIf}
+                disabled={whatIfLoading}
+                className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+              >
+                <Play size={13} />
+                <span>{whatIfLoading ? "Simulating..." : "Run Simulator"}</span>
+              </button>
+            </div>
+
+            {/* Counterfactual Chart */}
+            {whatIfResult && (
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={counterfactualChartData} margin={{ top: 10, right: 10, bottom: 5, left: -10 }}>
+                    <CartesianGrid stroke="#1E293B" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="minute" stroke="#64748B" fontSize={11} tickLine={false} />
+                    <YAxis stroke="#64748B" fontSize={11} tickLine={false} />
+                    <Tooltip />
+                    <ReferenceLine y={whatIfResult.limits.upper} stroke="#EF4444" strokeDasharray="4 4" />
+                    <ReferenceLine y={whatIfResult.limits.lower} stroke="#3B82F6" strokeDasharray="4 4" />
+                    <Line type="monotone" dataKey="baseline" stroke="#22D3EE" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="scenario" stroke="#F43F5E" strokeWidth={2.5} strokeDasharray="4 4" dot={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 3: Multi-Zone Matrix */}
+        {activeAnalyticsTab === "matrix" && (
+          <div className="pt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            {ZONE_CONFIGS.map((cfg) => {
+              const zoneData = (zones as ZoneSummary[])?.find((z) => z.zone_id === cfg.id);
+              const temp = zoneData?.temperature ?? cfg.targetTemp;
+              const isSelected = selectedZoneId === cfg.id;
+              const isCompressorRunning = zoneData?.compressor_status === "running";
+              return (
+                <div
+                  key={`matrix-${cfg.id}`}
+                  onClick={() => handleZoneSelect(cfg.id)}
+                  className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                    isSelected ? "bg-slate-900 border-cyan-400 shadow-lg" : "bg-slate-950/70 border-white/5 hover:border-slate-700"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-white text-sm">{cfg.name}</span>
+                    <span className="text-[10px] font-mono text-cyan-400">{cfg.product}</span>
+                  </div>
+                  <div className="text-2xl font-bold font-mono text-white mb-2">{fmtTemp(temp)}</div>
+                  <div className="text-xs text-slate-400 font-mono space-y-1">
+                    <div>Safe Range: {cfg.tempRange}</div>
+                    <div>Humidity: {zoneData?.humidity != null ? `${Math.round(zoneData.humidity)}%` : "—"}</div>
+                    <div>Power: {zoneData?.power_consumption_kw != null ? `${zoneData.power_consumption_kw.toFixed(1)} kW` : "— kW"}</div>
+                    <div>Compressor: <span className={isCompressorRunning ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>{zoneData?.compressor_status ? zoneData.compressor_status.toUpperCase() : "RUNNING"}</span></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Tab 4: Events & Recovery Log */}
+        {activeAnalyticsTab === "events" && (
+          <div className="pt-4 overflow-x-auto">
+            {(() => {
+              const rawEvents = facilityEventsPoll.data ?? [];
+              const combinedEvents = [
+                ...activityLog.map((ev) => ({
+                  time: ev.time,
+                  zone: ev.zone,
+                  event: ev.message,
+                  severity: ev.type,
+                  status: "active",
+                  action: null,
+                })),
+                ...rawEvents.map((ev) => ({
+                  time: ev.time,
+                  zone: ev.zone_name,
+                  event: ev.event,
+                  severity: ev.severity === "high" ? "critical" : ev.severity === "medium" ? "warning" : "info",
+                  status: ev.status,
+                  action: ev.recommended_action,
+                })),
+              ];
+
+              if (combinedEvents.length === 0) {
+                return (
+                  <div className="py-8 text-center text-slate-400 font-mono text-xs">
+                    No active or historical alarm events recorded. Facility running nominal.
+                  </div>
+                );
+              }
+
+              return (
+                <table className="w-full text-left text-xs font-mono border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400 uppercase text-[11px]">
+                      <th className="pb-2">Time</th>
+                      <th className="pb-2">Zone</th>
+                      <th className="pb-2">Event Description</th>
+                      <th className="pb-2">Severity</th>
+                      <th className="pb-2">Action / Recommendation</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {combinedEvents.map((ev, i) => (
+                      <tr key={i} className="hover:bg-slate-900/40">
+                        <td className="py-2.5 text-slate-400">{ev.time}</td>
+                        <td className="py-2.5 text-white font-bold">{ev.zone}</td>
+                        <td className="py-2.5 text-slate-200">{ev.event}</td>
+                        <td className="py-2.5">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              ev.severity === "critical"
+                                ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                                : ev.severity === "warning"
+                                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                                : "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                            }`}
+                          >
+                            {ev.severity.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-slate-400 text-[11px] truncate max-w-xs">
+                          {ev.action ?? "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Tab 5: Sensor Health */}
+        {activeAnalyticsTab === "health" && (
+          <div className="pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+            {/* Total Probes */}
+            {(() => {
+              const totalProbes = 6;
+              const burnedCount = simState.burnedSensors.size;
+              const failedCount = simState.failedSensors.size;
+              const degradedZones = allZones.filter((z) => z.sensor_health && z.sensor_health !== "healthy").length;
+              const offlineProbes = Math.max(burnedCount + failedCount, degradedZones);
+              const onlineProbes = Math.max(0, totalProbes - offlineProbes);
+              const pctOnline = Math.round((onlineProbes / totalProbes) * 100);
+              const isHealthy = offlineProbes === 0;
+
+              return (
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5">
+                  <span className="text-slate-400">Total Probes</span>
+                  <div className="text-lg font-bold text-white mt-1">
+                    {onlineProbes} / {totalProbes} Online
+                  </div>
+                  <div className={`text-[10px] mt-0.5 font-bold ${isHealthy ? "text-emerald-400" : "text-amber-400"}`}>
+                    {pctOnline}% Operational {offlineProbes > 0 ? `(${offlineProbes} Fault)` : ""}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Telemetry Stream */}
+            <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5">
+              <span className="text-slate-400">Telemetry Stream</span>
+              <div className="text-lg font-bold text-cyan-300 mt-1">
+                {health?.status === "ok" ? "FastSync Active" : "Stream Degraded"}
+              </div>
+              <div className="text-slate-400 text-[10px] mt-0.5">
+                {health?.tick_seconds ? `${health.tick_seconds}s cycle` : "1.0s cycle"} • {health?.readings_stored?.toLocaleString() ?? 0} records
+              </div>
+            </div>
+
+            {/* Isolation Forest Anomaly Detection */}
+            {(() => {
+              const isAnomaly = selectedZone?.sensor_health && selectedZone.sensor_health !== "healthy";
+              const firstIssue = selectedZone?.sensor_issues?.[0];
+              const issueLabel =
+                typeof firstIssue === "string"
+                  ? firstIssue
+                  : firstIssue?.detail ?? firstIssue?.type ?? selectedZone?.sensor_health?.replace("_", " ");
+
+              return (
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5">
+                  <span className="text-slate-400">Isolation Forest</span>
+                  <div className={`text-lg font-bold mt-1 ${isAnomaly ? "text-rose-400" : "text-emerald-400"}`}>
+                    {isAnomaly ? "Anomaly Detected" : "Nominal"}
+                  </div>
+                  <div className="text-slate-400 text-[10px] mt-0.5 truncate">
+                    {isAnomaly ? issueLabel : "Outlier score: normal"}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Model Pipeline */}
+            <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5">
+              <span className="text-slate-400">Model Pipeline</span>
+              <div className="text-lg font-bold text-purple-300 mt-1 truncate">
+                {modelEvaluationPoll.data?.model_architecture ? "Random Forest" : "RF Regressor"}
+              </div>
+              <div className="text-slate-400 text-[10px] mt-0.5">
+                {modelEvaluationPoll.data?.n_train_samples
+                  ? `${modelEvaluationPoll.data.n_train_samples.toLocaleString()} samples`
+                  : "Trained physics model"}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          CONSEQUENTIAL ACTION SAFETY CONFIRMATION MODAL
+          ═══════════════════════════════════════════════════════════════════ */}
+      {confirmModal && confirmModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-rose-500/40 bg-slate-950 p-5 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/40">
+                <AlertTriangle size={20} />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-white">{confirmModal.title}</h3>
+                <div className="text-xs text-rose-300 font-mono">Consequential Simulation Event</div>
+              </div>
+            </div>
+
+            <p className="text-xs text-fg leading-relaxed">
+              {confirmModal.description}
+            </p>
+
+            <div className="rounded-lg bg-rose-950/30 border border-rose-500/20 p-3 text-[11px] font-mono text-rose-200">
+              <div className="font-bold text-rose-400 mb-1">Operational Impact:</div>
+              {confirmModal.impact}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="px-3.5 py-1.5 rounded-lg border border-white/10 text-xs font-mono text-fg-muted hover:text-white hover:bg-slate-900 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmModal.onConfirm}
+                className="px-4 py-1.5 rounded-lg border border-rose-500 bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold transition shadow-lg cursor-pointer"
+              >
+                {confirmModal.actionLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ All values are illustrative defaults for a prototype; they are not regulatory li
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -23,6 +23,10 @@ class ZoneConfig:
     kp: float  # proportional gain of the simulated thermostat
     humidity_base: float  # typical relative humidity (%)
     humidity_door: float  # humidity the room drifts to with the door open (%)
+    vulnerable_items: list[str] = field(default_factory=list)
+    inventory_value_usd: int = 50000
+    spoilage_threshold: float = 8.0
+    spoilage_mechanism: str = "Thermal degradation of stored perishables."
 
     @property
     def range_width(self) -> float:
@@ -47,6 +51,15 @@ ZONES: dict[str, ZoneConfig] = {
             kp=0.5,
             humidity_base=52.0,
             humidity_door=78.0,
+            vulnerable_items=[
+                "COVID-19 mRNA Vaccine Vials (Comirnaty / Spikevax) - 4,200 doses",
+                "Pediatric MMR, Varicella & Rotavirus Cold-Chain Vaccines - 3,500 doses",
+                "Recombinant Human Insulin (Glargine & Lispro) - 2,800 cartridges",
+                "Monoclonal Antibodies & Oncology Immunotherapies - 1,100 vials",
+            ],
+            inventory_value_usd=186000,
+            spoilage_threshold=8.0,
+            spoilage_mechanism="Denaturation of tertiary protein chains and mRNA lipid nanoparticle degradation above 8.0°C; results in total antigenic potency loss requiring mandatory quarantine and disposal under WHO/FDA Good Distribution Practices.",
         ),
         ZoneConfig(
             zone_id="zone-b",
@@ -63,6 +76,15 @@ ZONES: dict[str, ZoneConfig] = {
             kp=0.5,
             humidity_base=80.0,
             humidity_door=90.0,
+            vulnerable_items=[
+                "Grade-A Pasteurized Whole & Skim Milk Cartons - 1,800 units",
+                "Artisan Live-Culture Greek Yoghurts & Kefir - 950 jars",
+                "Soft Fresh Cheeses (Fresh Mozzarella, Ricotta, Brie) - 620 kg",
+                "Heavy Whipping Cream & Custards - 480 liters",
+            ],
+            inventory_value_usd=26500,
+            spoilage_threshold=6.0,
+            spoilage_mechanism="Proliferation of psychrotrophic bacteria (Pseudomonas, Listeria monocytogenes) accelerating casein proteolysis and lactic acidification above 6.0°C; causes premature souring, curdling, and renders stock unsellable within 2-4 hours.",
         ),
         ZoneConfig(
             zone_id="zone-c",
@@ -79,6 +101,15 @@ ZONES: dict[str, ZoneConfig] = {
             kp=0.5,
             humidity_base=45.0,
             humidity_door=70.0,
+            vulnerable_items=[
+                "Clinical Trial Cryo-Preserved Blood Plasma & Serum Units - 850 units",
+                "Export-Grade Frozen Wild Salmon & Bluefin Tuna Loins - 1,400 kg",
+                "Ultra-Premium Dairy Ice Cream & Gelato Desserts - 1,200 tubs",
+                "Prepared Frozen Surgical Bone & Tissue Allografts - 320 units",
+            ],
+            inventory_value_usd=114000,
+            spoilage_threshold=-15.0,
+            spoilage_mechanism="Ice crystal recrystallization and Ostwald ripening above -15.0°C causing cellular membrane rupture, freezer burn, and irreversible textural collapse; thawing above -10.0°C triggers active enzymatic degradation and bacterial revival.",
         ),
     ]
 }

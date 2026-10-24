@@ -10,6 +10,12 @@ interface Toast {
   message: string;
 }
 
+export interface DoorSimState {
+  isOpen: boolean;
+  openedAt: number | null;
+  durationMinutes?: number;
+}
+
 export interface AppState {
   zones: ZoneSummary[] | null;
   allZones: ZoneSummary[] | null;
@@ -31,6 +37,10 @@ export interface AppState {
   toasts: Toast[];
   notify: (kind: Toast["kind"], message: string) => void;
   dismiss: (id: number) => void;
+  doorSimulations: Record<string, DoorSimState>;
+  isDoorOpen: (zoneId: string) => boolean;
+  getDoorOpenSeconds: (zoneId: string) => number;
+  toggleDoor: (zoneId: string, durationMinutes?: number, forceAction?: "open" | "close") => Promise<void>;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -105,11 +115,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
               ambient_temperature: z.ambient_temperature,
               temperature_status: z.temperature_status,
               compressor_status: z.compressor_status,
+              fans_active: z.fans_active ?? true,
+              fan_status: z.fan_status ?? "running",
+              fan_off_seconds: z.fan_off_seconds ?? 0,
               compressor_load_pct: z.compressor_load_pct,
               power_consumption_kw: z.power_consumption_kw,
               sensor_health: z.sensor_health,
               door_status: z.door_status,
               door_open_minutes: z.door_open_minutes,
+              door_open_seconds: z.door_open_seconds ?? (z.door_status === "open" ? Math.round(z.door_open_minutes * 60) : 0),
               compressor_off_minutes: z.compressor_off_minutes,
               sensor_status: z.sensor_status,
               sensor_issues: z.sensor_issues ?? [],
@@ -214,6 +228,142 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return effectiveZones.find((z) => z.zone_id === selectedZoneId) ?? effectiveZones[0];
   }, [effectiveZones, selectedZoneId]);
 
+  // ═══════════════════════════════════════════════════════════════════
+  // GLOBAL STATEFUL DOOR OPEN TRACKING (Single Source Across All Tabs)
+  // ═══════════════════════════════════════════════════════════════════
+  const [doorSimulations, setDoorSimulations] = useState<Record<string, DoorSimState>>(() => {
+    try {
+      const saved = localStorage.getItem("coldguard.doorSims");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [timerTick, setTimerTick] = useState(0);
+
+  // 1-second global interval that never unmounts when navigating between pages
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimerTick((t) => t + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const getDoorOpenSeconds = useCallback(
+    (zoneId: string): number => {
+      const sim = doorSimulations[zoneId];
+      if (sim?.isOpen && sim.openedAt) {
+        return Math.max(1, Math.floor((Date.now() - sim.openedAt) / 1000));
+      }
+      const z = effectiveZones?.find((item) => item.zone_id === zoneId);
+      if (z?.door_status === "open" || z?.scenario === "door_open") {
+        return z.door_open_seconds ?? (z.door_open_minutes ? Math.round(z.door_open_minutes * 60) : 1);
+      }
+      return 0;
+    },
+    // timerTick ensures every consumer of getDoorOpenSeconds re-renders every 1s with precise elapsed seconds
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [doorSimulations, effectiveZones, timerTick]
+  );
+
+  const isDoorOpen = useCallback(
+    (zoneId: string): boolean => {
+      if (doorSimulations[zoneId]?.isOpen) return true;
+      const z = effectiveZones?.find((item) => item.zone_id === zoneId);
+      return z?.door_status === "open" || z?.scenario === "door_open";
+    },
+    [doorSimulations, effectiveZones]
+  );
+
+  const toggleDoor = useCallback(
+    async (zoneId: string, durationMinutes?: number, forceAction?: "open" | "close") => {
+      const openNow = isDoorOpen(zoneId);
+      const currentDuration = doorSimulations[zoneId]?.durationMinutes;
+
+      let willOpen: boolean;
+      if (forceAction) {
+        willOpen = forceAction === "open";
+      } else if (durationMinutes !== undefined) {
+        // If already open with the exact same duration, toggle it closed. Otherwise, open / switch to this duration.
+        willOpen = !(openNow && currentDuration === durationMinutes);
+      } else {
+        willOpen = !openNow;
+      }
+
+      const openedAt = willOpen ? Date.now() : null;
+
+      setDoorSimulations((prev) => {
+        const next = { ...prev, [zoneId]: { isOpen: willOpen, openedAt, durationMinutes: willOpen ? durationMinutes : undefined } };
+        try {
+          localStorage.setItem("coldguard.doorSims", JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      try {
+        if (willOpen) {
+          await api.controlDoor(zoneId, "open", durationMinutes);
+          await api.setScenario(zoneId, "door_open");
+          notify(
+            "info",
+            `Chamber door opened for ${zoneId} (${durationMinutes ? `${durationMinutes}m test` : "Continuous Ingress"}). Ingress active.`
+          );
+        } else {
+          await api.controlDoor(zoneId, "close");
+          await api.reset("scenario", zoneId);
+          notify("info", `Chamber door closed for ${zoneId}. Pull-down cooling recovery active.`);
+        }
+        zonesPoll.refresh();
+      } catch (err: any) {
+        console.error("Failed to toggle door:", err);
+        notify("error", err?.message || "Failed to update door state");
+      }
+    },
+    [isDoorOpen, doorSimulations, notify, zonesPoll]
+  );
+
+  // Auto-close when commanded durationMinutes expires
+  useEffect(() => {
+    for (const [zoneId, sim] of Object.entries(doorSimulations)) {
+      if (sim.isOpen && sim.openedAt && sim.durationMinutes) {
+        const elapsedSec = (Date.now() - sim.openedAt) / 1000;
+        if (elapsedSec >= sim.durationMinutes * 60) {
+          toggleDoor(zoneId, undefined, "close");
+        }
+      }
+    }
+  }, [timerTick, doorSimulations, toggleDoor]);
+
+  // Sync with incoming telemetry from backend
+  useEffect(() => {
+    if (!effectiveZones) return;
+    for (const z of effectiveZones) {
+      const sim = doorSimulations[z.zone_id];
+      if (z.door_status === "closed" && z.scenario !== "door_open" && sim?.isOpen) {
+        // If user action was recent (< 3 seconds ago), avoid race with in-flight telemetry
+        if (sim.openedAt && Date.now() - sim.openedAt < 3000) {
+          continue;
+        }
+        setDoorSimulations((prev) => {
+          const next = { ...prev, [z.zone_id]: { isOpen: false, openedAt: null } };
+          try {
+            localStorage.setItem("coldguard.doorSims", JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+      } else if ((z.door_status === "open" || z.scenario === "door_open") && !sim?.isOpen) {
+        const initSec = z.door_open_seconds ?? (z.door_open_minutes ? Math.round(z.door_open_minutes * 60) : 1);
+        setDoorSimulations((prev) => {
+          const next = { ...prev, [z.zone_id]: { isOpen: true, openedAt: Date.now() - initSec * 1000 } };
+          try {
+            localStorage.setItem("coldguard.doorSims", JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+      }
+    }
+  }, [effectiveZones, doorSimulations]);
+
   const value = useMemo<AppState>(
     () => ({
       zones: effectiveZones,
@@ -236,6 +386,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toasts,
       notify,
       dismiss,
+      doorSimulations,
+      isDoorOpen,
+      getDoorOpenSeconds,
+      toggleDoor,
     }),
     [
       effectiveZones,
@@ -257,6 +411,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toasts,
       notify,
       dismiss,
+      doorSimulations,
+      isDoorOpen,
+      getDoorOpenSeconds,
+      toggleDoor,
     ],
   );
 

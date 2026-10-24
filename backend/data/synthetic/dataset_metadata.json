@@ -1,9 +1,26 @@
 {
   "dataset_name": "ColdGuard-AI Physics-Informed Synthetic Cold Storage Dataset",
   "version": "2.0.0",
-  "generation_timestamp": "2026-10-22T17:05:50.029143",
+  "generation_timestamp": "2026-10-24T19:03:31.539777",
   "is_synthetic": true,
   "disclaimer": "NOTICE: All data in this dataset is SYNTHETIC and generated via a calibrated lumped-capacitance thermodynamic ODE model. It is intended for algorithm development, excursion forecasting benchmarks, and digital twin visualization.",
+  "empirical_grounding": {
+    "reference_dataset": "Zenodo Multi-Sensor Cold Storage Room Dataset (SENSOR01-09)",
+    "sensors_profiled": [
+      "SENSOR01",
+      "SENSOR02",
+      "SENSOR03",
+      "SENSOR04",
+      "SENSOR05",
+      "SENSOR06"
+    ],
+    "empirical_noise_sigma": 0.0397,
+    "empirical_d1_std": 0.113,
+    "empirical_d5_std": 0.4473,
+    "empirical_rh_mean": 77.53,
+    "calibration_status": "Fully Grounded & Empirically Aligned",
+    "grounding_method": "Empirical parameter injection into Lumped-Capacitance Thermodynamic ODE"
+  },
   "total_records": 60480,
   "zones": [
     "zone-a",
@@ -18,7 +35,8 @@
     "compressor_failure",
     "cooling_degradation",
     "ambient_heatwave",
-    "sensor_anomaly"
+    "sensor_anomaly",
+    "fire_runaway"
   ],
   "splits": {
     "train": {
@@ -26,21 +44,21 @@
       "ratio": 0.7,
       "start": "2026-01-01T00:00:00",
       "end": "2026-01-10T19:11:00",
-      "excursion_positive_rate_30m": 0.0657
+      "excursion_positive_rate_30m": 0.2602
     },
     "validation": {
       "records": 9072,
       "ratio": 0.15,
       "start": "2026-01-10T19:12:00",
       "end": "2026-01-12T21:35:00",
-      "excursion_positive_rate_30m": 0.0572
+      "excursion_positive_rate_30m": 0.335
     },
     "test": {
       "records": 8892,
       "ratio": 0.15,
       "start": "2026-01-12T21:36:00",
       "end": "2026-01-14T22:59:00",
-      "excursion_positive_rate_30m": 0.0819
+      "excursion_positive_rate_30m": 0.2233
     }
   },
   "target_variables": {
@@ -60,8 +78,18 @@
     "compressor_status": "Refrigeration state: running, idle, failed, degraded",
     "compressor_load_pct": "Instantaneous cooling demand load percentage (0-100%)",
     "power_consumption_kw": "Total instantaneous electrical power draw in kW",
-    "sensor_health": "Sensor health status: healthy, degraded_drift, stuck_frozen, spike_anomaly, missing",
-    "scenario": "Active operational scenario"
+    "sensor_health": "Sensor health status: healthy, degraded_drift, stuck_frozen, spike_anomaly, missing, sensor_fire_runaway",
+    "scenario": "Active operational scenario: normal, door_open, compressor_failure, cooling_degradation, ambient_heatwave, sensor_anomaly, fire_runaway",
+    "door_open_flag": "Binary indicator (1 = dock/chamber door open, 0 = closed)",
+    "compressor_failed_flag": "Binary indicator (1 = compressor tripped or failed, 0 = operational)",
+    "cooling_degraded_flag": "Binary indicator (1 = cooling system degraded by 45%, 0 = full COP)",
+    "sensor_fault_flag": "Binary indicator (1 = sensor anomaly/drift/freeze, 0 = reliable)",
+    "fire_runaway_flag": "Binary indicator (1 = sensor burning / thermal runaway, 0 = nominal)",
+    "cooling_capacity_pct": "Available mechanical cooling capacity percentage (0.0%, 55.0%, 100.0%)",
+    "thermal_drift_rate_c_hr": "Estimated instantaneous thermal drift velocity in \u00b0C/hour",
+    "risk_score": "Continuous explainable risk score (0-100) combining thermal proximity and active fault penalties",
+    "risk_category": "Risk category classification (low, warning, critical)",
+    "time_to_breach_min": "Estimated minutes until upper or lower safety boundary breach (999.0 if safe)"
   },
   "zone_configurations": {
     "zone-a": {

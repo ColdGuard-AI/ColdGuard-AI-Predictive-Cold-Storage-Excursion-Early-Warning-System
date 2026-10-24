@@ -8,9 +8,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 ScenarioName = Literal[
     "normal", "door_open", "compressor_failure", "ambient_increase",
-    "sensor_anomaly", "cooling_degradation", "abnormal_humidity", "fire_runaway"
+    "sensor_anomaly", "cooling_degradation", "abnormal_humidity", "fire_runaway", "fan_off"
 ]
-WhatIfScenario = Literal["normal", "door_open", "compressor_failure", "ambient_increase", "cooling_degradation"]
+WhatIfScenario = Literal["normal", "door_open", "compressor_failure", "ambient_increase", "cooling_degradation", "fan_off"]
 Severity = Literal["info", "warning", "critical"]
 
 
@@ -58,6 +58,47 @@ class ReadingsResponse(BaseModel):
     readings: list[Reading]
 
 
+class TelemetryIngestItem(BaseModel):
+    timestamp: Optional[datetime] = None
+    zone_id: str
+    sensor_id: Optional[str] = None
+    temperature: Optional[float] = None
+    humidity: Optional[float] = None
+    ambient_temperature: Optional[float] = None
+    compressor_status: Optional[str] = "running"
+    compressor_load_pct: Optional[float] = None
+    power_consumption_kw: Optional[float] = None
+    sensor_health: Optional[str] = "healthy"
+    door_status: Optional[str] = "closed"
+    door_open_duration_seconds: Optional[int] = 0
+    scenario: Optional[str] = "normal"
+    cooling_capacity_pct: Optional[float] = None
+    thermal_drift_rate_c_hr: Optional[float] = None
+    risk_score: Optional[int] = None
+    time_to_breach_min: Optional[float] = None
+
+
+class TelemetryIngestResponse(BaseModel):
+    status: str = "ok"
+    ingested_count: int
+    timestamp: datetime
+    zones_updated: list[str]
+
+
+class TelemetrySourceStatus(BaseModel):
+    source: str  # "dataset" | "simulator"
+    dataset_name: Optional[str] = "test_dataset.csv"
+    playback_index: int = 0
+    total_timestamps: int = 0
+    progress_pct: float = 0.0
+    current_timestamp: Optional[str] = None
+
+
+class TelemetrySourceChangeRequest(BaseModel):
+    source: Literal["dataset", "simulator"]
+    dataset_type: Optional[Literal["test", "train", "val", "full"]] = "test"
+
+
 class Alert(BaseModel):
     id: str
     zone_id: str
@@ -96,6 +137,7 @@ class ZoneSummary(BaseModel):
     compressor_status: Optional[str]
     door_status: Optional[str]
     door_open_minutes: float
+    door_open_seconds: Optional[int] = 0
     compressor_off_minutes: float
     compressor_load_pct: Optional[float] = None
     power_consumption_kw: Optional[float] = None
@@ -239,6 +281,19 @@ class DoorEventItem(BaseModel):
     notes: Optional[str] = None
 
 
+class InventorySpoilageRisk(BaseModel):
+    zone_name: str
+    inventory_category: str
+    total_inventory_value_usd: str
+    spoilage_status: str  # "Nominal (Protected)" | "Warning (Thermal Drift)" | "Critical (Spoilage Imminent / In Progress)"
+    vulnerable_items: list[str]
+    critical_threshold_c: float
+    time_to_spoilage_minutes: Optional[float] = None
+    spoilage_mechanism: str
+    financial_impact_risk: str
+    mitigation_urgency: str
+
+
 class AIExplanationResponse(BaseModel):
     headline: str
     severity: str
@@ -247,6 +302,7 @@ class AIExplanationResponse(BaseModel):
     summary_text: str
     recommended_actions: list[str]
     sensor_fault_analysis: Optional[dict[str, Any]] = None
+    inventory_spoilage_risk: Optional[InventorySpoilageRisk] = None
 
 
 class ZonePredictionOverview(BaseModel):

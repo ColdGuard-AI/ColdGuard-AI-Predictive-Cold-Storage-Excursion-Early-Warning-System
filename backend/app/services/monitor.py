@@ -67,18 +67,166 @@ class MonitoringService:
         self._lock = threading.RLock()
         self._task: asyncio.Task | None = None
         self._active_door_event_ids: dict[str, int | None] = {}
+        self.telemetry_source = "simulator"  # "simulator" | "dataset"
+        self.dataset_type = "test"
+        self.dataset_df: pd.DataFrame | None = None
+        self.dataset_timestamps: list[str] = []
+        self.dataset_playback_idx: int = 0
+        self._load_playback_dataset("test")
+
+        from app.crypto.blockchain import BlockchainLedger
+        from app.mqtt.service import MqttService
+
+        self.blockchain = BlockchainLedger(db, difficulty=settings.blockchain_difficulty)
+        self.mqtt = MqttService(
+            db=db,
+            blockchain=self.blockchain,
+            monitor=self,
+            broker_host=settings.mqtt_broker_host,
+            broker_port=settings.mqtt_broker_port,
+            topic=settings.mqtt_topic,
+            username=settings.mqtt_username,
+            password=settings.mqtt_password,
+            use_tls=settings.mqtt_use_tls,
+            anchor_batch_size=settings.blockchain_batch_size,
+        )
+
+    def _load_playback_dataset(self, dataset_type: str = "test") -> bool:
+        from pathlib import Path
+        filename = "synthetic_sensor_readings_full.csv" if dataset_type == "full" else f"{dataset_type}_dataset.csv"
+        path = Path(__file__).resolve().parents[2] / "data" / "synthetic" / filename
+        if not path.exists():
+            return False
+        try:
+            df = pd.read_csv(path)
+            if "timestamp" not in df.columns or "zone_id" not in df.columns:
+                return False
+
+            # Filter clean baseline normal timestamps so extreme pre-recorded catastrophe tests
+            # (e.g. fire runaway reaching 136°C) are never replayed as normal baseline telemetry
+            valid_mask = (df["scenario"] == "normal") & (
+                ((df["zone_id"] == "zone-a") & (df["temperature"].between(2.0, 9.0))) |
+                ((df["zone_id"] == "zone-b") & (df["temperature"].between(0.0, 7.0))) |
+                ((df["zone_id"] == "zone-c") & (df["temperature"].between(-26.0, -12.0)))
+            )
+            clean_ts = df[valid_mask].groupby("timestamp")["zone_id"].nunique()
+            clean_timestamps = clean_ts[clean_ts == 3].index.tolist()
+
+            if clean_timestamps:
+                self.dataset_df = df[df["timestamp"].isin(clean_timestamps)].copy()
+                self.dataset_timestamps = sorted(clean_timestamps)
+            else:
+                self.dataset_df = df
+                self.dataset_timestamps = sorted(df["timestamp"].unique().tolist())
+
+            self.dataset_type = dataset_type
+            self.dataset_playback_idx = 0
+            log.info("Loaded dataset playback source: %s (%d timestamps)", filename, len(self.dataset_timestamps))
+            return True
+        except Exception as e:
+            log.warning("Failed to load dataset playback: %s", e)
+            return False
+
+    def set_telemetry_source(self, source: str, dataset_type: str = "test") -> dict[str, Any]:
+        with self._lock:
+            if source == "dataset":
+                success = self._load_playback_dataset(dataset_type)
+                if not success:
+                    self.telemetry_source = "simulator"
+                    return {"source": "simulator", "error": f"Dataset {dataset_type} not found"}
+                self.telemetry_source = "dataset"
+            else:
+                self.telemetry_source = "simulator"
+            return self.get_telemetry_source_status()
+
+    def get_telemetry_source_status(self) -> dict[str, Any]:
+        with self._lock:
+            n_ts = len(self.dataset_timestamps)
+            curr_ts = self.dataset_timestamps[self.dataset_playback_idx] if (self.dataset_timestamps and self.dataset_playback_idx < n_ts) else None
+            pct = round((self.dataset_playback_idx / max(1, n_ts)) * 100.0, 1) if n_ts else 0.0
+            filename = "synthetic_sensor_readings_full.csv" if self.dataset_type == "full" else f"{self.dataset_type}_dataset.csv"
+            return {
+                "source": self.telemetry_source,
+                "dataset_name": filename,
+                "playback_index": self.dataset_playback_idx,
+                "total_timestamps": n_ts,
+                "progress_pct": pct,
+                "current_timestamp": curr_ts,
+            }
+
+    def ingest_readings(self, readings_list: list[dict[str, Any]]) -> dict[str, Any]:
+        """Directly ingest sensor packets from external IoT scripts/gateways."""
+        with self._lock:
+            ingested = []
+            now_time = datetime.now().replace(microsecond=0)
+            zones_updated = set()
+            for item in readings_list:
+                zid = item.get("zone_id")
+                if zid not in ZONES:
+                    continue
+                cfg = ZONES[zid]
+                item_ts = item.get("timestamp") or now_time
+                if isinstance(item_ts, str):
+                    try:
+                        item_ts = datetime.fromisoformat(item_ts)
+                    except Exception:
+                        item_ts = now_time
+
+                reading = {
+                    "timestamp": item_ts,
+                    "zone_id": zid,
+                    "sensor_id": item.get("sensor_id", cfg.sensor_id),
+                    "temperature": item.get("temperature"),
+                    "humidity": item.get("humidity", 50.0),
+                    "compressor_status": item.get("compressor_status", "running"),
+                    "compressor_load_pct": item.get("compressor_load_pct", 85.0),
+                    "power_consumption_kw": item.get("power_consumption_kw", 3.0),
+                    "sensor_health": item.get("sensor_health", "healthy"),
+                    "door_status": item.get("door_status", "closed"),
+                    "door_open_duration_seconds": item.get("door_open_duration_seconds", 0),
+                    "time_since_closure_seconds": item.get("time_since_closure_seconds", 0),
+                    "cumulative_open_seconds_24h": 0,
+                    "ambient_temperature": item.get("ambient_temperature", 24.0),
+                    "scenario": item.get("scenario", "normal"),
+                    "residual_rise_predicted": item.get("residual_rise_predicted", 0.0),
+                    "peak_temp_predicted": item.get("peak_temp_predicted", cfg.setpoint),
+                    "recovery_time_minutes": item.get("recovery_time_minutes", 0.0),
+                    "recovery_progress_pct": item.get("recovery_progress_pct", 100.0),
+                    "recovery_phase": item.get("recovery_phase", "none"),
+                    "true_temperature": item.get("true_temperature", item.get("temperature", cfg.setpoint)),
+                    "is_synthetic": True,
+                }
+                ingested.append(reading)
+                zones_updated.add(zid)
+
+            if ingested:
+                self.db.insert_readings(ingested)
+                for zid in zones_updated:
+                    self._assess(zid, raise_alerts=True)
+
+            return {
+                "status": "ok",
+                "ingested_count": len(ingested),
+                "timestamp": now_time,
+                "zones_updated": list(zones_updated),
+            }
 
     # ------------------------------------------------------------------ lifecycle
     def initialize(self, start_time: datetime | None = None) -> None:
         """Fresh start: clear storage, seed simulators with realistic normal history."""
         with self._lock:
             self.db.reset()
+            if hasattr(self, "blockchain") and self.blockchain:
+                self.blockchain._ensure_genesis_block()
+            if hasattr(self, "mqtt") and self.mqtt:
+                self.mqtt.device_states = {}
+                self.mqtt.pending_anchor_buffer = []
             now = (start_time or datetime.now()).replace(second=0, microsecond=0)
             self.sims = {}
             self._active_door_event_ids = {zid: None for zid in ZONES}
             history = []
             for i, (zone_id, cfg) in enumerate(ZONES.items()):
-                sim = ZoneSimulator(cfg, seed=self.settings.seed + i * 17, start_time=now)
+                sim = ZoneSimulator(cfg, seed=self.settings.seed + i * 17, start_time=now, routine_door_openings=False)
                 history.extend(seed_live_history(cfg, sim, self.settings.seed_history_minutes))
                 self.sims[zone_id] = sim
             self.db.insert_readings(history)
@@ -97,9 +245,120 @@ class MonitoringService:
         and generate fresh multi-horizon ML predictions persisted into the database."""
         created: list[dict[str, Any]] = []
         with self._lock:
-            # 1. Step every simulator
-            readings = [sim.step() for sim in self.sims.values()]
-            self.db.insert_readings(readings)
+            readings = []
+            has_active_scenario = any(s.scenario != "normal" or s.state.door_open or not s.state.fans_active for s in self.sims.values())
+            if self.telemetry_source == "dataset" and not has_active_scenario and self.dataset_df is not None and self.dataset_timestamps:
+                target_ts = self.dataset_timestamps[self.dataset_playback_idx]
+                ts_rows = self.dataset_df[self.dataset_df["timestamp"] == target_ts]
+                sim_clock = max(s.time for s in self.sims.values()) if self.sims else datetime.now().replace(microsecond=0)
+                sim_clock_next = sim_clock + timedelta(minutes=1)
+                for _, row in ts_rows.iterrows():
+                    zid = str(row["zone_id"])
+                    cfg = ZONES.get(zid)
+                    if not cfg:
+                        continue
+                    if zid in self.sims:
+                        self.sims[zid].time = sim_clock_next
+
+                    sim_state = self.sims[zid].state
+                    sim_scenario = self.sims[zid].scenario
+                    is_door_open = sim_state.door_open
+                    is_comp_on = sim_state.compressor_on
+
+                    raw_temp = float(row["temperature"]) if pd.notna(row.get("temperature")) else cfg.setpoint
+                    if sim_scenario == "normal":
+                        if zid == "zone-a":
+                            clamped_temp = max(2.5, min(7.5, raw_temp))
+                        elif zid == "zone-b":
+                            clamped_temp = max(0.5, min(5.5, raw_temp))
+                        else:
+                            clamped_temp = max(-24.0, min(-16.0, raw_temp))
+                    else:
+                        clamped_temp = raw_temp
+
+                    r = {
+                        "timestamp": sim_clock_next,
+                        "zone_id": zid,
+                        "sensor_id": str(row.get("sensor_id", cfg.sensor_id)),
+                        "temperature": round(clamped_temp, 2),
+                        "humidity": float(row.get("humidity", 50.0)),
+                        "compressor_status": "running" if is_comp_on else "stopped",
+                        "compressor_load_pct": float(row.get("compressor_load_pct", 85.0)) if is_comp_on else 0.0,
+                        "power_consumption_kw": float(row.get("power_consumption_kw", 3.0)) if is_comp_on else 0.2,
+                        "fans_active": sim_state.fans_active,
+                        "fan_status": "running" if sim_state.fans_active else "stopped",
+                        "fan_off_seconds": sim_state.fan_off_seconds,
+                        "sensor_health": "healthy" if sim_scenario != "sensor_anomaly" else "spike_anomaly",
+                        "door_status": "open" if is_door_open else "closed",
+                        "door_open_duration_seconds": sim_state.door_open_seconds if is_door_open else 0,
+                        "time_since_closure_seconds": sim_state.time_since_closure_seconds if not is_door_open else 0,
+                        "cumulative_open_seconds_24h": 0,
+                        "ambient_temperature": float(row.get("ambient_temperature", 24.0)),
+                        "scenario": sim_scenario,
+                        "residual_rise_predicted": float(sim_state.residual_rise_predicted),
+                        "peak_temp_predicted": float(sim_state.peak_temp_predicted if sim_state.peak_temp_predicted is not None else cfg.setpoint),
+                        "recovery_time_minutes": float(sim_state.recovery_time_minutes),
+                        "recovery_progress_pct": float(sim_state.recovery_progress_pct),
+                        "recovery_phase": str(sim_state.recovery_phase if not is_door_open else "door_open"),
+                        "true_temperature": round(clamped_temp, 2),
+                        "is_synthetic": True,
+                    }
+                    readings.append(r)
+                self.dataset_playback_idx = (self.dataset_playback_idx + 1) % len(self.dataset_timestamps)
+            else:
+                readings = [sim.step() for sim in self.sims.values()]
+
+            from app.crypto.canonical import compute_telemetry_hash
+            for r in readings:
+                rid = self.db.insert_reading_single(r)
+                zid = r["zone_id"]
+                cfg = ZONES.get(zid)
+                dev_id = str(r.get("sensor_id") or (cfg.sensor_id if cfg else f"TS-{zid}"))
+                dev_state = self.mqtt.device_states.get(dev_id, {"last_seq": 0, "last_hash": "0" * 64})
+                seq = dev_state["last_seq"] + 1
+                prev_hash = dev_state["last_hash"]
+
+                ts_val = r["timestamp"]
+                ts_str = ts_val.isoformat() if hasattr(ts_val, "isoformat") else str(ts_val)
+                payload_dict = {
+                    "device_id": dev_id,
+                    "zone_id": zid,
+                    "timestamp": ts_str,
+                    "sequence_number": seq,
+                    "temperature": r.get("temperature"),
+                    "humidity": r.get("humidity", 50.0),
+                    "door_state": r.get("door_status", "closed"),
+                    "compressor_status": r.get("compressor_status", "running"),
+                    "prev_hash": prev_hash,
+                }
+                canonical_json, computed_hash = compute_telemetry_hash(payload_dict)
+
+                self.db.record_telemetry_verification(
+                    reading_id=rid,
+                    zone_id=zid,
+                    device_id=dev_id,
+                    sequence_number=seq,
+                    timestamp=ts_str,
+                    payload_hash=computed_hash,
+                    prev_hash=prev_hash,
+                    canonical_payload=canonical_json,
+                    verification_status="verified",
+                    verification_message="Verified from simulated telemetry stream",
+                )
+                self.mqtt.device_states[dev_id] = {
+                    "last_seq": seq,
+                    "last_hash": computed_hash,
+                }
+                self.mqtt.pending_anchor_buffer.append({
+                    "reading_id": rid,
+                    "payload_hash": computed_hash,
+                })
+
+            if len(self.mqtt.pending_anchor_buffer) >= self.mqtt.anchor_batch_size:
+                try:
+                    self.mqtt.anchor_pending_batch()
+                except Exception as err:
+                    log.error("Failed to anchor pending batch: %s", err)
 
             # 2. Track stateful door open and door close events independently per zone
             for r in readings:
@@ -219,11 +478,15 @@ class MonitoringService:
 
     def start_background(self) -> None:
         self.running = True
+        if hasattr(self, "mqtt") and self.mqtt:
+            self.mqtt.start()
         if self._task is None or self._task.done():
             self._task = asyncio.get_event_loop().create_task(self.run_loop())
 
     async def stop_background(self) -> None:
         self.running = False
+        if hasattr(self, "mqtt") and self.mqtt:
+            self.mqtt.stop()
         if self._task:
             self._task.cancel()
             try:
@@ -282,9 +545,16 @@ class MonitoringService:
 
         # Stateful door & recovery tracking
         res_rise = sim.state.residual_rise_predicted if sim else float(latest_row.get("residual_rise_predicted") or 0.0)
-        peak_t = sim.state.peak_temp_predicted if sim else float(latest_row.get("peak_temp_predicted") or (current_for_risk or cfg.setpoint))
         rec_prog = sim.state.recovery_progress_pct if sim else float(latest_row.get("recovery_progress_pct") or 100.0)
         rec_phase = sim.state.recovery_phase if sim else str(latest_row.get("recovery_phase") or "none")
+        if rec_phase in ("recovered", "none") or rec_prog >= 99.0:
+            peak_t = current_for_risk or cfg.setpoint
+            res_rise = 0.0
+            if sim:
+                sim.state.peak_temp_predicted = cfg.setpoint
+                sim.state.residual_rise_predicted = 0.0
+        else:
+            peak_t = sim.state.peak_temp_predicted if sim else float(latest_row.get("peak_temp_predicted") or (current_for_risk or cfg.setpoint))
         m_since_close = (sim.state.time_since_closure_seconds / 60.0) if sim else (float(latest_row.get("time_since_closure_seconds") or 0) / 60.0)
         last_dur_min = (sim.state.last_door_duration_seconds / 60.0) if sim else 0.0
 
@@ -292,6 +562,8 @@ class MonitoringService:
             history, cfg, forecaster, prepared=prepared, features=all_feats,
             residual_rise=res_rise, peak_temp_predicted=peak_t, recovery_phase=rec_phase,
         )
+
+        scenario_kind = sim.scenario if sim else str(latest_row.get("scenario") or "normal")
 
         risk = self._risk_from(
             cfg, forecast, current_for_risk, slope, comp_off_min, door_min,
@@ -302,6 +574,7 @@ class MonitoringService:
             peak_temp_predicted=peak_t,
             recovery_progress_pct=rec_prog,
             recovery_phase=rec_phase,
+            scenario=scenario_kind,
         )
 
         self.assessments[zone_id] = ZoneAssessment(
@@ -348,6 +621,7 @@ class MonitoringService:
         peak_temp_predicted: float | None = None,
         recovery_progress_pct: float = 100.0,
         recovery_phase: str = "none",
+        scenario: str = "normal",
     ) -> dict[str, Any]:
         temps = [p["temperature"] for p in forecast.get("points", [])] if forecast.get("available") else []
         steps = FORECAST_STEPS[: len(temps)]
@@ -359,6 +633,7 @@ class MonitoringService:
             peak_temp_predicted=peak_temp_predicted,
             recovery_progress_pct=recovery_progress_pct,
             recovery_phase=recovery_phase,
+            scenario=scenario,
         )
         out = result.to_dict()
         out["forecast_available"] = bool(temps)
@@ -376,6 +651,7 @@ class MonitoringService:
 
             if action == "open":
                 sim.open_door(duration_minutes=duration_minutes)
+                sim.set_scenario("door_open")
                 active_ev_id = self._active_door_event_ids.get(zone_id)
                 if active_ev_id is None:
                     stats_24h = self.db.get_door_stats_24h(zone_id, now)
@@ -400,6 +676,8 @@ class MonitoringService:
                     self._active_door_event_ids[zone_id] = ev_id
             elif action == "close":
                 info = sim.close_door()
+                if sim.scenario == "door_open":
+                    sim.set_scenario("normal")
                 active_ev_id = self._active_door_event_ids.get(zone_id)
                 if active_ev_id is not None:
                     self.db.update_door_event(
@@ -509,8 +787,12 @@ class MonitoringService:
             "ambient_temperature": latest.get("ambient_temperature"),
             "temperature_status": a.temperature_status,
             "compressor_status": latest.get("compressor_status"),
+            "fans_active": latest.get("fans_active", sim.state.fans_active if sim else True),
+            "fan_status": latest.get("fan_status", "running" if (sim.state.fans_active if sim else True) else "stopped"),
+            "fan_off_seconds": latest.get("fan_off_seconds", sim.state.fan_off_seconds if sim else 0),
             "door_status": latest.get("door_status"),
             "door_open_minutes": a.door_open_minutes,
+            "door_open_seconds": sim.state.door_open_seconds if sim and sim.state.door_open else 0,
             "compressor_off_minutes": a.compressor_off_minutes,
             "compressor_load_pct": latest.get("compressor_load_pct", 85.0 if latest.get("compressor_status") in ("running", "degraded") else 0.0),
             "power_consumption_kw": latest.get("power_consumption_kw"),
@@ -645,45 +927,212 @@ class MonitoringService:
         active_fc = forecast_cache.get(selected_horizon) or self.forecast(zone_id, selected_horizon)
         chart_points = active_fc.get("points", [])
 
-        door_open = latest.get("door_status") == "open" or a.door_open_minutes > 0
+        sim = self.sims.get(zone_id)
+        active_scenario = sim.scenario if sim else str(latest.get("scenario") or "normal")
+
+        # Telemetry & status resolution
+        door_open = latest.get("door_status") == "open" or a.door_open_minutes > 0 or (sim.state.door_open if sim else False)
         comp_status = latest.get("compressor_status", "running")
+        if sim and not sim.state.compressor_on:
+            comp_status = "stopped"
+        if active_scenario == "compressor_failure":
+            comp_status = "stopped"
+        elif active_scenario == "cooling_degradation":
+            comp_status = "degraded"
+        elif active_scenario == "fire_runaway":
+            comp_status = "failed"
+
+        fans_active = latest.get("fans_active", sim.state.fans_active if sim else True)
+        if sim and not sim.state.fans_active:
+            fans_active = False
+        if active_scenario == "fan_off":
+            fans_active = False
+
         sensor_status = a.sensor.get("status", "normal")
         sensor_issues = a.sensor.get("issues", [])
         trend = round(a.slope_per_min * 60.0, 1)
         ttb_60 = horizons_dict["60"].get("time_to_breach_minutes")
 
+        # Explicit Scenario Categorization Flags
+        is_fire_runaway = (active_scenario == "fire_runaway")
+        is_comp_offline = (
+            active_scenario == "compressor_failure"
+            or comp_status in ("stopped", "failed", "offline")
+            or (sim is not None and not sim.state.compressor_on and active_scenario != "fan_off")
+        )
+        is_fan_offline = (
+            active_scenario == "fan_off"
+            or not fans_active
+            or latest.get("fan_status") == "stopped"
+        )
+        is_door_open = (door_open or active_scenario == "door_open")
+        is_cooling_degraded = (active_scenario == "cooling_degradation" or comp_status == "degraded")
+        is_sensor_fault = (active_scenario == "sensor_anomaly" or sensor_status == "suspicious" or bool(sensor_issues))
+
         # Explainable AI & Narrative Generation
-        if door_open:
-            min_open = max(1, int(a.door_open_minutes or 5))
-            time_str = f"{int(ttb_60)} minutes" if ttb_60 and ttb_60 > 0 else "40 minutes"
-            headline = f"High risk of temperature excursion in next {time_str}" if ttb_60 and ttb_60 <= 60 else "Elevated heat ingress from open chamber door"
-            severity = "critical" if (ttb_60 and ttb_60 <= 60) else "warning"
-            base_t = round(curr_temp - (a.slope_per_min * 10), 1)
+        if is_fire_runaway:
+            time_str = f"{int(ttb_60)} minutes" if ttb_60 and ttb_60 > 0 else "12 minutes"
+            headline = "Critical electrical thermal runaway & sensor combustion"
+            severity = "critical"
             narrative = (
-                f"The door of {cfg.name} has been open for {min_open} minutes, allowing warm outdoor air ({amb_temp:.1f}°C) "
-                f"to enter. This has driven temperature up from {base_t:.1f}°C to {curr_temp:.1f}°C. "
-                f"Closing the door now is urgent: residual heat will continue warming the room for several minutes after closure "
-                f"before cooling pull-down takes full effect."
+                f"EMERGENCY IN {cfg.name.upper()}: Primary sensor probe wiring harness has suffered electrical thermal runaway / combustion. "
+                f"Extreme localized heating (+2.0°C/min) detected. Emergency compressor failsafe shutoff has engaged to prevent electrical ignition. "
+                f"Chamber air temperature is rapidly destabilizing toward critical upper limit ({cfg.upper_limit:.1f}°C) in approximately {time_str}."
             )
             factors = [
-                f"Door open for {min_open} minutes (direct convective infiltration)",
-                f"Outdoor ambient temperature {amb_temp:.1f}°C (steep thermal gradient)",
-                f"Rising temperature trend ({'+' if trend >= 0 else ''}{trend:.1f}°C in last 10 minutes)",
-                "Compressor operating at maximum duty cycle against infiltration",
+                "Sensor probe combustion and thermal runaway (+2°C/min heat influx)",
+                "Emergency electrical failsafe shutoff engaged",
+                f"Outdoor ambient temperature {amb_temp:.1f}°C accelerating chamber warmup",
+                "Zero telemetry reliability on affected probe circuit",
             ]
             summary_text = (
-                f"If the door is closed now, peak temperature is projected to reach ~{curr_temp + 0.6:.1f}°C before recovery begins. "
-                f"If the door remains open, excursion probability is {horizons_dict['60']['risk_score']}% within 1 hour."
+                f"Active electrical thermal runaway in progress. Evacuate chamber and isolate electrical subpanel immediately; excursion probability reaches {max(85, horizons_dict['30']['risk_score'])}% within 15 minutes."
             )
             recs = [
-                "Close the door immediately and inspect perimeter gasket latch.",
-                "Do NOT re-open the door during the post-closure recovery phase.",
-                "Monitor temperature for the next 45-60 minutes.",
-                "Ensure compressor inverter ramps to full cooling pull-down.",
-                "Verify no cargo obstructions are preventing tight door seal.",
+                "Isolate electrical breaker feeding the chamber branch circuit immediately.",
+                "Deploy CO2 dry chemical fire extinguisher if visible smoke or flame is detected.",
+                "Evacuate chamber personnel and ensure cold-room emergency latch is sealed.",
+                "Engage backup portable telemetry probes to monitor stock.",
+                "Dispatch emergency facilities electrical engineer immediately.",
             ]
-        elif not door_open and (a.recovery_phase in ("residual_rise", "active_recovery") or (a.time_since_closure_minutes < 45 and a.recovery_progress_pct < 95.0)):
-            # Door recently closed: Residual Rise & Recovery Phase
+        elif is_comp_offline:
+            min_off = max(1, int(a.compressor_off_minutes or 2))
+            headline = f"Primary refrigeration compressor tripped offline ({min_off}m offline)"
+            severity = "critical"
+            time_str = f"{int(ttb_60)} minutes" if ttb_60 and ttb_60 > 0 else "34 minutes"
+            narrative = (
+                f"Primary refrigeration compressor in {cfg.name} has tripped offline ({min_off} consecutive minutes elapsed). "
+                f"Active cooling output is 0.0 kW. Under an outdoor ambient temperature of {amb_temp:.1f}°C "
+                f"(thermal gradient: +{amb_temp - curr_temp:+.1f}°C), external wall heat ingress is driving chamber temperature "
+                f"upward toward safe upper limit ({cfg.upper_limit:.1f}°C) in approximately {time_str}."
+            )
+            factors = [
+                f"Compressor status 'stopped' / tripped ({min_off} min offline)",
+                "Zero active refrigeration lift (0.0 kW sensible cooling)",
+                f"External ambient temperature {amb_temp:.1f}°C driving continuous heat leakage",
+                f"Temperature rising at {trend:+.1f}°C/h toward excursion threshold",
+            ]
+            summary_text = (
+                f"Refrigeration is completely offline. Immediate breaker reset or auxiliary cooling is required within {time_str}; excursion probability reaches {max(horizons_dict['30']['risk_score'], horizons_dict['60']['risk_score'])}%."
+            )
+            recs = [
+                "Inspect compressor power circuit breakers and motor contactors on main electrical panel.",
+                "Engage secondary auxiliary refrigeration circuit if available.",
+                "Maintain cold room door seal locked to conserve remaining thermal inertia.",
+                "Prepare transfer protocol for sensitive inventory to backup cold storage.",
+                "Dispatch certified HVAC refrigeration specialist immediately.",
+            ]
+        elif is_fan_offline:
+            fan_off_sec = latest.get("fan_off_seconds", (sim.state.fan_off_seconds if sim else 60))
+            m_off = max(1, fan_off_sec // 60)
+            time_str = f"{int(ttb_60)} minutes" if ttb_60 and ttb_60 > 0 else "28 minutes"
+            headline = f"Evaporator cooling fan tripped offline ({m_off}m offline)"
+            severity = "critical" if ttb_60 and ttb_60 <= 45 else "warning"
+            narrative = (
+                f"Evaporator circulation fans in {cfg.name} have tripped offline ({m_off} minutes elapsed). "
+                f"Forced air circulation across cooling coils has completely halted, causing an 85% reduction in heat extraction capacity. "
+                f"Under an outdoor ambient temperature of {amb_temp:.1f}°C (thermal gradient: +{amb_temp - curr_temp:+.1f}°C), "
+                f"stagnant air is warming rapidly toward safe upper limit ({cfg.upper_limit:.1f}°C) in approximately {time_str}."
+            )
+            factors = [
+                f"Evaporator fan offline for {m_off} minutes (zero forced coil airflow)",
+                "85% reduction in effective refrigeration heat extraction",
+                f"Outdoor ambient temperature {amb_temp:.1f}°C exerting continuous thermal pressure",
+                f"Thermal stratification and upward drift of {trend:+.1f}°C/h",
+            ]
+            summary_text = (
+                f"Without evaporator airflow, cold air remains trapped at the floor and coils freeze over. "
+                f"Excursion risk is {horizons_dict['30']['risk_score']}% within 30 minutes unless fan breaker is reset."
+            )
+            recs = [
+                "Reset evaporator fan thermal overload relay and inspect motor windings.",
+                "Check fan belt and electrical subpanel breaker for tripping.",
+                "Engage emergency secondary air circulation blowers if available.",
+                "Keep chamber doors strictly sealed to preserve existing cold air volume.",
+                "Verify temperature across vertical air column with auxiliary probes.",
+            ]
+        elif is_door_open:
+            sec_open = latest.get("door_open_duration_seconds", (sim.state.door_open_seconds if sim else int((a.door_open_minutes or 1) * 60)))
+            m_open = sec_open // 60
+            s_open = sec_open % 60
+            dur_display = f"{m_open}m {s_open}s" if m_open > 0 else f"{s_open} seconds"
+            time_str = f"{int(ttb_60)} minutes" if ttb_60 and ttb_60 > 0 else "38 minutes"
+            headline = f"High risk of temperature excursion in next {time_str}" if ttb_60 and ttb_60 <= 60 else "Chamber door open — convective heat ingress"
+            severity = "critical" if (ttb_60 and ttb_60 <= 60) else "warning"
+            temp_gradient = amb_temp - curr_temp
+            narrative = (
+                f"The dock door of {cfg.name} has been left open for {dur_display}. "
+                f"Outdoor air at {amb_temp:.1f}°C is actively infiltrating into the chamber (thermal gradient: +{temp_gradient:.1f}°C). "
+                f"At current ingress rates, chamber air is warming toward the critical limit of {cfg.upper_limit:.1f}°C in ~{time_str}. "
+                f"Immediate action is required to latch the door; every additional 30 seconds of open doorway adds residual trapped heat."
+            )
+            factors = [
+                f"Door open for {dur_display} (continuous convective air exchange)",
+                f"Outdoor ambient temperature {amb_temp:.1f}°C (steep +{temp_gradient:.1f}°C thermal differential)",
+                f"Convective heat ingress exceeding refrigeration lift capacity",
+                f"Projected chamber temperature drift of {trend:+.1f}°C/h",
+            ]
+            summary_text = (
+                f"If the door is sealed now, residual thermal rise will peak at ~{curr_temp + min(1.8, max(0.2, 0.08 * (sec_open / 60.0) * (temp_gradient / 18.0))):.1f}°C. "
+                f"If left open, excursion probability reaches {horizons_dict['60']['risk_score']}% within 1 hour."
+            )
+            recs = [
+                "Close the door immediately and verify magnetic gasket compression.",
+                "Do NOT re-open the door during the subsequent thermal pull-down phase.",
+                "Monitor chamber recovery trajectory for the next 45-60 minutes.",
+                "Ensure refrigeration compressor inverter ramps to full cooling pull-down.",
+                "Verify no cargo pallet obstructions are preventing tight door latch.",
+            ]
+        elif is_cooling_degraded:
+            headline = "Cooling system performance degraded (45% capacity loss)"
+            severity = "warning"
+            narrative = (
+                f"The refrigeration unit in {cfg.name} is operating at degraded capacity (approx. 50% of nominal lift). "
+                f"Under {amb_temp:.1f}°C ambient conditions, the compressor cannot meet setpoint demand."
+            )
+            factors = [
+                "Refrigeration cooling output derated to 50%",
+                "Condenser heat rejection efficiency impaired",
+                f"Elevated ambient thermal gradient ({amb_temp:.1f}°C)",
+                "Thermal recovery slope lagging standard envelope by 50%",
+            ]
+            summary_text = (
+                f"At 50% capacity, chamber will stabilize around {curr_temp + 2.2:.1f}°C unless maintenance cleans coils."
+            )
+            recs = [
+                "Clean condenser coils of dust, grease, and particulate buildup.",
+                "Verify evaporator fan speed and defrost cycle completion.",
+                "Check refrigerant pressure gauges for slow leaks.",
+                "Restrict routine door access to minimize sensible load.",
+                "Schedule priority maintenance service ticket.",
+            ]
+        elif is_sensor_fault:
+            issue_desc = sensor_issues[0].get("detail", "High variance / telemetry spike detected") if sensor_issues else "Telemetry spike detected"
+            headline = f"Telemetry anomaly detected on sensor {cfg.sensor_id}"
+            severity = "warning"
+            narrative = (
+                f"Sensor {cfg.sensor_id} in {cfg.name} is reporting unnatural telemetry ({issue_desc}). "
+                f"Physical thermal mass inertia and refrigeration current indicate this is an instrumentation fault, "
+                f"not a genuine bulk chamber excursion."
+            )
+            factors = [
+                f"Statistical anomaly flag on sensor {cfg.sensor_id}",
+                "Incompatible gradient with thermal time constant (>180 min)",
+                f"Ambient temperature steady at {amb_temp:.1f}°C",
+                "Secondary power draw telemetry indicates nominal cooling",
+            ]
+            summary_text = (
+                "Predictive models have engaged robust Kalman filtering. Readings marked suspicious until physical probe inspection."
+            )
+            recs = [
+                f"Physically inspect {cfg.sensor_id} wiring and mounting harness.",
+                "Verify temperature using an independent calibrated handheld probe.",
+                "Check RF signal strength and gateway wireless link quality.",
+                "Perform probe zero-offset calibration.",
+                "Replace sensor cartridge if telemetry jitter exceeds ±0.4°C.",
+            ]
+        elif not is_door_open and (a.recovery_phase in ("residual_rise", "active_recovery") or (a.time_since_closure_minutes < 45 and a.recovery_progress_pct < 95.0)):
+            # Door recently closed: Residual Rise & Recovery Phase (refrigeration running normally)
             m_since = max(1, int(a.time_since_closure_minutes))
             dur_prev = max(1, int(a.last_door_duration_minutes or 3))
             est_rec = int(latest.get("recovery_time_minutes", 35))
@@ -716,88 +1165,13 @@ class MonitoringService:
                 "Verify high compressor load and uninterrupted evaporator fan airflow.",
                 f"Monitor pull-down trajectory until temperature stabilizes within ±0.3°C of {cfg.setpoint:.1f}°C.",
             ]
-        elif comp_status in ("stopped", "failed"):
-            min_off = max(1, int(a.compressor_off_minutes or 2))
-            headline = "Refrigeration compressor failure alert"
-            severity = "critical"
-            time_str = f"{int(ttb_60)} minutes" if ttb_60 and ttb_60 > 0 else "35 minutes"
-            narrative = (
-                f"Compressor in {cfg.name} has been offline for {min_off} consecutive minutes. "
-                f"Active cooling is 0 kW. Ambient heat infiltration ({amb_temp:.1f}°C) is driving temperature "
-                f"upward toward safe upper limit ({cfg.upper_limit:.1f}°C) in approximately {time_str}."
-            )
-            factors = [
-                f"Compressor status 'stopped' ({min_off} min offline)",
-                f"Zero sensible cooling against {amb_temp:.1f}°C external ambient",
-                f"Passive chamber thermal leakage coefficient k={cfg.k_leak}",
-                f"Rate of temperature rise {trend:+.1f}°C/h",
-            ]
-            summary_text = (
-                f"If cooling is restored now, temperature will re-stabilize near {cfg.setpoint:.1f}°C in 45 min. "
-                f"Without intervention, excursion probability reaches {horizons_dict['60']['risk_score']}% within 1 hour."
-            )
-            recs = [
-                "Inspect compressor power circuit breakers and motor contactors.",
-                "Engage secondary auxiliary refrigeration unit if available.",
-                "Maintain cold room door seal lock to conserve thermal inertia.",
-                "Prepare transfer protocol for sensitive inventory.",
-                "Dispatch certified HVAC refrigeration technician.",
-            ]
-        elif sensor_status == "suspicious" or sensor_issues:
-            issue_desc = sensor_issues[0].get("detail", "High variance / telemetry spike detected") if sensor_issues else "Telemetry spike detected"
-            headline = f"Telemetry anomaly detected on sensor {cfg.sensor_id}"
-            severity = "warning"
-            narrative = (
-                f"Sensor {cfg.sensor_id} in {cfg.name} is reporting unnatural telemetry ({issue_desc}). "
-                f"Physical thermal mass inertia and refrigeration current indicate this is an instrumentation fault, "
-                f"not a genuine bulk chamber excursion."
-            )
-            factors = [
-                f"Statistical anomaly flag on sensor {cfg.sensor_id}",
-                "Incompatible gradient with thermal time constant (>180 min)",
-                f"Ambient temperature steady at {amb_temp:.1f}°C",
-                "Secondary power draw telemetry indicates nominal cooling",
-            ]
-            summary_text = (
-                "Predictive models have engaged robust Kalman filtering. Readings marked suspicious until physical probe inspection."
-            )
-            recs = [
-                f"Physically inspect {cfg.sensor_id} wiring and mounting harness.",
-                "Verify temperature using an independent calibrated handheld probe.",
-                "Check RF signal strength and gateway wireless link quality.",
-                "Perform probe zero-offset calibration.",
-                "Replace sensor cartridge if telemetry jitter exceeds ±0.4°C.",
-            ]
-        elif comp_status == "degraded":
-            headline = "Cooling system performance degraded (50% capacity)"
-            severity = "warning"
-            narrative = (
-                f"The refrigeration unit in {cfg.name} is operating at degraded capacity (approx. 50% of nominal lift). "
-                f"Under {amb_temp:.1f}°C ambient conditions, the compressor cannot meet setpoint demand."
-            )
-            factors = [
-                "Refrigeration cooling output derated to 50%",
-                "Condenser heat rejection efficiency impaired",
-                f"Elevated ambient thermal gradient ({amb_temp:.1f}°C)",
-                "Thermal recovery slope lagging standard envelope by 50%",
-            ]
-            summary_text = (
-                f"At 50% capacity, chamber will stabilize around {curr_temp + 2.2:.1f}°C unless maintenance cleans coils."
-            )
-            recs = [
-                "Clean condenser coils of dust, grease, and particulate buildup.",
-                "Verify evaporator fan speed and defrost cycle completion.",
-                "Check refrigerant pressure gauges for slow leaks.",
-                "Restrict routine door access to minimize sensible load.",
-                "Schedule priority maintenance service ticket.",
-            ]
         else:
             headline = "All systems operating within safe limits"
             severity = "normal"
             narrative = (
                 f"Storage chamber {cfg.name} is in steady-state thermal equilibrium. Temperature is maintaining "
                 f"at {curr_temp:.1f}°C (setpoint {cfg.setpoint:.1f}°C, safe range {cfg.lower_limit:.1f}°C to {cfg.upper_limit:.1f}°C). "
-                f"Compressor duty cycle and perimeter gaskets are operating within validated GMP tolerances."
+                f"Outdoor ambient temperature is {amb_temp:.1f}°C. Compressor duty cycle and perimeter gaskets are operating within validated GMP tolerances."
             )
             factors = [
                 "Door sealed and perimeter gasket intact",
@@ -816,6 +1190,51 @@ class MonitoringService:
                 "Log routine HACCP compliance check.",
             ]
 
+        # Dynamic Perishable Inventory Spoilage Calculation
+        vulnerable_items = getattr(cfg, "vulnerable_items", [cfg.product])
+        inventory_val = getattr(cfg, "inventory_value_usd", 50000)
+        spoilage_th = getattr(cfg, "spoilage_threshold", cfg.upper_limit)
+        spoilage_mech = getattr(cfg, "spoilage_mechanism", "Thermal degradation of stored perishables.")
+
+        if curr_temp >= spoilage_th:
+            spoilage_status = "Critical (Active Batch Spoilage / Mandatory Quarantine)"
+            time_to_spoilage = 0.0
+            mitigation_urgency = "Immediate Emergency — Quarantine & Audit Batch"
+            financial_risk = f"${inventory_val:,.0f} USD (100% Total Lot Loss)"
+        elif is_comp_offline or is_fan_offline or is_fire_runaway:
+            time_to_spoilage = round(float(ttb_60), 1) if ttb_60 and ttb_60 > 0 else 34.0
+            spoilage_status = "Critical (Imminent Spoilage Risk — Refrigeration Offline)" if is_comp_offline else "Warning (Imminent Spoilage Risk)"
+            mitigation_urgency = f"Tier-1 Priority — Intervene within {int(time_to_spoilage)} minutes"
+            financial_risk = f"${inventory_val:,.0f} USD at immediate risk"
+        elif ttb_60 is not None and ttb_60 <= 60:
+            spoilage_status = "Warning (Imminent Spoilage Risk)"
+            time_to_spoilage = round(float(ttb_60), 1)
+            mitigation_urgency = f"Tier-1 Priority — Intervene within {int(time_to_spoilage)} minutes"
+            financial_risk = f"${inventory_val:,.0f} USD at immediate risk"
+        elif active_fc.get("time_to_breach_minutes") is not None:
+            time_to_spoilage = round(float(active_fc["time_to_breach_minutes"]), 1)
+            spoilage_status = "Elevated (Projected Excursion)"
+            mitigation_urgency = "High Priority — Inspect within 30 minutes"
+            financial_risk = f"${inventory_val:,.0f} USD vulnerable"
+        else:
+            spoilage_status = "Nominal (Inventory Fully Protected)"
+            time_to_spoilage = None
+            mitigation_urgency = "Routine Monitoring (GMP Compliant)"
+            financial_risk = "$0 USD (Safe within validated storage envelope)"
+
+        inventory_spoilage_payload = {
+            "zone_name": cfg.name,
+            "inventory_category": cfg.product,
+            "total_inventory_value_usd": f"${inventory_val:,.0f}",
+            "spoilage_status": spoilage_status,
+            "vulnerable_items": vulnerable_items,
+            "critical_threshold_c": spoilage_th,
+            "time_to_spoilage_minutes": time_to_spoilage,
+            "spoilage_mechanism": spoilage_mech,
+            "financial_impact_risk": financial_risk,
+            "mitigation_urgency": mitigation_urgency,
+        }
+
         return {
             "zone_id": zone_id,
             "zone_name": cfg.name,
@@ -833,6 +1252,7 @@ class MonitoringService:
                 "contributing_factors": factors,
                 "summary_text": summary_text,
                 "recommended_actions": recs,
+                "inventory_spoilage_risk": inventory_spoilage_payload,
             },
             "forecast_points": chart_points,
             "recovery_status": self.get_recovery_status(zone_id),

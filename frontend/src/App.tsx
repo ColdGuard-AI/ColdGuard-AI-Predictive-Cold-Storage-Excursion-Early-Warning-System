@@ -20,6 +20,7 @@ import Predictions from "./pages/Predictions";
 import AIExplanation from "./pages/AIExplanation";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import BlockchainAudit from "./pages/BlockchainAudit";
 
 // Auth Gateway Components from feature/auth-gateway
 import SimulatedDataBanner from "./components/SimulatedDataBanner";
@@ -113,6 +114,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/chat" element={<ChatRedirect />} />
+              <Route path="/blockchain" element={<BlockchainAudit />} />
               <Route path="/twin" element={<DigitalTwin />} />
               <Route path="/excursion" element={<ExcursionMonitor />} />
               <Route path="/predictions" element={<Predictions />} />

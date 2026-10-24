@@ -65,6 +65,13 @@ def forecast_from_history(
     t0 = pd.Timestamp(prepared["timestamp"].iloc[-1]).to_pydatetime()
     points = []
 
+    scenario = str(history["scenario"].iloc[-1]) if "scenario" in history.columns else "normal"
+
+    ambient_now = float(prepared["ambient_temperature"].iloc[-1]) if "ambient_temperature" in prepared.columns else config.ambient_base
+    amb_gradient = max(0.2, (ambient_now - base) / 20.0)
+    door_open_sec = float(history["door_open_duration_seconds"].iloc[-1]) if "door_open_duration_seconds" in history.columns else (60.0 if bool(last.get("door_open", 0)) else 0.0)
+    door_time_factor = min(1.0, max(0.15, door_open_sec / 180.0))
+
     # ML forecaster steps with thermal residual wave correction
     ml_steps = [h for h in FORECAST_STEPS if h <= horizon] if horizon < 60 else FORECAST_STEPS
     for j, h in enumerate(FORECAST_STEPS):
@@ -76,10 +83,31 @@ def forecast_from_history(
                 wave = residual_rise * (h / 6.0) * math.exp(1.0 - h / 6.0) if h <= 25 else 0.0
                 pred_delta = max(pred_delta, wave)
 
+            # Active fault scenario thermal trajectory adjustment
+            if scenario == "fire_runaway":
+                fire_drift = min(12.0, 1.55 * (h / 5.0))
+                pred_delta = max(pred_delta, fire_drift)
+            elif scenario == "compressor_failure":
+                comp_drift = min(8.0, 0.62 * amb_gradient * (h / 5.0))
+                pred_delta = max(pred_delta, comp_drift)
+            elif scenario == "fan_off":
+                # Evaporator fan off: no forced airflow across cooling coils
+                fan_drift = min(6.5, 0.42 * amb_gradient * (h / 5.0))
+                pred_delta = max(pred_delta, fan_drift)
+            elif scenario == "cooling_degradation":
+                deg_drift = min(4.5, 0.38 * amb_gradient * (h / 5.0))
+                pred_delta = max(pred_delta, deg_drift)
+            elif scenario == "door_open" or bool(last.get("door_open", 0)):
+                # Realistic infiltration: scaled by time open and outdoor ambient gradient
+                door_drift = min(7.5, (0.58 if config.zone_id == "zone-c" else 0.45) * amb_gradient * door_time_factor * (h / 5.0))
+                pred_delta = max(pred_delta, door_drift)
+
             t_val = round(base + pred_delta, 2)
             point = {"timestamp": t0 + timedelta(minutes=h), "minutes_ahead": h, "temperature": t_val}
             if with_band:
                 spread = abs(float(p90[j]) - float(p10[j])) / 2.0
+                if scenario == "sensor_anomaly":
+                    spread = max(2.5, spread * 2.2)
                 point["lower"] = round(t_val - max(0.2, spread), 2)
                 point["upper"] = round(t_val + max(0.2, spread), 2)
             points.append(point)
@@ -90,6 +118,7 @@ def forecast_from_history(
         door_open = bool(last["door_open"])
         compressor_on = bool(last["compressor_on"])
         is_degraded = False
+        is_fan_off = (scenario == "fan_off")
         if "compressor_status" in prepared.columns:
             is_degraded = (prepared["compressor_status"].iloc[-1] == "degraded")
 
@@ -110,9 +139,11 @@ def forecast_from_history(
             hour = (t0.hour + (t0.minute + m) / 60.0) % 24.0
             amb_val = ambient + 1.2 * math.sin(2 * math.pi * (hour - 9.0) / 24.0)
             leak = config.k_leak * (amb_val - curr_t)
-            door_leak = (config.k_door * (amb_val - curr_t)) if door_open else 0.0
+            door_leak = (config.k_door * (amb_val - curr_t) * door_time_factor) if door_open else 0.0
             if not compressor_on:
                 cooling = 0.0
+            elif is_fan_off:
+                cooling = config.cooling_max * 0.15
             elif is_degraded:
                 cooling = config.cooling_max * 0.48
             else:

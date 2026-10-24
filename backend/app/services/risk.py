@@ -98,13 +98,23 @@ def compute_risk(
     peak_temp_predicted: float | None = None,
     recovery_progress_pct: float = 100.0,
     recovery_phase: str = "none",
+    scenario: str = "normal",
 ) -> RiskResult:
     half_band = config.range_width / 2.0
     factors: list[RiskFactor] = []
 
     # 1. Forecast proximity: how close does the forecast get to a limit within the horizon?
     in_horizon = [t for t, h in zip(forecast_temps, forecast_steps) if h <= horizon_minutes]
-    effective_peak = peak_temp_predicted if peak_temp_predicted is not None else (current_temp or config.setpoint)
+    is_active_recovery = (
+        door_open_minutes > 0
+        or recovery_phase in ("residual_rise", "active_recovery", "door_open")
+    ) and recovery_progress_pct < 100.0
+
+    effective_peak = (
+        peak_temp_predicted
+        if (is_active_recovery and peak_temp_predicted is not None)
+        else (current_temp or config.setpoint)
+    )
     if in_horizon:
         hi, lo = max(in_horizon), min(in_horizon)
         if effective_peak > hi:
@@ -122,7 +132,7 @@ def compute_risk(
         else:
             detail = f"Forecast peaks at {extreme:.1f}°C within {horizon_minutes} min ({margin:.1f}°C from {which} limit of {limit:.1f}°C)."
         factors.append(RiskFactor("forecast", "Forecast approaches limit", pts, 40, detail))
-    elif peak_temp_predicted is not None and peak_temp_predicted > config.setpoint:
+    elif is_active_recovery and peak_temp_predicted is not None and peak_temp_predicted > config.setpoint:
         margin_hi = config.upper_limit - peak_temp_predicted
         pts = 40.0 * _clip01(1.0 - margin_hi / (0.6 * half_band))
         factors.append(RiskFactor("forecast", "Predicted peak approaches limit", pts, 40,
@@ -185,6 +195,21 @@ def compute_risk(
     if sensor_suspicious:
         factors.append(RiskFactor("sensor", "Sensor readings suspicious", 10.0, 10,
                                   "Sensor telemetry anomaly detected - readings and forecast may be unreliable."))
+
+    # 6. Specific Situation Impact & Fault Injections
+    if scenario == "fire_runaway":
+        factors.append(RiskFactor("fire_hazard", "Sensor Fire / Thermal Runaway", 35.0, 35,
+                                  "Critical thermal runaway active on sensor node; +2°C/min heat influx with emergency failsafe."))
+    elif scenario == "fan_off":
+        factors.append(RiskFactor("fan_trip", "Evaporator Fan Tripped (Zero Forced Airflow)", 28.0, 28,
+                                  "Evaporator circulation fans offline; heat cannot be extracted from cooling coils, causing rapid thermal stratification."))
+    elif scenario == "cooling_degradation":
+        factors.append(RiskFactor("degradation", "Cooling Capacity Degraded 45%", 20.0, 20,
+                                  "Condenser fouling or refrigerant loss; cooling efficiency derated by 45% under continuous compressor strain."))
+    elif scenario == "sensor_anomaly":
+        if not sensor_suspicious:
+            factors.append(RiskFactor("sensor_fault", "Sensor Telemetry Fault", 20.0, 20,
+                                      "Sensor anomaly active; telemetry stream corrupted or frozen."))
 
     score = int(round(min(100.0, sum(f.points for f in factors))))
     factors.sort(key=lambda f: f.points, reverse=True)
