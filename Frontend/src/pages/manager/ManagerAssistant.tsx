@@ -474,164 +474,125 @@ export default function ManagerAssistant() {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          3. Main Interactive Workspace (Sidebar Controls + Chat Console)
+          3. Full-Width Main Interactive Chat & Voice Workstation
       ───────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column (4 cols): Configuration & Quick Questions */}
-        <div className="lg:col-span-4 space-y-5">
-          {/* Settings Card */}
-          <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card space-y-4">
-            <h3 className="text-base font-extrabold text-[#0F172A] tracking-tight flex items-center gap-2">
-              <Sparkles size={18} className="text-[#2563EB]" />
-              Assistant Configuration
-            </h3>
+      <div className="w-full rounded-2xl bg-white border border-[#DCE8F6] shadow-arctic-card flex flex-col h-[780px] overflow-hidden">
+        {/* Chat Header & Integrated Control Toolbar */}
+        <div className="px-6 py-4 border-b border-[#DCE8F6] bg-[#F8FAFC] flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="h-10 w-10 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shadow-sm">
+              <BrainCircuit size={20} />
+            </div>
+            <div>
+              <div className="font-extrabold text-[#0F172A] text-base leading-tight">
+                ColdGuard Storage Manager Copilot
+              </div>
+              <div className="text-xs text-[#64748B] font-medium flex items-center gap-1.5 mt-0.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Real-time RAG Telemetry Connected</span>
+                <span>•</span>
+                <span>3 Active Chambers Grounded</span>
+              </div>
+            </div>
+          </div>
 
+          {/* Integrated Control Toolbar (Language, Model, TTS, Clear) */}
+          <div className="flex items-center gap-2.5 flex-wrap ml-auto">
             {/* Language Selector */}
-            <div>
-              <label className="text-xs font-bold text-[#475569] block mb-1.5 uppercase tracking-wider">
-                Conversation Language
-              </label>
-              <div className="relative">
-                <select
-                  value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
-                  className="w-full bg-[#F8FAFC] border border-[#DCE8F6] rounded-xl px-3.5 py-2.5 text-sm font-bold text-[#0F172A] pr-9 appearance-none cursor-pointer focus:outline-none focus:border-[#2563EB]"
-                >
-                  {LANGUAGES.map((lang) => (
-                    <option key={lang.code} value={lang.code}>
-                      {lang.flag} {lang.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={16} className="absolute right-3 top-3 text-[#475569] pointer-events-none" />
-              </div>
+            <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-[#DCE8F6] shadow-sm">
+              <Globe2 size={15} className="text-[#2563EB]" />
+              <select
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
+                className="bg-transparent font-bold text-xs sm:text-sm text-[#0F172A] cursor-pointer focus:outline-none"
+              >
+                {LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.flag} {lang.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* Ollama Model Selector */}
-            <div>
-              <label className="text-xs font-bold text-[#475569] block mb-1.5 uppercase tracking-wider">
-                Ollama Base Model
-              </label>
-              <div className="relative">
-                <select
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
-                  className="w-full bg-[#F8FAFC] border border-[#DCE8F6] rounded-xl px-3.5 py-2.5 text-sm font-bold text-[#0F172A] pr-9 appearance-none cursor-pointer focus:outline-none focus:border-[#2563EB]"
-                >
-                  {OLLAMA_MODELS.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={16} className="absolute right-3 top-3 text-[#475569] pointer-events-none" />
-              </div>
-              <p className="text-[11px] text-[#64748B] mt-1">
-                {OLLAMA_MODELS.find((m) => m.id === selectedModel)?.desc}
-              </p>
+            {/* Model Selector */}
+            <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-[#DCE8F6] shadow-sm">
+              <Server size={15} className="text-[#2563EB]" />
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="bg-transparent font-bold text-xs sm:text-sm text-[#0F172A] cursor-pointer focus:outline-none"
+              >
+                {OLLAMA_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* Voice Options */}
-            <div className="pt-3 border-t border-[#DCE8F6] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {autoSpeak ? <Volume2 size={16} className="text-[#2563EB]" /> : <VolumeX size={16} className="text-[#64748B]" />}
-                <span className="text-xs font-bold text-[#0F172A]">Auto-Speak Responses (TTS)</span>
-              </div>
-              <input
-                type="checkbox"
-                checked={autoSpeak}
-                onChange={(e) => setAutoSpeak(e.target.checked)}
-                className="h-4 w-4 rounded text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
-              />
-            </div>
-          </div>
+            {/* Auto-Speak TTS Toggle */}
+            <button
+              onClick={() => setAutoSpeak(!autoSpeak)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs sm:text-sm font-bold transition shadow-sm cursor-pointer ${
+                autoSpeak
+                  ? "bg-[#EFF6FF] border-[#BAE6FD] text-[#2563EB]"
+                  : "bg-white border-[#DCE8F6] text-[#64748B] hover:text-[#0F172A]"
+              }`}
+              title={autoSpeak ? "Disable automated voice readout" : "Enable automated voice readout"}
+            >
+              {autoSpeak ? <Volume2 size={15} className="text-[#2563EB]" /> : <VolumeX size={15} />}
+              <span>{autoSpeak ? "Voice TTS On" : "TTS Muted"}</span>
+            </button>
 
-          {/* Live Telemetry Glance */}
-          <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-[#DCE8F6]">
-              <span className="text-xs font-bold text-[#475569] uppercase tracking-wider">Live Grounded Sensors</span>
-              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                Active MQTT
-              </span>
-            </div>
-            <div className="space-y-2.5">
-              {zones?.map((z) => (
-                <div key={z.zone_id} className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] flex items-center justify-between text-xs">
-                  <div>
-                    <div className="font-bold text-[#0F172A]">{z.name}</div>
-                    <div className="text-[11px] text-[#64748B]">Safe: [{z.lower_limit}°C, {z.upper_limit}°C]</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-base font-extrabold text-[#0F172A] font-sans">
-                      {z.temperature?.toFixed(1) ?? "—"}°C
-                    </div>
-                    <div className="text-[10px] font-bold text-emerald-700">Risk: {z.risk_score ?? 0}%</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick Questions Categorized Accordions */}
-          <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card space-y-4">
-            <h3 className="text-base font-extrabold text-[#0F172A] tracking-tight flex items-center gap-2">
-              <MessageSquare size={18} className="text-[#2563EB]" />
-              Quick Query Templates
-            </h3>
-            <div className="space-y-3">
-              {QUICK_PROMPTS.map((cat, idx) => {
-                const Icon = cat.icon;
-                return (
-                  <div key={idx} className="space-y-1.5">
-                    <div className="text-xs font-bold text-[#64748B] flex items-center gap-1.5 uppercase tracking-wider">
-                      <Icon size={13} className="text-[#2563EB]" />
-                      <span>{cat.category}</span>
-                    </div>
-                    <div className="space-y-1">
-                      {cat.prompts.map((p, pIdx) => (
-                        <button
-                          key={pIdx}
-                          onClick={() => handleSendMessage(p)}
-                          className="w-full text-left p-2 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-medium text-[#0F172A] transition cursor-pointer"
-                        >
-                          {p}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            {/* Status Pill */}
+            <span className="text-xs font-mono font-bold px-3 py-1.5 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB]">
+              {ollamaStatus.connected ? "Ollama Active" : "Local Telemetry RAG"}
+            </span>
           </div>
         </div>
 
-        {/* Right Column (8 cols): Interactive Chat Console */}
-        <div className="lg:col-span-8 rounded-2xl bg-white border border-[#DCE8F6] shadow-arctic-card flex flex-col h-[750px] overflow-hidden">
-          {/* Chat Header Bar */}
-          <div className="px-6 py-4 border-b border-[#DCE8F6] bg-[#F8FAFC] flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shadow-sm">
-                <BrainCircuit size={20} />
-              </div>
-              <div>
-                <div className="font-extrabold text-[#0F172A] text-base leading-tight">
-                  ColdGuard Storage Manager Copilot
-                </div>
-                <div className="text-xs text-[#64748B] font-medium flex items-center gap-1.5 mt-0.5">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Real-time RAG Telemetry Connected</span>
-                  <span>•</span>
-                  <span>{LANGUAGES.find((l) => l.code === selectedLanguage)?.flag} {LANGUAGES.find((l) => l.code === selectedLanguage)?.name}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB]">
-                {ollamaStatus.connected ? "Ollama Connected" : "Local Telemetry RAG"}
-              </span>
-            </div>
-          </div>
+        {/* Quick Query Templates Strip */}
+        <div className="px-6 py-2.5 bg-white border-b border-[#DCE8F6] flex items-center gap-2 overflow-x-auto text-xs">
+          <span className="text-xs font-bold text-[#64748B] uppercase tracking-wider shrink-0 flex items-center gap-1">
+            <Sparkles size={13} className="text-[#2563EB]" /> Quick Prompts:
+          </span>
+          <button
+            onClick={() => handleSendMessage("What is the current temperature of all 3 cold chambers?")}
+            className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
+          >
+            🌡️ All Temperatures
+          </button>
+          <button
+            onClick={() => handleSendMessage("Are there any predicted excursion breaches in the next 1 hour?")}
+            className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
+          >
+            🚨 1h Excursion Forecast
+          </button>
+          <button
+            onClick={() => handleSendMessage("How much total financial inventory is at risk across the facility?")}
+            className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
+          >
+            💰 Inventory Financial Exposure
+          </button>
+          <button
+            onClick={() => handleSendMessage("Explain the cooling pull-down recovery curve and door status.")}
+            className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
+          >
+            🚪 Door &amp; Pull-Down
+          </button>
+          <button
+            onClick={() => handleSendMessage("Are all digital telemetry logs compliant with FDA 21 CFR Part 11?")}
+            className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
+          >
+            📋 FDA GxP Regulations
+          </button>
+          <button
+            onClick={() => handleSendMessage("Are all compressor racks operating within normal electrical load?")}
+            className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
+          >
+            ⚡ Compressor Power (kW)
+          </button>
+        </div>
 
           {/* Chat Message Scrollable Area */}
           <div className="flex-1 p-6 overflow-y-auto space-y-5 bg-gradient-to-b from-[#F1F7FF]/30 to-white">
@@ -794,7 +755,6 @@ export default function ManagerAssistant() {
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 }
