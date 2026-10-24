@@ -68,6 +68,15 @@ class Settings:
     # Blockchain settings
     blockchain_difficulty: int = field(default_factory=lambda: _env_int("BLOCKCHAIN_DIFFICULTY", 1))
     blockchain_batch_size: int = field(default_factory=lambda: _env_int("BLOCKCHAIN_BATCH_SIZE", 5))
+    # JWT Authentication
+    jwt_secret_key: str = field(default_factory=lambda: os.getenv("JWT_SECRET_KEY", "coldguard-dev-secret-change-in-production-2026"))
+    jwt_algorithm: str = "HS256"
+    jwt_expire_hours: int = field(default_factory=lambda: _env_int("JWT_EXPIRE_HOURS", 12))
+    # Manager Bootstrap (env-var based, never in source code)
+    manager_email: str = field(default_factory=lambda: os.getenv("COLDGUARD_MANAGER_EMAIL", "ruchita4@company.org.in"))
+    manager_name: str = field(default_factory=lambda: os.getenv("COLDGUARD_MANAGER_NAME", "Ruchita"))
+    manager_phone: str = field(default_factory=lambda: os.getenv("COLDGUARD_MANAGER_PHONE", "+918262036045"))
+    manager_password: str = field(default_factory=lambda: os.getenv("COLDGUARD_MANAGER_PASSWORD", ""))
 
 
 settings = Settings()

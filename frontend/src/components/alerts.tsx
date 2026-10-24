@@ -42,31 +42,33 @@ export function AlertRow({ alert, zoneName, onOpen, onAck, ackPending }: {
 }) {
   const tone = toneForSeverity(alert.severity);
   return (
-    <li className={`group rounded-lg border bg-ink-900/60 transition-colors hover:border-neon/25 ${alert.active && alert.severity === "critical" ? "border-crit/30" : "border-white/[0.06]"}`}>
-      <div className="flex items-start gap-3 p-3">
+    <li className={`group rounded-2xl border bg-white transition-all shadow-arctic-card hover:shadow-arctic-hover hover:border-[#BAE6FD] ${
+      alert.active && alert.severity === "critical" ? "border-red-300 ring-1 ring-red-200" : "border-[#DCE8F6]"
+    }`}>
+      <div className="flex items-start gap-3.5 p-4">
         <span className={`mt-0.5 ${TONE_TEXT[tone]}`} aria-hidden>
-          {alert.active ? <BellRing size={16} /> : <CircleDot size={16} />}
+          {alert.active ? <BellRing size={18} /> : <CircleDot size={18} />}
         </span>
-        <button className="min-w-0 flex-1 text-left" onClick={() => onOpen(alert)} aria-label={`Open alert ${alert.title}`}>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-fg">{alert.category_label}</span>
+        <button className="min-w-0 flex-1 text-left cursor-pointer" onClick={() => onOpen(alert)} aria-label={`Open alert ${alert.title}`}>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-base font-bold text-[#0F172A]">{alert.category_label}</span>
             <SeverityBadge severity={alert.severity} />
             {!alert.active && <Badge>Resolved</Badge>}
           </div>
-          <p className="mt-1 line-clamp-2 text-xs text-fg-muted">{alert.explanation}</p>
-          <p className="mt-1 font-mono text-[11px] text-fg-faint">
+          <p className="mt-1 line-clamp-2 text-sm text-[#475569]">{alert.explanation}</p>
+          <p className="mt-1.5 font-mono text-xs text-slate-400">
             {fmtDateTime(alert.created_at)}
             {zoneName ? ` · ${zoneName}` : ""} · {alert.id}
           </p>
         </button>
         <div className="shrink-0">
           {alert.acknowledged ? (
-            <span className="flex items-center gap-1 text-[11px] text-fg-faint" title={`Acknowledged by ${alert.acknowledged_by ?? "operator"}`}>
-              <CheckCircle2 size={13} className="text-neon/70" /> Ack'd
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full" title={`Acknowledged by ${alert.acknowledged_by ?? "operator"}`}>
+              <CheckCircle2 size={14} className="text-emerald-600" /> Ack'd
             </span>
           ) : (
-            <Button size="sm" onClick={() => onAck(alert)} loading={ackPending} aria-label={`Acknowledge alert ${alert.id}`}>
-              <Check size={13} /> Ack
+            <Button size="sm" variant="secondary" onClick={() => onAck(alert)} loading={ackPending} aria-label={`Acknowledge alert ${alert.id}`}>
+              <Check size={14} /> Ack
             </Button>
           )}
         </div>
@@ -92,66 +94,64 @@ export function AlertDetail({ alert, zoneName, onClose, onAck, ackPending }: {
   const ctxEntries = Object.entries(alert.context ?? {}).filter(([, v]) => v !== null && typeof v !== "object");
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-labelledby="alert-detail-title">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-neon/15 bg-ink-900 p-5 shadow-2xl">
-        <div className="flex items-start justify-between gap-3">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative flex h-full w-full max-w-lg flex-col overflow-y-auto border-l border-[#DCE8F6] bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-3 pb-4 border-b border-[#DCE8F6]">
           <div>
-            <p className="font-mono text-xs text-fg-faint">{alert.id}</p>
-            <h2 id="alert-detail-title" className="mt-1 text-lg font-semibold text-fg">{alert.category_label}</h2>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <p className="font-mono text-xs font-bold text-slate-400">{alert.id}</p>
+            <h2 id="alert-detail-title" className="mt-1 text-xl font-extrabold text-[#0F172A]">{alert.category_label}</h2>
+            <div className="mt-2.5 flex flex-wrap gap-2">
               <SeverityBadge severity={alert.severity} />
-              <Badge tone={alert.active ? "crit" : "neutral"}>{alert.active ? "Condition active" : "Resolved"}</Badge>
-              <Badge tone={alert.acknowledged ? "ok" : "warn"}>{alert.acknowledged ? "Acknowledged" : "Unacknowledged"}</Badge>
+              <Badge tone={alert.active ? "crit" : "neutral"}>{alert.active ? "Active Excursion" : "Resolved"}</Badge>
+              <Badge tone={alert.acknowledged ? "ok" : "warn"}>{alert.acknowledged ? "Acknowledged" : "Action Required"}</Badge>
             </div>
           </div>
-          <button ref={closeRef} onClick={onClose} aria-label="Close alert details" className="rounded p-1 text-fg-muted hover:text-fg">
+          <button ref={closeRef} onClick={onClose} aria-label="Close alert details" className="rounded-xl border border-slate-200 p-2 text-slate-400 hover:text-[#0F172A] hover:bg-slate-50 transition cursor-pointer">
             <X size={18} />
           </button>
         </div>
 
-        <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
-          <div><dt className="text-[11px] uppercase tracking-wider text-fg-faint">Zone</dt><dd className="text-fg">{zoneName ?? alert.zone_id}</dd></div>
-          <div><dt className="text-[11px] uppercase tracking-wider text-fg-faint">Raised</dt><dd className="font-mono text-fg">{fmtDateTime(alert.created_at)}</dd></div>
-          <div><dt className="text-[11px] uppercase tracking-wider text-fg-faint">Last seen</dt><dd className="font-mono text-fg">{fmtTime(alert.last_seen_at)}</dd></div>
-          <div><dt className="text-[11px] uppercase tracking-wider text-fg-faint">Occurrences</dt><dd className="font-mono text-fg">{alert.occurrences}</dd></div>
+        <dl className="mt-6 grid grid-cols-2 gap-4 text-sm bg-slate-50 p-4 rounded-xl border border-[#DCE8F6]">
+          <div><dt className="text-xs font-bold uppercase tracking-wider text-[#475569]">Cold Room</dt><dd className="font-bold text-[#0F172A] mt-0.5">{zoneName ?? alert.zone_id}</dd></div>
+          <div><dt className="text-xs font-bold uppercase tracking-wider text-[#475569]">Raised At</dt><dd className="font-mono font-bold text-[#0F172A] mt-0.5">{fmtDateTime(alert.created_at)}</dd></div>
+          <div><dt className="text-xs font-bold uppercase tracking-wider text-[#475569]">Last Telemetry</dt><dd className="font-mono font-bold text-[#0F172A] mt-0.5">{fmtTime(alert.last_seen_at)}</dd></div>
+          <div><dt className="text-xs font-bold uppercase tracking-wider text-[#475569]">Occurrences</dt><dd className="font-mono font-bold text-[#0F172A] mt-0.5">{alert.occurrences}</dd></div>
         </dl>
 
-        <section className="mt-5">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-fg-faint">Explanation</h3>
-          <p className="mt-1.5 text-sm leading-relaxed text-fg">{alert.explanation}</p>
+        <section className="mt-6">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[#475569]">Diagnostic Explanation</h3>
+          <p className="mt-2 text-base leading-relaxed text-[#0F172A]">{alert.explanation}</p>
         </section>
 
-        <section className="mt-4 rounded-lg border border-neon/20 bg-neon/[0.05] p-3">
-          <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-neon">
-            <Lightbulb size={13} /> Recommended action
+        <section className="mt-5 rounded-2xl border-2 border-sky-200 bg-[#EFF6FF] p-4 shadow-sm">
+          <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#2563EB]">
+            <Lightbulb size={16} /> Standard Operating Procedure (SOP) Action
           </h3>
-          <p className="mt-1.5 text-sm text-fg">{alert.recommended_action}</p>
+          <p className="mt-2 text-sm sm:text-base font-semibold text-[#0F172A] leading-relaxed">{alert.recommended_action}</p>
         </section>
 
         {ctxEntries.length > 0 && (
-          <section className="mt-4">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-fg-faint">Data behind this alert</h3>
-            <dl className="mt-1.5 space-y-1 text-xs">
+          <section className="mt-5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#475569]">Telemetry Attributes</h3>
+            <dl className="mt-2 space-y-1.5 text-sm bg-slate-50 p-4 rounded-xl border border-[#DCE8F6]">
               {ctxEntries.map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-3">
-                  <dt className="text-fg-muted">{k.replace(/_/g, " ")}</dt>
-                  <dd className="font-mono text-fg">{typeof v === "number" ? Number(v.toFixed(2)) : String(v)}</dd>
+                  <dt className="text-[#475569] font-medium">{k.replace(/_/g, " ")}</dt>
+                  <dd className="font-mono font-bold text-[#0F172A]">{typeof v === "number" ? Number(v.toFixed(2)) : String(v)}</dd>
                 </div>
               ))}
             </dl>
           </section>
         )}
 
-        <p className="mt-4 text-[11px] text-fg-faint">Generated from simulated sensor data. Verify on site before acting.</p>
-
-        <div className="mt-auto pt-6">
+        <div className="mt-auto pt-6 border-t border-[#DCE8F6]">
           {alert.acknowledged ? (
-            <p className="text-xs text-fg-muted">
-              Acknowledged by {alert.acknowledged_by ?? "operator"} at {fmtTime(alert.acknowledged_at)} (sim clock).
+            <p className="text-sm font-medium text-[#475569]">
+              Acknowledged by <strong className="text-[#0F172A]">{alert.acknowledged_by ?? "operator"}</strong> at {fmtTime(alert.acknowledged_at)}.
             </p>
           ) : (
-            <Button variant="primary" className="w-full" onClick={() => onAck(alert)} loading={ackPending}>
-              <Check size={15} /> Acknowledge alert
+            <Button variant="primary" className="w-full py-3" onClick={() => onAck(alert)} loading={ackPending}>
+              <Check size={18} /> Acknowledge Alert & Log SOP Action
             </Button>
           )}
         </div>

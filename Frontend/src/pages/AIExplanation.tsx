@@ -37,29 +37,31 @@ export default function AIExplanation() {
   const isWarning = aiExplanation?.severity === "warning";
 
   return (
-    <div className="space-y-6 pb-12 font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="space-y-6 pb-12 font-sans selection:bg-[#38BDF8]/30 selection:text-[#0F172A]">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
-            <Sparkles className="text-purple-400" />
+          <h1 className="text-2xl font-bold text-[#0F172A] tracking-tight flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center">
+              <Sparkles size={20} />
+            </div>
             AI Explainability & Incident Diagnostics
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-[#475569] mt-1 font-medium">
             Interpretable machine learning, root-cause attribution, and perishable inventory risk for every zone.
           </p>
         </div>
 
         {/* Zone Selector */}
-        <div className="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-xl border border-slate-800">
+        <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-[#DCE8F6] shadow-sm">
           {zones?.map((z) => (
             <button
               key={z.zone_id}
               onClick={() => setSelectedZoneId(z.zone_id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 selectedZone === z.zone_id
-                  ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-[#2563EB] text-white shadow-sm"
+                  : "text-[#475569] hover:text-[#0F172A] hover:bg-[#F1F7FF]"
               }`}
             >
               {z.name.replace(" Vaccine Store", "").replace(" Dairy Chiller", "").replace(" Frozen Store", "")}
@@ -69,15 +71,15 @@ export default function AIExplanation() {
       </div>
 
       {/* Main Narrative Card */}
-      <div className="rounded-2xl bg-[#0F192C]/90 border border-slate-800 p-6 shadow-2xl backdrop-blur-xl space-y-5">
-        <div className="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-slate-800">
+      <div className="rounded-2xl bg-white border border-[#DCE8F6] p-6 shadow-arctic-card space-y-5">
+        <div className="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-[#DCE8F6]">
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-400 flex items-center justify-center">
+            <div className="h-8 w-8 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center">
               <BrainCircuit size={18} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">Dynamic AI Diagnosis: {currentZone?.name}</h2>
-              <p className="text-xs text-slate-400">Derived from 1-minute time-series features & thermal boundary states</p>
+              <h2 className="text-base font-bold text-[#0F172A]">Dynamic AI Diagnosis: {currentZone?.name}</h2>
+              <p className="text-xs text-[#475569]">Derived from 1-minute time-series features & thermal boundary states</p>
             </div>
           </div>
 
@@ -85,10 +87,10 @@ export default function AIExplanation() {
             <span
               className={`text-[11px] uppercase font-bold tracking-wider px-3 py-1 rounded-full border ${
                 isCritical
-                  ? "bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-[0_0_10px_rgba(244,63,94,0.3)]"
+                  ? "bg-rose-50 text-rose-800 border-rose-200"
                   : isWarning
-                  ? "bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)]"
-                  : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                  ? "bg-amber-50 text-amber-800 border-amber-200"
+                  : "bg-emerald-50 text-emerald-800 border-emerald-200"
               }`}
             >
               {aiExplanation.severity}
@@ -98,14 +100,18 @@ export default function AIExplanation() {
 
         {/* AI Headline */}
         {aiExplanation?.headline && (
-          <div className="text-sm font-bold text-cyan-300 font-mono flex items-center gap-2">
-            <span className={`h-2.5 w-2.5 rounded-full ${isCritical ? "bg-rose-500 animate-pulse" : isWarning ? "bg-amber-500" : "bg-emerald-500"}`} />
+          <div className="text-sm font-bold text-[#2563EB] font-mono flex items-center gap-2">
+            <span
+              className={`h-2.5 w-2.5 rounded-full ${
+                isCritical ? "bg-rose-500 animate-pulse" : isWarning ? "bg-amber-500" : "bg-emerald-500"
+              }`}
+            />
             {aiExplanation.headline}
           </div>
         )}
 
         {/* Narrative Box */}
-        <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 text-sm text-slate-200 leading-relaxed">
+        <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] text-sm text-[#0F172A] leading-relaxed">
           {aiExplanation?.narrative || (
             currentZone?.compressor_status === "stopped" || currentZone?.compressor_status === "failed"
               ? `Refrigeration compressor in ${currentZone.name} is offline. Active cooling is halted and chamber temperature is drifting upward toward upper limit (${currentZone.upper_limit}°C). Immediate breaker inspection is required.`
@@ -123,21 +129,21 @@ export default function AIExplanation() {
 
         {/* Perishable Inventory Spoilage Risk Card */}
         {spoilage && (
-          <div className="rounded-xl p-4 bg-gradient-to-r from-rose-950/40 via-slate-900/80 to-amber-950/30 border border-rose-500/30 space-y-3">
+          <div className="rounded-xl p-5 bg-[#EFF6FF] border border-[#BAE6FD] space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-                <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+                <span className="h-2 w-2 rounded-full bg-[#2563EB] animate-pulse" />
+                <span className="text-xs font-bold text-[#0F172A] uppercase tracking-wider font-mono">
                   Perishable Inventory at Risk — {spoilage.zone_name}
                 </span>
               </div>
               <span
-                className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
                   spoilage.spoilage_status.includes("Critical")
-                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                    ? "bg-rose-50 text-rose-800 border-rose-200"
                     : spoilage.spoilage_status.includes("Warning")
-                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    ? "bg-amber-50 text-amber-800 border-amber-200"
+                    : "bg-emerald-50 text-emerald-800 border-emerald-200"
                 }`}
               >
                 {spoilage.spoilage_status}
@@ -145,58 +151,60 @@ export default function AIExplanation() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
-              <div className="p-2 rounded-lg bg-slate-900/70 border border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-mono">Stock Category</span>
-                <span className="text-white font-semibold">{spoilage.inventory_category}</span>
+              <div className="p-3 rounded-lg bg-white border border-[#DCE8F6]">
+                <span className="text-[10px] text-[#475569] uppercase tracking-wider block font-mono">Stock Category</span>
+                <span className="text-[#0F172A] font-semibold">{spoilage.inventory_category}</span>
               </div>
-              <div className="p-2 rounded-lg bg-slate-900/70 border border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-mono">Total Value</span>
-                <span className="text-emerald-400 font-bold">{spoilage.total_inventory_value_usd}</span>
+              <div className="p-3 rounded-lg bg-white border border-[#DCE8F6]">
+                <span className="text-[10px] text-[#475569] uppercase tracking-wider block font-mono">Total Value</span>
+                <span className="text-emerald-700 font-bold">{spoilage.total_inventory_value_usd}</span>
               </div>
-              <div className="p-2 rounded-lg bg-slate-900/70 border border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-mono">Critical Threshold</span>
-                <span className="text-rose-400 font-bold">{spoilage.critical_threshold_c}°C</span>
+              <div className="p-3 rounded-lg bg-white border border-[#DCE8F6]">
+                <span className="text-[10px] text-[#475569] uppercase tracking-wider block font-mono">Critical Threshold</span>
+                <span className="text-rose-600 font-bold">{spoilage.critical_threshold_c}°C</span>
               </div>
-              <div className="p-2 rounded-lg bg-slate-900/70 border border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-mono">Time to Spoilage</span>
-                <span className={`font-bold ${spoilage.time_to_spoilage_minutes != null ? "text-amber-400" : "text-slate-300"}`}>
+              <div className="p-3 rounded-lg bg-white border border-[#DCE8F6]">
+                <span className="text-[10px] text-[#475569] uppercase tracking-wider block font-mono">Time to Spoilage</span>
+                <span className={`font-bold ${spoilage.time_to_spoilage_minutes != null ? "text-amber-600" : "text-[#475569]"}`}>
                   {spoilage.time_to_spoilage_minutes != null ? `${spoilage.time_to_spoilage_minutes} min` : "No risk (Safe)"}
                 </span>
               </div>
             </div>
 
             <div className="space-y-1.5 pt-1">
-              <span className="text-[11px] font-semibold text-slate-300 block font-mono">Vulnerable Inventory Items:</span>
+              <span className="text-[11px] font-semibold text-[#0F172A] block font-mono">Vulnerable Inventory Items:</span>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
                 {spoilage.vulnerable_items.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-2 text-xs text-slate-300 bg-slate-900/50 px-2.5 py-1 rounded border border-slate-800/80">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
+                  <div key={idx} className="flex items-center gap-2 text-xs text-[#0F172A] bg-white px-2.5 py-1.5 rounded border border-[#DCE8F6]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#2563EB] shrink-0" />
                     <span className="truncate">{item}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-800/80 text-xs text-slate-300">
-              <span className="text-rose-400 font-semibold font-mono">Spoilage Mechanism: </span>
+            <div className="pt-2 border-t border-[#BAE6FD] text-xs text-[#0F172A]">
+              <span className="text-[#2563EB] font-bold font-mono">Spoilage Mechanism: </span>
               {spoilage.spoilage_mechanism}
             </div>
 
             <div className="flex items-center justify-between text-xs pt-1 font-mono">
-              <span className="text-slate-400">Financial Exposure: <span className="text-rose-400 font-bold">{spoilage.financial_impact_risk}</span></span>
-              <span className="text-amber-400 font-semibold">{spoilage.mitigation_urgency}</span>
+              <span className="text-[#475569]">
+                Financial Exposure: <span className="text-rose-600 font-bold">{spoilage.financial_impact_risk}</span>
+              </span>
+              <span className="text-amber-700 font-semibold">{spoilage.mitigation_urgency}</span>
             </div>
           </div>
         )}
 
         {/* Summary & Expected Recovery Card */}
-        <div className="rounded-xl p-3.5 bg-gradient-to-r from-blue-950/70 via-slate-900/90 to-cyan-950/60 border border-blue-500/40 flex items-start gap-3 shadow-lg">
-          <div className="h-8 w-8 rounded-lg bg-blue-500/20 text-cyan-400 flex items-center justify-center shrink-0 border border-blue-400/40">
+        <div className="rounded-xl p-4 bg-[#EFF6FF] border border-[#BAE6FD] flex items-start gap-3 shadow-sm">
+          <div className="h-8 w-8 rounded-lg bg-white text-[#2563EB] flex items-center justify-center shrink-0 border border-[#DCE8F6]">
             <Sparkles size={18} />
           </div>
           <div className="space-y-1">
-            <div className="text-xs font-bold text-white uppercase tracking-wider font-mono">Summary & Expected Recovery</div>
-            <div className="text-xs text-slate-200 leading-relaxed font-sans">
+            <div className="text-xs font-bold text-[#0F172A] uppercase tracking-wider font-mono">Summary & Expected Recovery</div>
+            <div className="text-xs text-[#475569] leading-relaxed font-sans">
               {aiExplanation?.summary_text ?? (predictionQuery.loading ? "Calculating forecast..." : "Chamber in thermal equilibrium.")}
             </div>
           </div>
@@ -204,12 +212,12 @@ export default function AIExplanation() {
 
         {/* Feature Importance & Contributing Factors */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-          <div className="rounded-xl bg-slate-900/60 border border-slate-800 p-4">
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Zap size={14} className="text-amber-400" />
+          <div className="rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] p-4">
+            <h3 className="text-xs font-bold text-[#0F172A] uppercase tracking-wider mb-3 flex items-center gap-2">
+              <Zap size={14} className="text-[#2563EB]" />
               Primary Driving Factors (Feature Attribution)
             </h3>
-            <ul className="space-y-2 text-xs text-slate-300">
+            <ul className="space-y-2 text-xs text-[#475569]">
               {(aiExplanation?.contributing_factors?.length ? aiExplanation.contributing_factors : [
                 currentZone?.compressor_status === "stopped" || currentZone?.compressor_status === "failed"
                   ? "Refrigeration compressor offline (0 kW cooling capacity)"
@@ -225,19 +233,19 @@ export default function AIExplanation() {
                   : "Compressor cycling or offline",
               ]).map((factor, i) => (
                 <li key={i} className="flex items-start gap-2.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-rose-400 mt-1.5 shrink-0" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#2563EB] mt-1.5 shrink-0" />
                   <span>{factor}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="rounded-xl bg-slate-900/60 border border-slate-800 p-4">
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Lightbulb size={14} className="text-cyan-400" />
+          <div className="rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] p-4">
+            <h3 className="text-xs font-bold text-[#0F172A] uppercase tracking-wider mb-3 flex items-center gap-2">
+              <Lightbulb size={14} className="text-[#2563EB]" />
               Recommended Corrective Procedures
             </h3>
-            <ol className="space-y-2 text-xs text-slate-300">
+            <ol className="space-y-2 text-xs text-[#475569]">
               {(aiExplanation?.recommended_actions?.length ? aiExplanation.recommended_actions : [
                 currentZone?.compressor_status === "stopped" || currentZone?.compressor_status === "failed"
                   ? "Inspect electrical subpanel breakers and reset compressor motor contactor."
@@ -251,7 +259,7 @@ export default function AIExplanation() {
                 "If temperature exceeds safe boundary, activate backup refrigeration loop.",
               ]).map((action, i) => (
                 <li key={i} className="flex items-center gap-2.5">
-                  <span className="h-5 w-5 rounded-full bg-blue-600/40 text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0 border border-blue-500/30">
+                  <span className="h-5 w-5 rounded-full bg-[#EFF6FF] text-[#2563EB] font-bold text-[10px] flex items-center justify-center shrink-0 border border-[#BAE6FD]">
                     {i + 1}
                   </span>
                   <span>{action}</span>
@@ -263,42 +271,42 @@ export default function AIExplanation() {
       </div>
 
       {/* Sensor Failure vs Genuine Thermal Shift Explainer */}
-      <div className="rounded-2xl bg-[#0F192C]/90 border border-slate-800 p-6 shadow-2xl backdrop-blur-xl">
-        <h2 className="text-base font-bold text-white mb-2 flex items-center gap-2">
-          <Wrench size={18} className="text-cyan-400" />
+      <div className="rounded-2xl bg-white border border-[#DCE8F6] p-6 shadow-arctic-card">
+        <h2 className="text-base font-bold text-[#0F172A] mb-2 flex items-center gap-2">
+          <Wrench size={18} className="text-[#2563EB]" />
           Sensor Reliability vs Genuine Thermal Excursion Classification
         </h2>
-        <p className="text-xs text-slate-400 mb-5 leading-relaxed">
+        <p className="text-xs text-[#475569] mb-5 leading-relaxed font-medium">
           ColdGuard AI continuously distinguishes between instrumentation hardware failures (spikes, stuck values, dropouts) and genuine physical room temperature breaches.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-            <div className="font-bold text-white mb-1.5 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-rose-400" />
+          <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
+            <div className="font-bold text-[#0F172A] mb-1.5 flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-rose-500" />
               Genuine Thermal Excursion
             </div>
-            <p className="text-slate-400 leading-relaxed">
+            <p className="text-[#475569] leading-relaxed">
               Temperature conforms to lumped room thermal capacitance (~180 min time constant). Neighboring probes and compressor power draw show synchronous thermodynamic shift.
             </p>
           </div>
 
-          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-            <div className="font-bold text-white mb-1.5 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-amber-400" />
+          <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
+            <div className="font-bold text-[#0F172A] mb-1.5 flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-amber-500" />
               Telemetry Spike / Jitter
             </div>
-            <p className="text-slate-400 leading-relaxed">
+            <p className="text-[#475569] leading-relaxed">
               Instantaneous gradient (&gt;2.5°C/min) physically impossible for stored inventory thermal mass. Flagged by Isolation Forest; filtered by Kalman smoother without false alarms.
             </p>
           </div>
 
-          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-            <div className="font-bold text-white mb-1.5 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-blue-400" />
+          <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
+            <div className="font-bold text-[#0F172A] mb-1.5 flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-[#2563EB]" />
               Stuck / Frozen Sensor
             </div>
-            <p className="text-slate-400 leading-relaxed">
+            <p className="text-[#475569] leading-relaxed">
               Zero variance over 15+ consecutive ticks while compressor cycles. Classified as transmitter ADC lockup; recommended probe replacement or bus reset.
             </p>
           </div>

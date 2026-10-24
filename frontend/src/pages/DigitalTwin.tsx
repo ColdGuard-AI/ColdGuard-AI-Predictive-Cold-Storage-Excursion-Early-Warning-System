@@ -3295,28 +3295,28 @@ export default function DigitalTwin() {
   }, [allZones, simState]);
 
   return (
-    <div className="space-y-4 font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="space-y-4 font-sans selection:bg-[#EFF6FF] selection:text-[#2563EB]">
       {/* ═══════════════════════════════════════════════════════════════════
           FACILITY HEADER BAR (MATCHING REFERENCE IMAGE)
           ═══════════════════════════════════════════════════════════════════ */}
-      <div className="rounded-2xl border border-white/10 bg-[#0B1424]/95 px-4 py-3 shadow-2xl backdrop-blur-xl flex flex-wrap items-center justify-between gap-3">
+      <div className="rounded-2xl border border-[#DCE8F6] bg-white px-5 py-3.5 shadow-arctic-card flex flex-wrap items-center justify-between gap-3">
         {/* Left: Brand / Facility Context */}
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2.5">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-inner">
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] shadow-sm">
               <Snowflake size={20} className="animate-pulse" />
             </div>
             <div>
-              <div className="text-base font-bold text-white tracking-wide leading-none">ColdGuard</div>
-              <div className="text-[10px] text-cyan-400/80 font-mono mt-0.5">Digital Twin | Cold Storage Monitoring</div>
+              <div className="text-base font-bold text-[#0F172A] tracking-tight leading-none">ColdGuard</div>
+              <div className="text-[11px] text-[#475569] font-mono mt-0.5">Digital Twin | Cold Storage Monitoring</div>
             </div>
           </div>
 
           {/* Facility Selector */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-xs font-mono text-slate-200">
-            <Warehouse size={14} className="text-cyan-400" />
-            <span className="font-semibold">Facility: ColdGuard Central Storage</span>
-            <span className="text-[10px] text-slate-400 ml-1">({allZones.length} Zones Active)</span>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#EFF6FF] border border-[#DCE8F6] text-xs font-mono text-[#0F172A]">
+            <Warehouse size={14} className="text-[#2563EB]" />
+            <span className="font-semibold text-[#0F172A]">Facility: ColdGuard Central Storage</span>
+            <span className="text-[10px] text-[#475569] ml-1">({allZones.length} Zones Active)</span>
           </div>
 
           {/* Operational Status Badge */}
@@ -3327,19 +3327,19 @@ export default function DigitalTwin() {
               <div
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-mono font-bold shadow-sm ${
                   isCritical
-                    ? "bg-rose-950/50 border-rose-500/40 text-rose-300"
+                    ? "bg-[#FEF2F2] border-[#FECACA] text-[#991B1B]"
                     : isWarning
-                    ? "bg-amber-950/50 border-amber-500/40 text-amber-300"
-                    : "bg-emerald-950/50 border-emerald-500/40 text-emerald-300"
+                    ? "bg-[#FFFBEB] border-[#FDE68A] text-[#92400E]"
+                    : "bg-[#ECFDF5] border-[#A7F3D0] text-[#065F46]"
                 }`}
               >
                 <span
                   className={`h-2 w-2 rounded-full animate-pulse ${
                     isCritical
-                      ? "bg-rose-400 shadow-[0_0_8px_#EF4444]"
+                      ? "bg-[#EF4444]"
                       : isWarning
-                      ? "bg-amber-400 shadow-[0_0_8px_#F59E0B]"
-                      : "bg-emerald-400 shadow-[0_0_8px_#10B981]"
+                      ? "bg-[#F59E0B]"
+                      : "bg-[#10B981]"
                   }`}
                 />
                 <span>{isCritical ? "Critical Alert" : isWarning ? "Risk Warning" : "Operational"}</span>
@@ -3348,8 +3348,8 @@ export default function DigitalTwin() {
           })()}
 
           {/* Clock / Last Updated */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono hidden md:flex">
-            <Clock size={14} className="text-slate-400" />
+          <div className="flex items-center gap-1.5 text-xs text-[#475569] font-mono hidden md:flex">
+            <Clock size={14} className="text-[#475569]" />
             <span>Last updated {new Date().toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })} • {liveClock}</span>
           </div>
         </div>
@@ -3358,53 +3358,53 @@ export default function DigitalTwin() {
         <div className="flex items-center gap-2.5 ml-auto flex-wrap">
           {/* Fault Injection Dropdown */}
           <div className="relative group">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 hover:bg-amber-950/70 hover:text-white text-xs font-mono font-semibold transition cursor-pointer shadow-lg">
-              <Zap size={14} className="text-amber-400" />
+            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-[#92400E] hover:bg-[#FEF3C7] text-xs font-mono font-semibold transition cursor-pointer shadow-sm">
+              <Zap size={14} className="text-[#F59E0B]" />
               <span>Fault Injection</span>
-              <ChevronDown size={14} className="text-amber-400/80" />
+              <ChevronDown size={14} className="text-[#92400E]/80" />
             </button>
-            <div className="absolute right-0 top-full mt-1.5 w-56 rounded-xl bg-slate-950 border border-white/10 p-1.5 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 space-y-1">
+            <div className="absolute right-0 top-full mt-1.5 w-56 rounded-xl bg-white border border-[#DCE8F6] p-1.5 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 space-y-1">
               <button
                 onClick={() => handleSimulateDoor()}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-amber-300 hover:bg-amber-950/60 flex items-center gap-2 cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-[#92400E] hover:bg-[#FFFBEB] flex items-center gap-2 cursor-pointer transition"
               >
                 <DoorOpen size={13} />
                 <span>Door Left Open (+26°C)</span>
               </button>
               <button
                 onClick={handleToggleCompressor}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-rose-300 hover:bg-rose-950/60 flex items-center gap-2 cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-[#991B1B] hover:bg-[#FEF2F2] flex items-center gap-2 cursor-pointer transition"
               >
                 <PowerOff size={13} />
                 <span>Trip Compressor Rack</span>
               </button>
               <button
                 onClick={handleToggleSensorFailure}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-purple-300 hover:bg-purple-950/60 flex items-center gap-2 cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-[#6D28D9] hover:bg-[#F5F3FF] flex items-center gap-2 cursor-pointer transition"
               >
                 <ZapOff size={13} />
                 <span>Sensor Probe Failure</span>
               </button>
               <button
                 onClick={handleToggleSensorBurning}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-red-300 hover:bg-red-950/60 flex items-center gap-2 cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-[#991B1B] hover:bg-[#FEF2F2] flex items-center gap-2 cursor-pointer transition"
               >
                 <Flame size={13} />
                 <span>Sensor Burning (Fire/Smoke)</span>
               </button>
               <button
                 onClick={handleToggleDegradation}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-cyan-300 hover:bg-cyan-950/60 flex items-center gap-2 cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-[#2563EB] hover:bg-[#EFF6FF] flex items-center gap-2 cursor-pointer transition"
               >
                 <ThermometerSnowflake size={13} />
                 <span>Cooling Degradation (45%)</span>
               </button>
-              <div className="border-t border-white/10 my-1" />
+              <div className="border-t border-[#DCE8F6] my-1" />
               <button
                 onClick={handleResetAll}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-slate-300 hover:bg-slate-900 flex items-center gap-2 cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-[#475569] hover:bg-[#F1F7FF] hover:text-[#0F172A] flex items-center gap-2 cursor-pointer transition"
               >
-                <RotateCcw size={13} className="text-cyan-400" />
+                <RotateCcw size={13} className="text-[#2563EB]" />
                 <span>Reset All Systems</span>
               </button>
             </div>
@@ -3413,24 +3413,24 @@ export default function DigitalTwin() {
           {/* Reset Button */}
           <button
             onClick={handleResetAll}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#DCE8F6] text-xs font-mono text-[#475569] hover:text-[#0F172A] hover:bg-[#F1F7FF] transition cursor-pointer shadow-sm"
           >
             <RotateCcw size={14} />
             <span>Reset</span>
           </button>
 
           {/* Notification Bell with Badge */}
-          <div className="relative p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white cursor-pointer">
+          <div className="relative p-2 rounded-xl bg-white border border-[#DCE8F6] text-[#475569] hover:text-[#0F172A] hover:bg-[#F1F7FF] cursor-pointer shadow-sm transition">
             <Bell size={16} />
             {activeCriticalCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-rose-500 text-white text-[10px] font-bold font-mono flex items-center justify-center shadow-[0_0_8px_#EF4444]">
+              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-[#EF4444] text-white text-[10px] font-bold font-mono flex items-center justify-center shadow-sm">
                 {activeCriticalCount}
               </span>
             )}
           </div>
 
           {/* Operator Console */}
-          <div className="h-8 w-8 rounded-xl bg-slate-900 border border-slate-700 text-cyan-400 flex items-center justify-center shadow-md" title="Operator Console">
+          <div className="h-8 w-8 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB] flex items-center justify-center shadow-sm" title="Operator Console">
             <Eye size={15} />
           </div>
         </div>
@@ -3442,16 +3442,16 @@ export default function DigitalTwin() {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
         {/* LEFT (col-span-8): 3D FACILITY VIEW */}
         <div className={is3DExpanded ? "xl:col-span-12" : "xl:col-span-8"}>
-          <div className="rounded-2xl border border-white/10 bg-[#0B1424]/95 shadow-2xl overflow-hidden flex flex-col justify-between">
+          <div className="rounded-2xl border border-[#DCE8F6] bg-white shadow-arctic-card overflow-hidden flex flex-col justify-between">
             {/* Header: Title + 3D View / Top View / Labels Switch */}
-            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10 bg-slate-900/90 flex-wrap">
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[#DCE8F6] bg-[#F8FAFC] flex-wrap">
               <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/40">
+                <div className="h-8 w-8 rounded-lg bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center border border-[#BFDBFE]">
                   <Boxes size={18} />
                 </div>
                 <div>
-                  <h2 className="text-sm font-bold text-white tracking-wide">3D Facility View</h2>
-                  <div className="text-[10px] text-slate-400 font-mono">Interactive digital twin of cold storage</div>
+                  <h2 className="text-sm font-bold text-[#0F172A] tracking-tight">3D Facility View</h2>
+                  <div className="text-[10px] text-[#475569] font-mono">Interactive digital twin of cold storage</div>
                 </div>
               </div>
 
@@ -3460,8 +3460,8 @@ export default function DigitalTwin() {
                   onClick={() => setCameraPreset("isometric")}
                   className={`px-3 py-1 rounded-lg text-xs font-mono font-bold border transition cursor-pointer flex items-center gap-1.5 ${
                     cameraPreset !== "top"
-                      ? "bg-cyan-600 text-white border-cyan-400 shadow-md shadow-cyan-600/30"
-                      : "bg-slate-900 text-slate-400 border-slate-700 hover:text-white"
+                      ? "bg-[#2563EB] text-white border-[#2563EB] shadow-sm"
+                      : "bg-white text-[#475569] border-[#DCE8F6] hover:text-[#0F172A] hover:bg-[#F1F7FF]"
                   }`}
                 >
                   <Boxes size={13} />
@@ -3472,20 +3472,20 @@ export default function DigitalTwin() {
                   onClick={() => setCameraPreset("top")}
                   className={`px-3 py-1 rounded-lg text-xs font-mono font-bold border transition cursor-pointer flex items-center gap-1.5 ${
                     cameraPreset === "top"
-                      ? "bg-cyan-600 text-white border-cyan-400 shadow-md shadow-cyan-600/30"
-                      : "bg-slate-900 text-slate-400 border-slate-700 hover:text-white"
+                      ? "bg-[#2563EB] text-white border-[#2563EB] shadow-sm"
+                      : "bg-white text-[#475569] border-[#DCE8F6] hover:text-[#0F172A] hover:bg-[#F1F7FF]"
                   }`}
                 >
                   <Layers size={13} />
                   <span>Top View</span>
                 </button>
 
-                <div className="flex items-center gap-1.5 pl-2 border-l border-white/10">
-                  <span className="text-xs text-slate-400 font-mono">Labels</span>
+                <div className="flex items-center gap-1.5 pl-2 border-l border-[#DCE8F6]">
+                  <span className="text-xs text-[#475569] font-mono">Labels</span>
                   <button
                     onClick={() => setShowLabels(!showLabels)}
                     className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${
-                      showLabels ? "bg-cyan-500" : "bg-slate-800"
+                      showLabels ? "bg-[#2563EB]" : "bg-slate-300"
                     }`}
                   >
                     <div
@@ -3499,9 +3499,9 @@ export default function DigitalTwin() {
             </div>
 
             {/* Sub-bar: Camera Flight Navigation + View Mode Controls */}
-            <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-white/10 bg-slate-950/70 flex-wrap">
+            <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-[#DCE8F6] bg-[#F1F7FF] flex-wrap">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold flex items-center gap-1 mr-1">
+                <span className="text-[10px] font-mono text-[#2563EB] uppercase font-bold flex items-center gap-1 mr-1">
                   <Navigation size={12} className="animate-pulse" /> CAMERA FLIGHT:
                 </span>
 
@@ -3512,8 +3512,8 @@ export default function DigitalTwin() {
                   }}
                   className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer ${
                     cameraPreset === "isometric" && !isNavigating
-                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold"
-                      : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                      ? "bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE] font-bold shadow-sm"
+                      : "bg-white text-[#475569] border-[#DCE8F6] hover:text-[#0F172A] hover:bg-[#EFF6FF]"
                   }`}
                 >
                   🌐 Overview
@@ -3527,13 +3527,13 @@ export default function DigitalTwin() {
                       onClick={() => handleZoneSelect(cfg.id)}
                       className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
                         isActive
-                          ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold shadow-sm"
-                          : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:border-cyan-400"
+                          ? "bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE] font-bold shadow-sm"
+                          : "bg-white text-[#475569] border-[#DCE8F6] hover:text-[#0F172A] hover:border-[#BFDBFE]"
                       }`}
                     >
                       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cfg.color }} />
                       <span>{cfg.name}</span>
-                      <span className="text-[9px] text-cyan-400 font-bold">
+                      <span className="text-[9px] text-[#2563EB] font-bold">
                         {cfg.id === "zone-a" ? "16m" : cfg.id === "zone-b" ? "10m" : "8m"}
                       </span>
                     </button>
@@ -3544,12 +3544,12 @@ export default function DigitalTwin() {
                   onClick={() => setCameraPreset("plant-room")}
                   className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
                     cameraPreset === "plant-room"
-                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold shadow-sm"
-                      : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:border-cyan-400"
+                      ? "bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE] font-bold shadow-sm"
+                      : "bg-white text-[#475569] border-[#DCE8F6] hover:text-[#0F172A] hover:border-[#BFDBFE]"
                   }`}
                   title="Fly to Plant Room / Compressor Rack"
                 >
-                  <Cpu size={12} className="text-cyan-400" />
+                  <Cpu size={12} className="text-[#2563EB]" />
                   <span>Plant Room</span>
                 </button>
 
@@ -3557,12 +3557,12 @@ export default function DigitalTwin() {
                   onClick={() => setCameraPreset("dock-bay")}
                   className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
                     cameraPreset === "dock-bay"
-                      ? "bg-amber-500/20 text-amber-300 border-amber-400 font-bold shadow-sm"
-                      : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:border-amber-400"
+                      ? "bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE] font-bold shadow-sm"
+                      : "bg-white text-[#475569] border-[#DCE8F6] hover:text-[#0F172A] hover:border-[#BFDBFE]"
                   }`}
                   title="Fly to Loading Dock & Door Ingress"
                 >
-                  <DoorOpen size={12} className="text-amber-400" />
+                  <DoorOpen size={12} className="text-[#F59E0B]" />
                   <span>Loading Dock</span>
                 </button>
               </div>
@@ -3573,8 +3573,8 @@ export default function DigitalTwin() {
                   onClick={() => setViewMode(viewMode === "thermal" ? "standard" : "thermal")}
                   className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
                     viewMode === "thermal"
-                      ? "bg-amber-500/20 text-amber-300 border-amber-400 font-bold"
-                      : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                      ? "bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE] font-bold shadow-sm"
+                      : "bg-white text-[#475569] border-[#DCE8F6] hover:text-[#0F172A]"
                   }`}
                   title="Thermal Heatmap"
                 >
@@ -3585,8 +3585,8 @@ export default function DigitalTwin() {
                   onClick={() => setViewMode(viewMode === "airflow" ? "standard" : "airflow")}
                   className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
                     viewMode === "airflow"
-                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold"
-                      : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                      ? "bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE] font-bold shadow-sm"
+                      : "bg-white text-[#475569] border-[#DCE8F6] hover:text-[#0F172A]"
                   }`}
                   title="Airflow Vectors"
                 >
@@ -3596,7 +3596,7 @@ export default function DigitalTwin() {
                 <button
                   onClick={() => setShowLabels(!showLabels)}
                   className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
-                    showLabels ? "bg-cyan-500/20 text-cyan-300 border-cyan-400" : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                    showLabels ? "bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE] font-bold" : "bg-white text-[#475569] border-[#DCE8F6] hover:text-[#0F172A]"
                   }`}
                 >
                   <Tag size={11} /> Labels
@@ -3605,7 +3605,7 @@ export default function DigitalTwin() {
                 <button
                   onClick={() => setAutoRotate(!autoRotate)}
                   className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
-                    autoRotate ? "bg-purple-500/20 text-purple-300 border-purple-400 font-bold" : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                    autoRotate ? "bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE] font-bold" : "bg-white text-[#475569] border-[#DCE8F6] hover:text-[#0F172A]"
                   }`}
                 >
                   <RefreshCw size={11} className={autoRotate ? "animate-spin" : ""} /> Orbit
@@ -3614,7 +3614,7 @@ export default function DigitalTwin() {
                 <button
                   onClick={() => setIs3DExpanded(!is3DExpanded)}
                   className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border flex items-center gap-1 cursor-pointer transition ${
-                    is3DExpanded ? "bg-cyan-500/20 text-cyan-300 border-cyan-400" : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                    is3DExpanded ? "bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE] font-bold" : "bg-white text-[#475569] border-[#DCE8F6] hover:text-[#0F172A]"
                   }`}
                 >
                   {is3DExpanded ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
@@ -3624,20 +3624,20 @@ export default function DigitalTwin() {
             </div>
 
             {/* Direct Simulation & Fault Injection Control Dock */}
-            <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-white/10 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 flex-wrap">
+            <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-[#DCE8F6] bg-white flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-mono text-amber-400 uppercase font-bold flex items-center gap-1.5 mr-1">
-                  <Zap size={13} className="text-amber-400 animate-pulse" /> SIMULATION LAB:
+                <span className="text-[10px] font-mono text-[#F59E0B] uppercase font-bold flex items-center gap-1.5 mr-1">
+                  <Zap size={13} className="text-[#F59E0B] animate-pulse" /> SIMULATION LAB:
                 </span>
 
                 {/* 1. Door Left Open */}
-                <div className="flex items-center rounded-lg border border-amber-500/40 bg-amber-950/30 overflow-hidden">
+                <div className="flex items-center rounded-lg border border-[#FDE68A] bg-[#FFFBEB] overflow-hidden">
                   <button
                     onClick={() => handleSimulateDoor()}
                     className={`px-2.5 py-1 text-[11px] font-mono font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                       simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a")
-                        ? "bg-amber-500 text-black font-bold shadow-[0_0_12px_rgba(245,158,11,0.5)]"
-                        : "text-amber-300 hover:bg-amber-900/40"
+                        ? "bg-[#F59E0B] text-white font-bold shadow-sm"
+                        : "text-[#92400E] hover:bg-[#FEF3C7]"
                     }`}
                   >
                     <DoorOpen size={13} />
@@ -3648,17 +3648,17 @@ export default function DigitalTwin() {
                     </span>
                   </button>
                   {!(simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a")) && (
-                    <div className="flex border-l border-amber-500/30">
+                    <div className="flex border-l border-[#FDE68A]">
                       <button
                         onClick={() => handleSimulateDoor(2)}
-                        className="px-1.5 py-1 text-[10px] font-mono text-amber-400 hover:bg-amber-800/40 border-r border-amber-500/20"
+                        className="px-1.5 py-1 text-[10px] font-mono text-[#92400E] hover:bg-[#FEF3C7] border-r border-[#FDE68A]"
                         title="Open for 2 minutes"
                       >
                         2m
                       </button>
                       <button
                         onClick={() => handleSimulateDoor(5)}
-                        className="px-1.5 py-1 text-[10px] font-mono text-amber-400 hover:bg-amber-800/40"
+                        className="px-1.5 py-1 text-[10px] font-mono text-[#92400E] hover:bg-[#FEF3C7]"
                         title="Open for 5 minutes"
                       >
                         5m
@@ -3672,8 +3672,8 @@ export default function DigitalTwin() {
                   onClick={handleToggleCompressor}
                   className={`px-2.5 py-1 text-[11px] font-mono font-semibold rounded-lg border transition cursor-pointer flex items-center gap-1.5 ${
                     activeScenario === "compressor_failure" || selectedZone?.scenario === "compressor_failure"
-                      ? "bg-rose-500 text-white font-bold border-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.6)] animate-pulse"
-                      : "bg-rose-950/30 text-rose-300 border-rose-500/40 hover:bg-rose-900/40 hover:text-white"
+                      ? "bg-[#EF4444] text-white font-bold border-[#EF4444] shadow-sm animate-pulse"
+                      : "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA] hover:bg-[#FEE2E2]"
                   }`}
                 >
                   <PowerOff size={13} />
@@ -3685,12 +3685,12 @@ export default function DigitalTwin() {
                   onClick={handleToggleFan}
                   className={`px-2.5 py-1 text-[11px] font-mono font-semibold rounded-lg border transition cursor-pointer flex items-center gap-1.5 ${
                     activeScenario === "fan_off" || selectedZone?.scenario === "fan_off"
-                      ? "bg-amber-600 text-white font-bold border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.6)] animate-pulse"
-                      : "bg-amber-950/30 text-amber-300 border-amber-500/40 hover:bg-amber-900/40 hover:text-white"
+                      ? "bg-[#F59E0B] text-white font-bold border-[#F59E0B] shadow-sm animate-pulse"
+                      : "bg-[#FFFBEB] text-[#92400E] border-[#FDE68A] hover:bg-[#FEF3C7]"
                   }`}
-                  title="Simulate evaporator cooling fan failure (stops forced convection across cooling coils)"
+                  title="Simulate evaporator cooling fan failure"
                 >
-                  <Fan size={13} className={activeScenario === "fan_off" || selectedZone?.scenario === "fan_off" ? "text-white" : "text-amber-400"} />
+                  <Fan size={13} className={activeScenario === "fan_off" || selectedZone?.scenario === "fan_off" ? "text-white" : "text-[#F59E0B]"} />
                   <span>{activeScenario === "fan_off" || selectedZone?.scenario === "fan_off" ? "Cooling Fan Off" : "Fan Off"}</span>
                 </button>
 
@@ -3699,8 +3699,8 @@ export default function DigitalTwin() {
                   onClick={handleToggleSensorFailure}
                   className={`px-2.5 py-1 text-[11px] font-mono font-semibold rounded-lg border transition cursor-pointer flex items-center gap-1.5 ${
                     activeScenario === "sensor_anomaly" || selectedZone?.scenario === "sensor_anomaly"
-                      ? "bg-purple-600 text-white font-bold border-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.5)] animate-pulse"
-                      : "bg-purple-950/30 text-purple-300 border-purple-500/40 hover:bg-purple-900/40 hover:text-white"
+                      ? "bg-[#8B5CF6] text-white font-bold border-[#8B5CF6] shadow-sm animate-pulse"
+                      : "bg-[#F5F3FF] text-[#6D28D9] border-[#DDD6FE] hover:bg-[#EDE9FE]"
                   }`}
                 >
                   <ZapOff size={13} />
@@ -3712,11 +3712,11 @@ export default function DigitalTwin() {
                   onClick={handleToggleSensorBurning}
                   className={`px-2.5 py-1 text-[11px] font-mono font-semibold rounded-lg border transition cursor-pointer flex items-center gap-1.5 ${
                     activeScenario === "fire_runaway" || activeScenario === "sensor_burn" || selectedZone?.scenario === "fire_runaway"
-                      ? "bg-red-600 text-white font-bold border-red-400 shadow-[0_0_16px_rgba(239,68,68,0.7)] animate-bounce"
-                      : "bg-red-950/30 text-red-300 border-red-500/40 hover:bg-red-900/40 hover:text-white"
+                      ? "bg-[#DC2626] text-white font-bold border-[#DC2626] shadow-md animate-bounce"
+                      : "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA] hover:bg-[#FEE2E2]"
                   }`}
                 >
-                  <Flame size={13} className={activeScenario === "fire_runaway" || selectedZone?.scenario === "fire_runaway" ? "text-amber-200" : "text-red-400"} />
+                  <Flame size={13} className={activeScenario === "fire_runaway" || selectedZone?.scenario === "fire_runaway" ? "text-white" : "text-[#DC2626]"} />
                   <span>{activeScenario === "fire_runaway" || activeScenario === "sensor_burn" || selectedZone?.scenario === "fire_runaway" ? "🔥 Sensor Burning!" : "Sensor Burning"}</span>
                 </button>
 
@@ -3725,8 +3725,8 @@ export default function DigitalTwin() {
                   onClick={handleToggleDegradation}
                   className={`px-2.5 py-1 text-[11px] font-mono font-semibold rounded-lg border transition cursor-pointer flex items-center gap-1.5 ${
                     activeScenario === "cooling_degradation" || selectedZone?.scenario === "cooling_degradation"
-                      ? "bg-cyan-500 text-black font-bold border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.5)]"
-                      : "bg-cyan-950/30 text-cyan-300 border-cyan-500/40 hover:bg-cyan-900/40 hover:text-white"
+                      ? "bg-[#2563EB] text-white font-bold border-[#2563EB] shadow-sm"
+                      : "bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE] hover:bg-[#DBEAFE]"
                   }`}
                 >
                   <ThermometerSnowflake size={13} />
@@ -3736,16 +3736,16 @@ export default function DigitalTwin() {
 
               <div className="flex items-center gap-2 ml-auto flex-wrap">
                 {/* Telemetry Sensor Feed Mode */}
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-cyan-500/30 bg-cyan-950/40 text-[11px] font-mono">
-                  <Database size={13} className="text-cyan-400" />
-                  <span className="text-slate-400">DATA FEED:</span>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#DCE8F6] bg-[#F1F7FF] text-[11px] font-mono">
+                  <Database size={13} className="text-[#2563EB]" />
+                  <span className="text-[#475569]">DATA FEED:</span>
                   <button
                     onClick={() =>
                       handleToggleTelemetrySource(
                         telemetrySourcePoll.data?.source === "dataset" ? "simulator" : "dataset"
                       )
                     }
-                    className="font-bold text-cyan-300 hover:text-cyan-100 flex items-center gap-1 cursor-pointer transition"
+                    className="font-bold text-[#2563EB] hover:text-[#1D4ED8] flex items-center gap-1 cursor-pointer transition"
                     title="Click to toggle between Pre-recorded Sensor Dataset Playback and Live Feeder API / Simulator"
                   >
                     <span>
@@ -3755,17 +3755,17 @@ export default function DigitalTwin() {
                           }/${telemetrySourcePoll.data.total_timestamps})`
                         : "Live IoT / Simulator"}
                     </span>
-                    <RefreshCw size={10} className="text-cyan-400/80" />
+                    <RefreshCw size={10} className="text-[#2563EB]" />
                   </button>
                 </div>
 
                 {/* Reset All Baseline */}
                 <button
                   onClick={handleResetAll}
-                  className="px-2.5 py-1 text-[11px] font-mono font-semibold rounded-lg border bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800 hover:text-white transition cursor-pointer flex items-center gap-1.5"
+                  className="px-2.5 py-1 text-[11px] font-mono font-semibold rounded-lg border bg-white text-[#475569] border-[#DCE8F6] hover:bg-[#F1F7FF] hover:text-[#0F172A] transition cursor-pointer flex items-center gap-1.5"
                   title="Reset all systems, sensors, compressors and doors to nominal"
                 >
-                  <RotateCcw size={13} className="text-cyan-400" />
+                  <RotateCcw size={13} className="text-[#2563EB]" />
                   <span>Reset Baseline</span>
                 </button>
               </div>
@@ -3800,18 +3800,18 @@ export default function DigitalTwin() {
 
               {/* Bottom-Left Sensor Legend (Matching Reference Image) */}
               <div className="absolute bottom-3 left-3 z-20 pointer-events-none">
-                <div className="rounded-xl border border-white/10 bg-slate-950/85 px-3 py-2 text-[11px] font-mono backdrop-blur-md shadow-xl flex flex-col gap-1 text-slate-300">
+                <div className="rounded-xl border border-[#DCE8F6] bg-white/95 px-3 py-2 text-[11px] font-mono backdrop-blur-md shadow-arctic-card flex flex-col gap-1 text-[#0F172A]">
                   <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-cyan-400" />
-                    <span>Temperature Sensor</span>
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#38BDF8]" />
+                    <span className="text-[#0F172A]">Temperature Sensor</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                    <span>Humidity Sensor</span>
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#10B981]" />
+                    <span className="text-[#0F172A]">Humidity Sensor</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-blue-400" />
-                    <span>Airflow Sensor</span>
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#2563EB]" />
+                    <span className="text-[#0F172A]">Airflow Sensor</span>
                   </div>
                 </div>
               </div>
@@ -3820,15 +3820,15 @@ export default function DigitalTwin() {
               <div className="absolute top-4 right-3 z-30 flex flex-col items-center gap-1.5 pointer-events-auto">
                 <button
                   onClick={() => setCameraPreset("isometric")}
-                  className="w-8 h-8 rounded-lg bg-slate-900/90 border border-white/20 text-white flex items-center justify-center hover:bg-slate-800 transition-all shadow-xl cursor-pointer"
+                  className="w-8 h-8 rounded-lg bg-white/95 border border-[#DCE8F6] text-[#0F172A] flex items-center justify-center hover:bg-[#EFF6FF] hover:text-[#2563EB] transition-all shadow-md cursor-pointer"
                   title="Reset Camera View"
                 >
-                  <Home size={15} className="text-cyan-400" />
+                  <Home size={15} className="text-[#2563EB]" />
                 </button>
 
                 <button
                   onClick={() => handleZoom(1)}
-                  className="w-8 h-8 rounded-t-lg bg-slate-900/90 border border-white/20 text-white flex items-center justify-center hover:bg-slate-800 transition-all shadow-xl cursor-pointer mt-1"
+                  className="w-8 h-8 rounded-t-lg bg-white/95 border border-[#DCE8F6] text-[#0F172A] flex items-center justify-center hover:bg-[#EFF6FF] hover:text-[#2563EB] transition-all shadow-md cursor-pointer mt-1"
                   title="Zoom In"
                 >
                   <Plus size={15} />
@@ -3836,7 +3836,7 @@ export default function DigitalTwin() {
 
                 <button
                   onClick={() => handleZoom(-1)}
-                  className="w-8 h-8 rounded-b-lg bg-slate-900/90 border-x border-b border-white/20 text-white flex items-center justify-center hover:bg-slate-800 transition-all shadow-xl cursor-pointer"
+                  className="w-8 h-8 rounded-b-lg bg-white/95 border-x border-b border-[#DCE8F6] text-[#0F172A] flex items-center justify-center hover:bg-[#EFF6FF] hover:text-[#2563EB] transition-all shadow-md cursor-pointer"
                   title="Zoom Out"
                 >
                   <Minus size={15} />
@@ -3844,10 +3844,10 @@ export default function DigitalTwin() {
 
                 <button
                   onClick={handleResetNorth}
-                  className="w-8 h-8 rounded-lg bg-slate-900/90 border border-white/20 text-white flex items-center justify-center hover:bg-slate-800 transition-all shadow-xl cursor-pointer mt-1"
+                  className="w-8 h-8 rounded-lg bg-white/95 border border-[#DCE8F6] text-[#0F172A] flex items-center justify-center hover:bg-[#EFF6FF] hover:text-[#2563EB] transition-all shadow-md cursor-pointer mt-1"
                   title="Reset Orientation"
                 >
-                  <RotateCw size={15} className="text-cyan-400" />
+                  <RotateCw size={15} className="text-[#2563EB]" />
                 </button>
               </div>
             </div>
@@ -3856,22 +3856,22 @@ export default function DigitalTwin() {
 
         {/* RIGHT (col-span-4): ZONE TELEMETRY & OPERATIONS CARD */}
         <div className={is3DExpanded ? "xl:col-span-12" : "xl:col-span-4"}>
-          <div className="rounded-2xl border border-white/10 bg-[#0B1424]/95 p-4 shadow-2xl backdrop-blur-xl flex flex-col justify-between h-full space-y-4">
+          <div className="rounded-2xl border border-[#DCE8F6] bg-white p-4 shadow-arctic-card flex flex-col justify-between h-full space-y-4">
             {/* Header: Zone Title + Status Badge */}
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+            <div className="flex items-center justify-between pb-3 border-b border-[#DCE8F6]">
               <div className="flex items-center gap-2">
-                <Layers size={17} className="text-cyan-400" />
-                <h3 className="text-base font-bold text-white tracking-tight">
+                <Layers size={17} className="text-[#2563EB]" />
+                <h3 className="text-base font-bold text-[#0F172A] tracking-tight">
                   {selectedConfig.name} – Telemetry & Operations
                 </h3>
               </div>
               <span
                 className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
                   simState.doorOpen
-                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse"
+                    ? "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA] animate-pulse"
                     : simState.isRecovering
-                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    ? "bg-[#FFFBEB] text-[#92400E] border-[#FDE68A]"
+                    : "bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]"
                 }`}
               >
                 {simState.doorOpen ? "● OPEN – INGRESS" : simState.isRecovering ? "● CLOSED – RECOVERING" : "● CLOSED – NORMAL"}
@@ -3881,30 +3881,30 @@ export default function DigitalTwin() {
             {/* 8 Metric Tiles Grid (2 cols x 4 rows) */}
             <div className="grid grid-cols-2 gap-2.5">
               {/* Tile 1: Temperature */}
-              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+              <div className="rounded-xl border border-[#DCE8F6] bg-[#F8FAFC] p-3 flex flex-col justify-between hover:border-[#BFDBFE] transition">
                 <div className="flex items-center justify-between">
-                  <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                    <Thermometer size={14} className="text-cyan-400" />
+                  <div className="text-[11px] text-[#475569] flex items-center gap-1 font-semibold">
+                    <Thermometer size={14} className="text-[#2563EB]" />
                     <span>Temperature</span>
                   </div>
-                  <DynamicSparkline data={tempHistory} color="#22D3EE" />
+                  <DynamicSparkline data={tempHistory} color="#2563EB" />
                 </div>
                 <div className="flex items-baseline justify-between mt-1">
-                  <div className="text-xl font-bold font-mono text-white">
+                  <div className="text-xl font-bold font-mono text-[#0F172A]">
                     {fmtTemp(currentZoneTemp)}
                   </div>
                   {activeScenario !== "normal" && (
                     <span
                       className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border animate-pulse ${
                         activeScenario === "fire_runaway" || activeScenario === "sensor_burn"
-                          ? "bg-red-500/20 text-red-300 border-red-500/40"
+                          ? "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA]"
                           : activeScenario === "compressor_failure"
-                          ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                          ? "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA]"
                           : activeScenario === "door_open"
-                          ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                          ? "bg-[#FFFBEB] text-[#92400E] border-[#FDE68A]"
                           : activeScenario === "sensor_anomaly"
-                          ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
-                          : "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
+                          ? "bg-[#F5F3FF] text-[#6D28D9] border-[#DDD6FE]"
+                          : "bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE]"
                       }`}
                     >
                       {activeScenario === "fire_runaway" || activeScenario === "sensor_burn"
@@ -3919,21 +3919,21 @@ export default function DigitalTwin() {
                     </span>
                   )}
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                <div className="text-[10px] text-[#475569] font-mono mt-0.5">
                   Target: {selectedConfig.tempRange}
                 </div>
               </div>
 
               {/* Tile 2: Relative Humidity */}
-              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+              <div className="rounded-xl border border-[#DCE8F6] bg-[#F8FAFC] p-3 flex flex-col justify-between hover:border-[#BFDBFE] transition">
                 <div className="flex items-center justify-between">
-                  <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                    <Droplets size={14} className="text-blue-400" />
+                  <div className="text-[11px] text-[#475569] flex items-center gap-1 font-semibold">
+                    <Droplets size={14} className="text-[#38BDF8]" />
                     <span>Relative Humidity</span>
                   </div>
                   <DynamicSparkline data={humidityHistory} color="#38BDF8" />
                 </div>
-                <div className="text-xl font-bold font-mono text-white mt-1">
+                <div className="text-xl font-bold font-mono text-[#0F172A] mt-1">
                   {simState.doorOpen
                     ? "78% RH"
                     : activeScenario === "sensor_anomaly"
@@ -3942,21 +3942,21 @@ export default function DigitalTwin() {
                     ? `${Math.round(selectedZone.humidity)}%`
                     : "—"}
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                <div className="text-[10px] text-[#475569] font-mono mt-0.5">
                   {simState.doorOpen ? "Ambient Latent Rush" : "Target: 45% – 70%"}
                 </div>
               </div>
 
               {/* Tile 3: Power Load */}
-              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+              <div className="rounded-xl border border-[#DCE8F6] bg-[#F8FAFC] p-3 flex flex-col justify-between hover:border-[#BFDBFE] transition">
                 <div className="flex items-center justify-between">
-                  <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                    <Zap size={14} className="text-amber-400" />
+                  <div className="text-[11px] text-[#475569] flex items-center gap-1 font-semibold">
+                    <Zap size={14} className="text-[#F59E0B]" />
                     <span>Power Load</span>
                   </div>
                   <DynamicSparkline data={powerHistory} color="#10B981" />
                 </div>
-                <div className="text-xl font-bold font-mono text-white mt-1">
+                <div className="text-xl font-bold font-mono text-[#0F172A] mt-1">
                   {!simState.compressorRunning
                     ? "0.45 kW"
                     : activeScenario === "cooling_degradation"
@@ -3965,7 +3965,7 @@ export default function DigitalTwin() {
                     ? `${selectedZone.power_consumption_kw.toFixed(1)} kW`
                     : "— kW"}
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
+                <div className="text-[10px] text-[#475569] font-mono mt-0.5 truncate">
                   {!simState.compressorRunning
                     ? "Load: 0% · TRIPPED / OFFLINE"
                     : activeScenario === "cooling_degradation"
@@ -3987,28 +3987,28 @@ export default function DigitalTwin() {
                   <div
                     className={`rounded-xl border p-3 flex flex-col justify-between transition-all ${
                       isBurned
-                        ? "bg-red-950/40 border-red-500/60"
+                        ? "bg-[#FEF2F2] border-[#FECACA]"
                         : isFailed
-                        ? "bg-purple-950/40 border-purple-500/60"
-                        : "border-white/5 bg-slate-900/80"
+                        ? "bg-[#F5F3FF] border-[#DDD6FE]"
+                        : "border-[#DCE8F6] bg-[#F8FAFC] hover:border-[#BFDBFE]"
                     }`}
                   >
-                    <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                      <Radio size={14} className={isBurned ? "text-red-400" : isDegraded ? "text-amber-400" : "text-emerald-400"} />
+                    <div className="text-[11px] text-[#475569] flex items-center gap-1 font-semibold">
+                      <Radio size={14} className={isBurned ? "text-[#EF4444]" : isDegraded ? "text-[#F59E0B]" : "text-[#10B981]"} />
                       <span>Sensor Probes</span>
                     </div>
-                    <div className={`text-lg font-bold font-mono mt-1 flex items-center gap-1.5 ${isBurned ? "text-red-400" : isDegraded ? "text-amber-400" : "text-emerald-400"}`}>
+                    <div className={`text-lg font-bold font-mono mt-1 flex items-center gap-1.5 ${isBurned ? "text-[#991B1B]" : isDegraded ? "text-[#92400E]" : "text-[#065F46]"}`}>
                       <span>{probesOnline} / 2</span>
-                      <span className="text-xs text-white">{isBurned ? "Fire Hazard" : isDegraded ? "Degraded" : "Online"}</span>
+                      <span className="text-xs font-semibold">{isBurned ? "Fire Hazard" : isDegraded ? "Degraded" : "Online"}</span>
                       {isBurned ? (
-                        <Flame size={14} className="text-red-400 animate-pulse" />
+                        <Flame size={14} className="text-[#EF4444] animate-pulse" />
                       ) : isDegraded ? (
-                        <AlertTriangle size={14} className="text-amber-400" />
+                        <AlertTriangle size={14} className="text-[#F59E0B]" />
                       ) : (
-                        <CheckCircle2 size={14} className="text-emerald-400" />
+                        <CheckCircle2 size={14} className="text-[#10B981]" />
                       )}
                     </div>
-                    <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
+                    <div className="text-[10px] text-[#475569] font-mono mt-0.5 truncate">
                       {isBurned
                         ? `${targetSensorId} Thermal Runaway`
                         : isFailed
@@ -4022,18 +4022,18 @@ export default function DigitalTwin() {
               })()}
 
               {/* Tile 5: Residual Rise ΔT */}
-              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+              <div className="rounded-xl border border-[#DCE8F6] bg-[#F8FAFC] p-3 flex flex-col justify-between hover:border-[#BFDBFE] transition">
                 <div className="flex items-center justify-between">
-                  <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                    <Wind size={14} className="text-cyan-400" />
+                  <div className="text-[11px] text-[#475569] flex items-center gap-1 font-semibold">
+                    <Wind size={14} className="text-[#2563EB]" />
                     <span>Residual Rise ΔT</span>
                   </div>
-                  <DynamicSparkline data={residualHistory} color="#22D3EE" />
+                  <DynamicSparkline data={residualHistory} color="#2563EB" />
                 </div>
-                <div className="text-xl font-bold font-mono text-amber-300 mt-1">
+                <div className="text-xl font-bold font-mono text-[#F59E0B] mt-1">
                   +{simState.doorOpen ? "1.8" : (selectedZone?.residual_rise_predicted ?? simState.residualRise ?? 0).toFixed(1)}°C
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                <div className="text-[10px] text-[#475569] font-mono mt-0.5">
                   Accumulated warm air
                 </div>
               </div>
@@ -4061,18 +4061,18 @@ export default function DigitalTwin() {
 
                 return (
                   <div
-                    className={`rounded-xl border p-3 flex flex-col justify-between ${
-                      isBreach ? "bg-rose-950/40 border-rose-500/50" : "border-white/5 bg-slate-900/80"
+                    className={`rounded-xl border p-3 flex flex-col justify-between transition-all ${
+                      isBreach ? "bg-[#FEF2F2] border-[#FECACA]" : "border-[#DCE8F6] bg-[#F8FAFC] hover:border-[#BFDBFE]"
                     }`}
                   >
-                    <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                      <Thermometer size={14} className="text-rose-400" />
+                    <div className="text-[11px] text-[#475569] flex items-center gap-1 font-semibold">
+                      <Thermometer size={14} className="text-[#EF4444]" />
                       <span>Predicted Peak Temp</span>
                     </div>
-                    <div className="text-xl font-bold font-mono text-rose-300 mt-1">
+                    <div className="text-xl font-bold font-mono text-[#991B1B] mt-1">
                       {fmtTemp(peakVal)}
                     </div>
-                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                    <div className="text-[10px] text-[#475569] font-mono mt-0.5">
                       {isBreach ? "⚠️ Excursion Breach Imminent" : "Thermal inertia peak"}
                     </div>
                   </div>
@@ -4095,18 +4095,18 @@ export default function DigitalTwin() {
                 const recMins = simRec ?? selectedZone?.recovery_time_minutes ?? simState.recoveryMinutes ?? 0;
 
                 return (
-                  <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
+                  <div className="rounded-xl border border-[#DCE8F6] bg-[#F8FAFC] p-3 flex flex-col justify-between hover:border-[#BFDBFE] transition">
                     <div className="flex items-center justify-between">
-                      <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                        <Clock size={14} className="text-cyan-400" />
+                      <div className="text-[11px] text-[#475569] flex items-center gap-1 font-semibold">
+                        <Clock size={14} className="text-[#2563EB]" />
                         <span>Est. Recovery Duration</span>
                       </div>
-                      <DynamicSparkline data={recoveryHistory} color="#A855F7" />
+                      <DynamicSparkline data={recoveryHistory} color="#8B5CF6" />
                     </div>
-                    <div className="text-xl font-bold font-mono text-cyan-300 mt-1">
+                    <div className="text-xl font-bold font-mono text-[#2563EB] mt-1">
                       ~ {Math.round(recMins)} min
                     </div>
-                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                    <div className="text-[10px] text-[#475569] font-mono mt-0.5">
                       Post-incident cooling
                     </div>
                   </div>
@@ -4114,15 +4114,15 @@ export default function DigitalTwin() {
               })()}
 
               {/* Tile 8: 24h Ingress Time */}
-              <div className="rounded-xl border border-white/5 bg-slate-900/80 p-3 flex flex-col justify-between">
-                <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                  <Calendar size={14} className="text-blue-400" />
+              <div className="rounded-xl border border-[#DCE8F6] bg-[#F8FAFC] p-3 flex flex-col justify-between hover:border-[#BFDBFE] transition">
+                <div className="text-[11px] text-[#475569] flex items-center gap-1 font-semibold">
+                  <Calendar size={14} className="text-[#2563EB]" />
                   <span>24h Ingress Time</span>
                 </div>
-                <div className="text-xl font-bold font-mono text-white mt-1">
+                <div className="text-xl font-bold font-mono text-[#0F172A] mt-1">
                   {(selectedZone?.cumulative_open_minutes_24h ?? 0).toFixed(0)} min
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                <div className="text-[10px] text-[#475569] font-mono mt-0.5">
                   {selectedZone?.door_events_count_24h ?? 0} events recorded
                 </div>
               </div>
@@ -4131,14 +4131,14 @@ export default function DigitalTwin() {
             {/* Cooling Recovery Progress Bar */}
             <div className="space-y-1.5 pt-1">
               <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-300 font-medium">Cooling Recovery Progress</span>
-                <span className="font-bold text-emerald-400">
+                <span className="text-[#475569] font-medium">Cooling Recovery Progress</span>
+                <span className="font-bold text-[#10B981]">
                   {Math.round(selectedZone?.recovery_progress_pct ?? simState.recoveryProgressPct ?? 100)}%
                 </span>
               </div>
-              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/60">
+              <div className="h-2.5 w-full bg-[#E2E8F0] rounded-full overflow-hidden p-0.5 border border-[#CBD5E1]">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all duration-500"
+                  className="h-full rounded-full bg-gradient-to-r from-[#38BDF8] to-[#10B981] transition-all duration-500"
                   style={{
                     width: `${Math.min(100, Math.max(5, selectedZone?.recovery_progress_pct ?? simState.recoveryProgressPct ?? 100))}%`,
                   }}
@@ -4147,17 +4147,17 @@ export default function DigitalTwin() {
             </div>
 
             {/* Real-Time Situations & Fault Injection Control Grid */}
-            <div className="pt-2 border-t border-white/10 space-y-2">
+            <div className="pt-2 border-t border-[#DCE8F6] space-y-2">
               <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-300 font-bold flex items-center gap-1.5">
-                  <Zap size={13} className="text-amber-400" />
+                <span className="text-[#0F172A] font-bold flex items-center gap-1.5">
+                  <Zap size={13} className="text-[#F59E0B]" />
                   <span>Simulate Situations</span>
                 </span>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                     activeScenario === "normal"
-                      ? "bg-emerald-950/60 border-emerald-500/40 text-emerald-300"
-                      : "bg-red-950/60 border-red-500/50 text-red-300 animate-pulse"
+                      ? "bg-[#ECFDF5] border-[#A7F3D0] text-[#065F46]"
+                      : "bg-[#FEF2F2] border-[#FECACA] text-[#991B1B] animate-pulse"
                   }`}
                 >
                   {activeScenario === "normal" ? "Nominal Baseline" : activeScenario.toUpperCase().replace("_", " ")}
@@ -4171,12 +4171,12 @@ export default function DigitalTwin() {
                   className={`py-1.5 px-2 rounded-lg border text-[11px] font-mono font-semibold transition flex items-center justify-center gap-1 cursor-pointer ${
                     (simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a")) &&
                     doorSimulations[selectedZoneId || "zone-a"]?.durationMinutes === 2
-                      ? "border-amber-500 bg-amber-950 text-amber-200"
-                      : "border-white/10 bg-slate-900/80 hover:bg-slate-800 text-slate-300"
+                      ? "border-[#F59E0B] bg-[#FFFBEB] text-[#92400E] font-bold"
+                      : "border-[#DCE8F6] bg-white hover:bg-[#F1F7FF] text-[#475569]"
                   }`}
                   title="Simulate 2-minute door ingress"
                 >
-                  <DoorOpen size={12} className="text-amber-400" />
+                  <DoorOpen size={12} className="text-[#F59E0B]" />
                   <span>
                     {(simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a")) &&
                     doorSimulations[selectedZoneId || "zone-a"]?.durationMinutes === 2
@@ -4190,12 +4190,12 @@ export default function DigitalTwin() {
                   className={`py-1.5 px-2 rounded-lg border text-[11px] font-mono font-semibold transition flex items-center justify-center gap-1 cursor-pointer ${
                     (simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a")) &&
                     doorSimulations[selectedZoneId || "zone-a"]?.durationMinutes === 5
-                      ? "border-amber-500 bg-amber-950 text-amber-200"
-                      : "border-white/10 bg-slate-900/80 hover:bg-slate-800 text-slate-300"
+                      ? "border-[#F59E0B] bg-[#FFFBEB] text-[#92400E] font-bold"
+                      : "border-[#DCE8F6] bg-white hover:bg-[#F1F7FF] text-[#475569]"
                   }`}
                   title="Simulate 5-minute door ingress"
                 >
-                  <DoorOpen size={12} className="text-amber-400" />
+                  <DoorOpen size={12} className="text-[#F59E0B]" />
                   <span>
                     {(simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a")) &&
                     doorSimulations[selectedZoneId || "zone-a"]?.durationMinutes === 5
@@ -4208,15 +4208,15 @@ export default function DigitalTwin() {
                   onClick={() => handleSimulateDoor()}
                   className={`py-1.5 px-2 rounded-lg border text-[11px] font-mono font-semibold transition flex items-center justify-center gap-1 cursor-pointer ${
                     simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a")
-                      ? "border-emerald-500/80 bg-emerald-950/60 text-emerald-300"
-                      : "border-white/10 bg-slate-900/80 hover:bg-slate-800 text-slate-300"
+                      ? "border-[#A7F3D0] bg-[#ECFDF5] text-[#065F46] font-bold"
+                      : "border-[#DCE8F6] bg-white hover:bg-[#F1F7FF] text-[#475569]"
                   }`}
                   title={simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a") ? "Close and seal door" : "Open door continuously"}
                 >
                   {simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a") ? (
-                    <Check size={12} className="text-emerald-400" />
+                    <Check size={12} className="text-[#10B981]" />
                   ) : (
-                    <DoorOpen size={12} className="text-amber-400" />
+                    <DoorOpen size={12} className="text-[#F59E0B]" />
                   )}
                   <span>{simState.doorOpen || isDoorOpenContext(selectedZoneId || "zone-a") ? "Seal Door" : "Continuous"}</span>
                 </button>
@@ -4228,11 +4228,11 @@ export default function DigitalTwin() {
                   onClick={handleToggleCompressor}
                   className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
                     !simState.compressorRunning
-                      ? "border-rose-500 bg-rose-950/80 text-rose-200 shadow-md animate-pulse"
-                      : "border-rose-500/30 bg-rose-950/20 hover:bg-rose-900/40 text-rose-300"
+                      ? "border-[#EF4444] bg-[#FEF2F2] text-[#991B1B] shadow-sm animate-pulse"
+                      : "border-[#FECACA] bg-[#FEF2F2]/60 hover:bg-[#FEE2E2] text-[#991B1B]"
                   }`}
                 >
-                  <PowerOff size={13} className={!simState.compressorRunning ? "text-rose-200" : "text-rose-400"} />
+                  <PowerOff size={13} className={!simState.compressorRunning ? "text-[#EF4444]" : "text-[#991B1B]"} />
                   <span>{!simState.compressorRunning ? "Restore Compressor" : "Trip Compressor"}</span>
                 </button>
 
@@ -4240,11 +4240,11 @@ export default function DigitalTwin() {
                   onClick={handleToggleSensorFailure}
                   className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
                     simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly"
-                      ? "border-purple-500 bg-purple-950/80 text-purple-200 shadow-md animate-pulse"
-                      : "border-purple-500/30 bg-purple-950/20 hover:bg-purple-900/40 text-purple-300"
+                      ? "border-[#8B5CF6] bg-[#F5F3FF] text-[#6D28D9] shadow-sm animate-pulse"
+                      : "border-[#DDD6FE] bg-[#F5F3FF]/60 hover:bg-[#EDE9FE] text-[#6D28D9]"
                   }`}
                 >
-                  <ZapOff size={13} className="text-purple-400" />
+                  <ZapOff size={13} className="text-[#8B5CF6]" />
                   <span>{simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly" ? "Clear Sensor Fault" : "Sensor Fails"}</span>
                 </button>
 
@@ -4252,11 +4252,11 @@ export default function DigitalTwin() {
                   onClick={handleToggleSensorBurning}
                   className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
                     simState.burnedSensors.size > 0 || activeScenario === "fire_runaway" || activeScenario === "sensor_burn"
-                      ? "border-red-500 bg-red-950/90 text-red-200 shadow-[0_0_15px_rgba(239,68,68,0.5)] animate-pulse"
-                      : "border-red-500/30 bg-red-950/20 hover:bg-red-900/40 text-red-300"
+                      ? "border-[#DC2626] bg-[#FEF2F2] text-[#991B1B] shadow-md animate-bounce"
+                      : "border-[#FECACA] bg-[#FEF2F2]/60 hover:bg-[#FEE2E2] text-[#991B1B]"
                   }`}
                 >
-                  <Flame size={13} className="text-red-400" />
+                  <Flame size={13} className="text-[#DC2626]" />
                   <span>{simState.burnedSensors.size > 0 || activeScenario === "fire_runaway" || activeScenario === "sensor_burn" ? "Extinguish Fire" : "Sensor Burning"}</span>
                 </button>
 
@@ -4264,11 +4264,11 @@ export default function DigitalTwin() {
                   onClick={handleToggleDegradation}
                   className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
                     activeScenario === "cooling_degradation"
-                      ? "border-cyan-500 bg-cyan-950/80 text-cyan-200 shadow-md"
-                      : "border-cyan-500/30 bg-cyan-950/20 hover:bg-cyan-900/40 text-cyan-300"
+                      ? "border-[#2563EB] bg-[#EFF6FF] text-[#2563EB] font-bold shadow-sm"
+                      : "border-[#BFDBFE] bg-[#EFF6FF]/60 hover:bg-[#DBEAFE] text-[#2563EB]"
                   }`}
                 >
-                  <ThermometerSnowflake size={13} className="text-cyan-400" />
+                  <ThermometerSnowflake size={13} className="text-[#2563EB]" />
                   <span>{activeScenario === "cooling_degradation" ? "Restore COP" : "Degrade 45%"}</span>
                 </button>
               </div>
@@ -4276,9 +4276,9 @@ export default function DigitalTwin() {
               {/* Full Reset Baseline */}
               <button
                 onClick={handleResetAll}
-                className="w-full py-1.5 px-3 rounded-xl border border-slate-700 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-mono font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                className="w-full py-2 px-3 rounded-xl border border-[#DCE8F6] bg-[#EFF6FF] hover:bg-[#DBEAFE] text-[#2563EB] text-xs font-mono font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
               >
-                <RotateCcw size={13} className="text-cyan-400" />
+                <RotateCcw size={13} className="text-[#2563EB]" />
                 <span>Reset All Systems to Nominal</span>
               </button>
             </div>
@@ -4290,17 +4290,17 @@ export default function DigitalTwin() {
           MIDDLE SECTION: LIVE INCIDENT IMPACT ASSESSMENT & RESPONSE SOP PLAYBOOK
           (Dynamic real-time cascading impact across Thermal, Refrigeration, Telemetry, and Inventory Assets)
           ═══════════════════════════════════════════════════════════════════ */}
-      <div className="rounded-2xl border border-white/10 bg-[#0B1424]/95 p-5 shadow-2xl backdrop-blur-xl space-y-4">
+      <div className="rounded-2xl border border-[#DCE8F6] bg-white p-5 shadow-arctic-card space-y-4">
         {/* Header: Title, Scenario Badge, Risk Score, and Quick Action */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-white/10">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[#DCE8F6]">
           <div className="flex items-center gap-3">
             <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-lg ${
+              className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-sm ${
                 riskAnalysis.score >= 70
-                  ? "bg-rose-500/20 border-rose-500/50 text-rose-400 shadow-rose-500/20 animate-pulse"
+                  ? "bg-[#FEF2F2] border-[#FECACA] text-[#EF4444] animate-pulse"
                   : riskAnalysis.score >= 35
-                  ? "bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-amber-500/20"
-                  : "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-emerald-500/20"
+                  ? "bg-[#FFFBEB] border-[#FDE68A] text-[#F59E0B]"
+                  : "bg-[#ECFDF5] border-[#A7F3D0] text-[#10B981]"
               }`}
             >
               {riskAnalysis.score >= 70 ? (
@@ -4313,22 +4313,22 @@ export default function DigitalTwin() {
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base font-bold text-white tracking-tight">
+                <h3 className="text-base font-bold text-[#0F172A] tracking-tight">
                   Incident Impact Assessment & Response SOP Playbook
                 </h3>
                 <span
                   className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider border shadow-sm ${
                     simState.doorOpen
-                      ? "bg-amber-500/20 text-amber-300 border-amber-500/50"
+                      ? "bg-[#FFFBEB] text-[#92400E] border-[#FDE68A]"
                       : !simState.compressorRunning
-                      ? "bg-rose-500/20 text-rose-300 border-rose-500/50"
+                      ? "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA]"
                       : simState.burnedSensors.size > 0 || activeScenario === "fire_runaway" || activeScenario === "sensor_burn"
-                      ? "bg-red-500/20 text-red-300 border-red-500/50 animate-pulse"
+                      ? "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA] animate-pulse"
                       : simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly"
-                      ? "bg-purple-500/20 text-purple-300 border-purple-500/50"
+                      ? "bg-[#F5F3FF] text-[#6D28D9] border-[#DDD6FE]"
                       : activeScenario === "cooling_degradation"
-                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50"
-                      : "bg-emerald-500/20 text-emerald-300 border-emerald-500/50"
+                      ? "bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE]"
+                      : "bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]"
                   }`}
                 >
                   {simState.doorOpen
@@ -4344,7 +4344,7 @@ export default function DigitalTwin() {
                     : "Nominal Operating Baseline"}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-[#475569] mt-0.5">
                 Real-time multi-layer cascade analysis across thermal dynamics, plant telemetry, refrigeration strain, and inventory assets.
               </p>
             </div>
@@ -4353,15 +4353,15 @@ export default function DigitalTwin() {
           {/* Right Action & Risk Score */}
           <div className="flex items-center gap-3 flex-wrap">
             {/* Risk Score Pill */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-slate-900/80">
-              <span className="text-[11px] font-mono text-slate-400 uppercase">AI Risk Score</span>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#DCE8F6] bg-[#F8FAFC]">
+              <span className="text-[11px] font-mono text-[#475569] uppercase font-semibold">AI Risk Score</span>
               <span
                 className={`text-sm font-mono font-black ${
                   riskAnalysis.score >= 70
-                    ? "text-rose-400"
+                    ? "text-[#EF4444]"
                     : riskAnalysis.score >= 35
-                    ? "text-amber-400"
-                    : "text-emerald-400"
+                    ? "text-[#F59E0B]"
+                    : "text-[#10B981]"
                 }`}
               >
                 {Math.round(riskAnalysis.score)} / 100
@@ -4369,10 +4369,10 @@ export default function DigitalTwin() {
               <span
                 className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-bold uppercase ${
                   riskAnalysis.score >= 70
-                    ? "bg-rose-500/20 text-rose-300"
+                    ? "bg-[#FEF2F2] text-[#991B1B]"
                     : riskAnalysis.score >= 35
-                    ? "bg-amber-500/20 text-amber-300"
-                    : "bg-emerald-500/20 text-emerald-300"
+                    ? "bg-[#FFFBEB] text-[#92400E]"
+                    : "bg-[#ECFDF5] text-[#065F46]"
                 }`}
               >
                 {riskAnalysis.category}
@@ -4383,9 +4383,9 @@ export default function DigitalTwin() {
             {riskAnalysis.actionLabel && riskAnalysis.onAction ? (
               <button
                 onClick={riskAnalysis.onAction}
-                className="py-1.5 px-3.5 rounded-xl border border-cyan-400 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 text-xs font-mono font-bold transition flex items-center gap-1.5 shadow-[0_0_15px_rgba(6,182,212,0.3)] cursor-pointer"
+                className="py-1.5 px-3.5 rounded-xl border border-[#2563EB] bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-mono font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
               >
-                <Sparkles size={13} className="text-cyan-300 animate-spin" />
+                <Sparkles size={13} className="text-sky-200 animate-spin" />
                 <span>{riskAnalysis.actionLabel}</span>
               </button>
             ) : null}
@@ -4393,23 +4393,23 @@ export default function DigitalTwin() {
             {/* Quick Reset Baseline */}
             <button
               onClick={handleResetAll}
-              className="py-1.5 px-3 rounded-xl border border-slate-700 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-mono font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+              className="py-1.5 px-3 rounded-xl border border-[#DCE8F6] bg-white hover:bg-[#F1F7FF] text-[#475569] hover:text-[#0F172A] text-xs font-mono font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
               title="Reset all systems to nominal baseline"
             >
-              <RotateCcw size={12} className="text-cyan-400" />
+              <RotateCcw size={12} className="text-[#2563EB]" />
               <span>Reset All</span>
             </button>
           </div>
         </div>
 
         {/* Explainable AI Risk Factor Contributions */}
-        <div className="rounded-xl border border-white/5 bg-slate-950/60 p-3">
-          <div className="flex items-center justify-between text-xs font-mono text-slate-400 mb-2">
-            <span className="flex items-center gap-1.5 font-bold text-slate-300">
-              <Cpu size={14} className="text-cyan-400" />
+        <div className="rounded-xl border border-[#DCE8F6] bg-[#F8FAFC] p-3">
+          <div className="flex items-center justify-between text-xs font-mono text-[#475569] mb-2">
+            <span className="flex items-center gap-1.5 font-bold text-[#0F172A]">
+              <Cpu size={14} className="text-[#2563EB]" />
               <span>Active Risk Factor Point Contributions</span>
             </span>
-            <span className="text-[11px] text-slate-500">
+            <span className="text-[11px] text-[#475569]">
               {riskAnalysis.factors.length} active risk vector{riskAnalysis.factors.length !== 1 ? "s" : ""}
             </span>
           </div>
@@ -4419,27 +4419,27 @@ export default function DigitalTwin() {
               {riskAnalysis.factors.map((factor, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center gap-2 rounded-lg border border-white/10 bg-slate-900/80 px-2.5 py-1.5 text-xs text-slate-200"
+                  className="flex items-center gap-2 rounded-lg border border-[#DCE8F6] bg-white px-2.5 py-1.5 text-xs text-[#0F172A] shadow-sm"
                 >
                   <span
                     className={`font-mono font-bold px-1.5 py-0.5 rounded text-[10px] ${
                       factor.points >= 50
-                        ? "bg-rose-500/30 text-rose-300 border border-rose-500/40"
+                        ? "bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA]"
                         : factor.points >= 30
-                        ? "bg-amber-500/30 text-amber-300 border border-amber-500/40"
-                        : "bg-cyan-500/30 text-cyan-300 border border-cyan-500/40"
+                        ? "bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]"
+                        : "bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]"
                     }`}
                   >
                     +{factor.points} pts
                   </span>
-                  <span className="font-semibold text-white">{factor.label}:</span>
-                  <span className="text-slate-400 text-[11px]">{factor.detail}</span>
+                  <span className="font-semibold text-[#0F172A]">{factor.label}:</span>
+                  <span className="text-[#475569] text-[11px]">{factor.detail}</span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-xs text-emerald-400 font-mono flex items-center gap-2 py-1">
-              <CheckCircle2 size={14} />
+            <div className="text-xs text-[#065F46] font-mono flex items-center gap-2 py-1">
+              <CheckCircle2 size={14} className="text-[#10B981]" />
               <span>All telemetry signals within nominal parameters. 0 active risk penalties applied. Model confidence 94.2%.</span>
             </div>
           )}
@@ -4448,19 +4448,19 @@ export default function DigitalTwin() {
         {/* The 4 Cascading Impact Pillars (4-Column Grid) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* Pillar 1: Thermal Dynamics & Ingress Velocity */}
-          <div className="rounded-xl border border-white/5 bg-slate-900/70 p-3.5 flex flex-col justify-between space-y-3">
+          <div className="rounded-xl border border-[#DCE8F6] bg-white p-3.5 flex flex-col justify-between space-y-3 shadow-sm">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-cyan-400 text-xs font-mono font-bold uppercase tracking-wider">
+              <div className="flex items-center gap-2 text-[#2563EB] text-xs font-mono font-bold uppercase tracking-wider">
                 <Thermometer size={14} />
                 <span>Thermal Dynamics</span>
               </div>
               <span
                 className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
                   simState.doorOpen || !simState.compressorRunning || simState.burnedSensors.size > 0
-                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                    ? "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA]"
                     : activeScenario === "cooling_degradation"
-                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    ? "bg-[#FFFBEB] text-[#92400E] border-[#FDE68A]"
+                    : "bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]"
                 }`}
               >
                 {simState.doorOpen
@@ -4477,18 +4477,18 @@ export default function DigitalTwin() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Drift Velocity</span>
+                <span className="text-[#475569]">Drift Velocity</span>
                 <span
                   className={`font-mono font-bold ${
                     simState.doorOpen
-                      ? "text-rose-400 font-black animate-pulse"
+                      ? "text-[#EF4444] font-black animate-pulse"
                       : !simState.compressorRunning
-                      ? "text-rose-400 font-black"
+                      ? "text-[#EF4444] font-black"
                       : simState.burnedSensors.size > 0
-                      ? "text-red-400 font-black"
+                      ? "text-[#DC2626] font-black"
                       : activeScenario === "cooling_degradation"
-                      ? "text-amber-400 font-bold"
-                      : "text-emerald-400"
+                      ? "text-[#F59E0B] font-bold"
+                      : "text-[#10B981]"
                   }`}
                 >
                   {simState.doorOpen
@@ -4506,8 +4506,8 @@ export default function DigitalTwin() {
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Net Energy Ingress</span>
-                <span className="font-mono text-slate-200 text-[11px]">
+                <span className="text-[#475569]">Net Energy Ingress</span>
+                <span className="font-mono text-[#0F172A] text-[11px] font-semibold">
                   {simState.doorOpen
                     ? "+3,850 W (Dock Air)"
                     : !simState.compressorRunning
@@ -4521,8 +4521,8 @@ export default function DigitalTwin() {
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Projected Peak Temp</span>
-                <span className="font-mono font-bold text-white text-xs">
+                <span className="text-[#475569]">Projected Peak Temp</span>
+                <span className="font-mono font-bold text-[#0F172A] text-xs">
                   {fmtTemp(
                     forecastData.length > 0 && activeScenario !== "normal"
                       ? Math.max(...forecastData.map((d) => d.temperature))
@@ -4532,12 +4532,12 @@ export default function DigitalTwin() {
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Est. Time to Breach</span>
+                <span className="text-[#475569]">Est. Time to Breach</span>
                 <span
                   className={`font-mono font-bold text-xs ${
                     simState.doorOpen || !simState.compressorRunning || simState.burnedSensors.size > 0
-                      ? "text-rose-400"
-                      : "text-slate-300"
+                      ? "text-[#EF4444]"
+                      : "text-[#0F172A]"
                   }`}
                 >
                   {simState.doorOpen
@@ -4555,26 +4555,26 @@ export default function DigitalTwin() {
               </div>
             </div>
 
-            <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
+            <div className="pt-2 border-t border-[#DCE8F6] flex items-center justify-between text-[11px] text-[#475569]">
               <span>Chamber Ambient</span>
-              <span className="font-mono text-slate-300">{fmtTemp(currentZoneTemp)}</span>
+              <span className="font-mono font-bold text-[#0F172A]">{fmtTemp(currentZoneTemp)}</span>
             </div>
           </div>
 
           {/* Pillar 2: Refrigeration Plant & Power Load */}
-          <div className="rounded-xl border border-white/5 bg-slate-900/70 p-3.5 flex flex-col justify-between space-y-3">
+          <div className="rounded-xl border border-[#DCE8F6] bg-white p-3.5 flex flex-col justify-between space-y-3 shadow-sm">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-cyan-400 text-xs font-mono font-bold uppercase tracking-wider">
+              <div className="flex items-center gap-2 text-[#2563EB] text-xs font-mono font-bold uppercase tracking-wider">
                 <Gauge size={14} />
                 <span>Refrigeration Plant</span>
               </div>
               <span
                 className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
                   !simState.compressorRunning
-                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse"
+                    ? "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA] animate-pulse"
                     : activeScenario === "cooling_degradation"
-                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    ? "bg-[#FFFBEB] text-[#92400E] border-[#FDE68A]"
+                    : "bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]"
                 }`}
               >
                 {!simState.compressorRunning
@@ -4587,10 +4587,10 @@ export default function DigitalTwin() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Compressor Rack</span>
+                <span className="text-[#475569]">Compressor Rack</span>
                 <span
                   className={`font-mono font-bold ${
-                    !simState.compressorRunning ? "text-rose-400" : "text-emerald-400"
+                    !simState.compressorRunning ? "text-[#EF4444]" : "text-[#10B981]"
                   }`}
                 >
                   {!simState.compressorRunning ? "TRIPPED (0.45 kW)" : "ACTIVE (3.2 kW)"}
@@ -4598,10 +4598,10 @@ export default function DigitalTwin() {
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Evaporator Fans</span>
+                <span className="text-[#475569]">Evaporator Fans</span>
                 <span
                   className={`font-mono ${
-                    !simState.compressorRunning ? "text-slate-500" : "text-cyan-300 font-semibold"
+                    !simState.compressorRunning ? "text-[#94A3B8]" : "text-[#2563EB] font-semibold"
                   }`}
                 >
                   {!simState.compressorRunning ? "Halted (0 RPM)" : "Circulating (1,450 RPM)"}
@@ -4609,8 +4609,8 @@ export default function DigitalTwin() {
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Cooling Capacity</span>
-                <span className="font-mono text-slate-200 text-[11px]">
+                <span className="text-[#475569]">Cooling Capacity</span>
+                <span className="font-mono text-[#0F172A] text-[11px] font-semibold">
                   {!simState.compressorRunning
                     ? "0% (Zero Active Cooling)"
                     : activeScenario === "cooling_degradation"
@@ -4620,10 +4620,10 @@ export default function DigitalTwin() {
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Breaker Panel Status</span>
+                <span className="text-[#475569]">Breaker Panel Status</span>
                 <span
                   className={`font-mono text-xs ${
-                    !simState.compressorRunning ? "text-amber-400 font-bold" : "text-slate-300"
+                    !simState.compressorRunning ? "text-[#F59E0B] font-bold" : "text-[#0F172A]"
                   }`}
                 >
                   {!simState.compressorRunning ? "Trip Interlock Closed" : "Normal 415V Phase"}
@@ -4631,11 +4631,11 @@ export default function DigitalTwin() {
               </div>
             </div>
 
-            <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
+            <div className="pt-2 border-t border-[#DCE8F6] flex items-center justify-between text-[11px] text-[#475569]">
               <span>Inspect 3D Equipment</span>
               <button
                 onClick={() => setCameraPreset("plant-room")}
-                className="text-cyan-400 hover:text-cyan-300 font-mono text-[11px] underline flex items-center gap-1 cursor-pointer"
+                className="text-[#2563EB] hover:text-[#1D4ED8] font-mono text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
               >
                 <span>Focus Plant Room</span>
                 <ArrowRight size={10} />
@@ -4644,19 +4644,19 @@ export default function DigitalTwin() {
           </div>
 
           {/* Pillar 3: Telemetry Stream & Sensor Health */}
-          <div className="rounded-xl border border-white/5 bg-slate-900/70 p-3.5 flex flex-col justify-between space-y-3">
+          <div className="rounded-xl border border-[#DCE8F6] bg-white p-3.5 flex flex-col justify-between space-y-3 shadow-sm">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-cyan-400 text-xs font-mono font-bold uppercase tracking-wider">
+              <div className="flex items-center gap-2 text-[#2563EB] text-xs font-mono font-bold uppercase tracking-wider">
                 <Radio size={14} />
                 <span>Telemetry Stream</span>
               </div>
               <span
                 className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
                   simState.burnedSensors.size > 0
-                    ? "bg-red-500/20 text-red-300 border-red-500/40 animate-pulse"
+                    ? "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA] animate-pulse"
                     : simState.failedSensors.size > 0 || activeScenario === "sensor_anomaly"
-                    ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
-                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    ? "bg-[#F5F3FF] text-[#6D28D9] border-[#DDD6FE]"
+                    : "bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]"
                 }`}
               >
                 {simState.burnedSensors.size > 0
@@ -4669,12 +4669,12 @@ export default function DigitalTwin() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Active Sensor Probes</span>
+                <span className="text-[#475569]">Active Sensor Probes</span>
                 <span
                   className={`font-mono font-bold ${
                     simState.burnedSensors.size > 0 || simState.failedSensors.size > 0
-                      ? "text-amber-400"
-                      : "text-emerald-400"
+                      ? "text-[#F59E0B]"
+                      : "text-[#10B981]"
                   }`}
                 >
                   {simState.burnedSensors.size > 0 || simState.failedSensors.size > 0
@@ -4684,14 +4684,14 @@ export default function DigitalTwin() {
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Isolation Forest Score</span>
+                <span className="text-[#475569]">Isolation Forest Score</span>
                 <span
                   className={`font-mono font-bold ${
                     activeScenario === "sensor_anomaly" || simState.failedSensors.size > 0
-                      ? "text-purple-400 font-black animate-pulse"
+                      ? "text-[#6D28D9] font-black animate-pulse"
                       : simState.burnedSensors.size > 0
-                      ? "text-red-400 font-black"
-                      : "text-emerald-400"
+                      ? "text-[#EF4444] font-black"
+                      : "text-[#10B981]"
                   }`}
                 >
                   {activeScenario === "sensor_anomaly" || simState.failedSensors.size > 0
@@ -4703,8 +4703,8 @@ export default function DigitalTwin() {
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">AI Confidence Index</span>
-                <span className="font-mono text-slate-200 text-[11px]">
+                <span className="text-[#475569]">AI Confidence Index</span>
+                <span className="font-mono text-[#0F172A] text-[11px] font-semibold">
                   {activeScenario === "sensor_anomaly"
                     ? "42.0% (Synthetic Fallback)"
                     : simState.burnedSensors.size > 0
@@ -4714,18 +4714,18 @@ export default function DigitalTwin() {
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Redundant Node TS-A2</span>
-                <span className="font-mono text-emerald-400 text-xs font-semibold">
+                <span className="text-[#475569]">Redundant Node TS-A2</span>
+                <span className="font-mono text-[#10B981] text-xs font-semibold">
                   Online & Calibrated
                 </span>
               </div>
             </div>
 
-            <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
+            <div className="pt-2 border-t border-[#DCE8F6] flex items-center justify-between text-[11px] text-[#475569]">
               <span>Inspect Sensor in 3D</span>
               <button
                 onClick={() => setCameraPreset("dock-bay")}
-                className="text-cyan-400 hover:text-cyan-300 font-mono text-[11px] underline flex items-center gap-1 cursor-pointer"
+                className="text-[#2563EB] hover:text-[#1D4ED8] font-mono text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
               >
                 <span>Focus Dock Bay</span>
                 <ArrowRight size={10} />
@@ -4734,17 +4734,17 @@ export default function DigitalTwin() {
           </div>
 
           {/* Pillar 4: Product Asset Value & Regulatory Compliance */}
-          <div className="rounded-xl border border-white/5 bg-slate-900/70 p-3.5 flex flex-col justify-between space-y-3">
+          <div className="rounded-xl border border-[#DCE8F6] bg-white p-3.5 flex flex-col justify-between space-y-3 shadow-sm">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-cyan-400 text-xs font-mono font-bold uppercase tracking-wider">
+              <div className="flex items-center gap-2 text-[#2563EB] text-xs font-mono font-bold uppercase tracking-wider">
                 <Boxes size={14} />
                 <span>Inventory & Assets</span>
               </div>
               <span
                 className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
                   simState.doorOpen || !simState.compressorRunning || simState.burnedSensors.size > 0
-                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
-                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    ? "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA]"
+                    : "bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]"
                 }`}
               >
                 {simState.doorOpen || !simState.compressorRunning || simState.burnedSensors.size > 0
@@ -4755,8 +4755,8 @@ export default function DigitalTwin() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Monitored Inventory</span>
-                <span className="font-mono font-bold text-white text-xs">
+                <span className="text-[#475569]">Monitored Inventory</span>
+                <span className="font-mono font-bold text-[#0F172A] text-xs">
                   {selectedZoneId === "zone-a"
                     ? "$142,500 Biologics"
                     : selectedZoneId === "zone-b"
@@ -4766,12 +4766,12 @@ export default function DigitalTwin() {
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Compliance Audit</span>
+                <span className="text-[#475569]">Compliance Audit</span>
                 <span
                   className={`font-mono text-xs font-semibold ${
                     simState.doorOpen || !simState.compressorRunning || simState.burnedSensors.size > 0
-                      ? "text-rose-400"
-                      : "text-emerald-400"
+                      ? "text-[#EF4444]"
+                      : "text-[#10B981]"
                   }`}
                 >
                   {simState.doorOpen || !simState.compressorRunning || simState.burnedSensors.size > 0
@@ -4781,8 +4781,8 @@ export default function DigitalTwin() {
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Residual Thermal Lag</span>
-                <span className="font-mono text-slate-200 text-[11px]">
+                <span className="text-[#475569]">Residual Thermal Lag</span>
+                <span className="font-mono text-[#0F172A] text-[11px] font-semibold">
                   {simState.doorOpen
                     ? "~18 min Post-Closure Wave"
                     : !simState.compressorRunning
@@ -4792,8 +4792,8 @@ export default function DigitalTwin() {
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">SOP Reference Code</span>
-                <span className="font-mono text-cyan-300 text-[11px] font-bold">
+                <span className="text-[#475569]">SOP Reference Code</span>
+                <span className="font-mono text-[#2563EB] text-[11px] font-bold">
                   {simState.doorOpen
                     ? "SOP-COLD-041 (Dock Ingress)"
                     : !simState.compressorRunning
@@ -4809,23 +4809,23 @@ export default function DigitalTwin() {
               </div>
             </div>
 
-            <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
+            <div className="pt-2 border-t border-[#DCE8F6] flex items-center justify-between text-[11px] text-[#475569]">
               <span>Facility Zone</span>
-              <span className="font-mono text-slate-300">{selectedConfig.name}</span>
+              <span className="font-mono font-bold text-[#0F172A]">{selectedConfig.name}</span>
             </div>
           </div>
         </div>
 
         {/* Operator SOP Action Playbook (3-Step Checklist) */}
-        <div className="rounded-xl border border-white/5 bg-slate-950/70 p-3.5 space-y-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-mono font-bold text-white">
-              <Terminal size={14} className="text-cyan-400" />
+        <div className="rounded-xl border border-[#DCE8F6] bg-[#F8FAFC] p-3.5 space-y-2.5">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#0F172A]">
+              <Terminal size={14} className="text-[#2563EB]" />
               <span>Standard Operating Procedure (SOP) Action Checklist</span>
             </div>
-            <span className="text-[11px] font-mono text-slate-400">
+            <span className="text-[11px] font-mono text-[#475569]">
               Active Protocol:{" "}
-              <span className="text-cyan-300 font-bold">
+              <span className="text-[#2563EB] font-bold">
                 {simState.doorOpen
                   ? "SOP-COLD-041 (Ingress Containment)"
                   : !simState.compressorRunning
@@ -4843,19 +4843,19 @@ export default function DigitalTwin() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
             {/* Step 1: Containment */}
-            <div className="rounded-lg border border-white/5 bg-slate-900/80 p-2.5 flex items-start gap-2.5">
+            <div className="rounded-lg border border-[#DCE8F6] bg-white p-2.5 flex items-start gap-2.5 shadow-sm">
               <div
                 className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-mono font-bold shrink-0 ${
                   simState.doorOpen || !simState.compressorRunning || simState.burnedSensors.size > 0 || simState.failedSensors.size > 0 || activeScenario === "cooling_degradation"
-                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                    : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                    ? "bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]"
+                    : "bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]"
                 }`}
               >
                 1
               </div>
               <div className="text-xs space-y-1">
-                <div className="font-bold text-white">Step 1: Immediate Containment</div>
-                <p className="text-slate-400 text-[11px] leading-relaxed">
+                <div className="font-bold text-[#0F172A]">Step 1: Immediate Containment</div>
+                <p className="text-[#475569] text-[11px] leading-relaxed">
                   {simState.doorOpen
                     ? "Engage magnetic seals and seal dock door to halt +26°C air ingress."
                     : !simState.compressorRunning
@@ -4871,7 +4871,7 @@ export default function DigitalTwin() {
                 {riskAnalysis.actionLabel && riskAnalysis.onAction && (
                   <button
                     onClick={riskAnalysis.onAction}
-                    className="mt-1 text-[10px] font-mono font-bold text-cyan-400 hover:text-cyan-300 underline flex items-center gap-1 cursor-pointer"
+                    className="mt-1 text-[10px] font-mono font-bold text-[#2563EB] hover:text-[#1D4ED8] underline flex items-center gap-1 cursor-pointer"
                   >
                     <span>Execute Step 1 Action</span>
                     <ArrowRight size={10} />
@@ -4881,13 +4881,13 @@ export default function DigitalTwin() {
             </div>
 
             {/* Step 2: System Stabilization */}
-            <div className="rounded-lg border border-white/5 bg-slate-900/80 p-2.5 flex items-start gap-2.5">
-              <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-mono font-bold shrink-0 bg-slate-800 text-slate-300 border border-slate-700">
+            <div className="rounded-lg border border-[#DCE8F6] bg-white p-2.5 flex items-start gap-2.5 shadow-sm">
+              <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-mono font-bold shrink-0 bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
                 2
               </div>
               <div className="text-xs space-y-1">
-                <div className="font-bold text-white">Step 2: Thermal Stabilization</div>
-                <p className="text-slate-400 text-[11px] leading-relaxed">
+                <div className="font-bold text-[#0F172A]">Step 2: Thermal Stabilization</div>
+                <p className="text-[#475569] text-[11px] leading-relaxed">
                   {simState.doorOpen
                     ? "Run booster evaporator fans at 100% capacity to overcome residual thermal lag."
                     : !simState.compressorRunning
@@ -4900,29 +4900,29 @@ export default function DigitalTwin() {
                     ? "Perform hot gas defrost cycle to clear icing on evaporator fins."
                     : "Continuously calculate predictive drift curves and Mean Kinetic Temperature."}
                 </p>
-                <div className="text-[10px] font-mono text-slate-500">
+                <div className="text-[10px] font-mono text-[#64748B]">
                   Target Stabilization: &lt; {selectedConfig.upperLimit}°C
                 </div>
               </div>
             </div>
 
             {/* Step 3: Audit & Regulatory Log */}
-            <div className="rounded-lg border border-white/5 bg-slate-900/80 p-2.5 flex items-start gap-2.5">
-              <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-mono font-bold shrink-0 bg-slate-800 text-slate-300 border border-slate-700">
+            <div className="rounded-lg border border-[#DCE8F6] bg-white p-2.5 flex items-start gap-2.5 shadow-sm">
+              <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-mono font-bold shrink-0 bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
                 3
               </div>
               <div className="text-xs space-y-1">
-                <div className="font-bold text-white">Step 3: FDA / GDP Compliance Audit</div>
-                <p className="text-slate-400 text-[11px] leading-relaxed">
+                <div className="font-bold text-[#0F172A]">Step 3: FDA / GDP Compliance Audit</div>
+                <p className="text-[#475569] text-[11px] leading-relaxed">
                   Timestamp incident telemetry into immutable FDA 21 CFR Part 11 audit ledger and generate excursion incident report.
                 </p>
                 <div className="pt-0.5 flex items-center gap-2">
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-950/80 text-cyan-300 border border-cyan-800">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] font-semibold">
                     Audit Log Active
                   </span>
                   <button
                     onClick={() => setActiveAnalyticsTab("events")}
-                    className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
+                    className="text-[10px] font-mono text-[#2563EB] hover:text-[#1D4ED8] underline cursor-pointer"
                   >
                     View Events Log
                   </button>
@@ -4936,18 +4936,18 @@ export default function DigitalTwin() {
       {/* ═══════════════════════════════════════════════════════════════════
           LOWER SECTION: TEMPERATURE FORECAST & ANALYTICS (FULL WIDTH)
           ═══════════════════════════════════════════════════════════════════ */}
-      <div className="rounded-2xl border border-white/10 bg-[#0B1424]/95 p-5 shadow-2xl backdrop-blur-xl">
+      <div className="rounded-2xl border border-[#DCE8F6] bg-white p-5 shadow-arctic-card">
         {/* Header: Title + Center Tabs + Right Projection Mode */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-white/10">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[#DCE8F6]">
           <div className="flex items-center gap-2.5">
-            <LineChartIcon size={18} className="text-cyan-400" />
-            <h3 className="text-base font-bold text-white tracking-tight">
+            <LineChartIcon size={18} className="text-[#2563EB]" />
+            <h3 className="text-base font-bold text-[#0F172A] tracking-tight">
               Temperature Forecast & Analytics
             </h3>
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800 flex-wrap">
+          <div className="flex items-center gap-1 bg-[#EFF6FF] p-1 rounded-xl border border-[#DCE8F6] flex-wrap">
             {[
               { id: "forecast", label: "Forecast" },
               { id: "what-if", label: "What-If Simulator" },
@@ -4960,8 +4960,8 @@ export default function DigitalTwin() {
                 onClick={() => setActiveAnalyticsTab(tab.id as any)}
                 className={`px-3 py-1 rounded-lg text-xs font-mono font-semibold transition cursor-pointer ${
                   activeAnalyticsTab === tab.id
-                    ? "bg-cyan-600 text-white shadow-md shadow-cyan-600/30"
-                    : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                    ? "bg-[#2563EB] text-white shadow-sm font-bold"
+                    : "text-[#475569] hover:text-[#0F172A] hover:bg-white/60"
                 }`}
               >
                 {tab.label}
@@ -4970,11 +4970,11 @@ export default function DigitalTwin() {
           </div>
 
           {/* Projection Mode */}
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
-            <span className="text-slate-400">Projection Mode:</span>
-            <div className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 flex items-center gap-1.5 font-semibold text-white">
+          <div className="flex items-center gap-2 text-xs font-mono text-[#0F172A]">
+            <span className="text-[#475569]">Projection Mode:</span>
+            <div className="px-2.5 py-1 rounded-lg bg-[#F8FAFC] border border-[#DCE8F6] flex items-center gap-1.5 font-semibold text-[#0F172A]">
               <span>Live AI Forecast (30 min)</span>
-              <ChevronDown size={13} className="text-slate-400" />
+              <ChevronDown size={13} className="text-[#475569]" />
             </div>
           </div>
         </div>
@@ -4987,7 +4987,7 @@ export default function DigitalTwin() {
               <div className="h-64 sm:h-72 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={forecastData} margin={{ top: 20, right: 20, bottom: 5, left: -10 }}>
-                    <CartesianGrid stroke="#1E293B" strokeDasharray="3 3" vertical={false} />
+                    <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="minute" stroke="#64748B" fontSize={11} tickLine={false} />
                     <YAxis
                       stroke="#64748B"
@@ -5001,10 +5001,10 @@ export default function DigitalTwin() {
                         if (!active || !payload?.length) return null;
                         const data = payload[0].payload;
                         return (
-                          <div className="rounded-xl border border-slate-700 bg-slate-900/95 p-2.5 text-xs font-mono shadow-2xl backdrop-blur-md">
-                            <div className="text-slate-400 mb-1">{data.minute} ahead</div>
-                            <div className="text-cyan-300 font-bold">Predicted: {data.temperature}°C</div>
-                            <div className="text-slate-400 text-[10px]">
+                          <div className="rounded-xl border border-[#DCE8F6] bg-white p-2.5 text-xs font-mono shadow-xl">
+                            <div className="text-[#475569] mb-1">{data.minute} ahead</div>
+                            <div className="text-[#2563EB] font-bold">Predicted: {data.temperature}°C</div>
+                            <div className="text-[#64748B] text-[10px]">
                               Safe: {selectedConfig.lowerLimit}°C – {selectedConfig.upperLimit}°C
                             </div>
                           </div>
@@ -5029,12 +5029,12 @@ export default function DigitalTwin() {
                     {/* Blue Dashed Lower Limit */}
                     <ReferenceLine
                       y={selectedConfig.lowerLimit}
-                      stroke="#3B82F6"
+                      stroke="#2563EB"
                       strokeDasharray="4 4"
                       strokeWidth={1.5}
                       label={{
                         value: `Lower Limit (${selectedConfig.lowerLimit}°C)`,
-                        fill: "#3B82F6",
+                        fill: "#2563EB",
                         fontSize: 10,
                         position: "insideBottomLeft",
                       }}
@@ -5044,8 +5044,8 @@ export default function DigitalTwin() {
                     <Area
                       type="monotone"
                       dataKey="temperature"
-                      fill="#22D3EE"
-                      fillOpacity={0.15}
+                      fill="#38BDF8"
+                      fillOpacity={0.12}
                       stroke="none"
                     />
 
@@ -5053,47 +5053,47 @@ export default function DigitalTwin() {
                     <Line
                       type="monotone"
                       dataKey="temperature"
-                      stroke="#22D3EE"
+                      stroke="#2563EB"
                       strokeWidth={2.5}
-                      dot={{ r: 4, fill: "#22D3EE", stroke: "#0B1424", strokeWidth: 2 }}
-                      activeDot={{ r: 6, fill: "#FFFFFF", stroke: "#22D3EE", strokeWidth: 2 }}
+                      dot={{ r: 4, fill: "#2563EB", stroke: "#FFFFFF", strokeWidth: 2 }}
+                      activeDot={{ r: 6, fill: "#FFFFFF", stroke: "#2563EB", strokeWidth: 2 }}
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
 
               {/* Chart Legend (Matching Reference Image) */}
-              <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-slate-300 font-mono pt-1">
+              <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-[#475569] font-mono pt-1">
                 <div className="flex items-center gap-2">
-                  <span className="w-5 h-0.5 bg-cyan-400 rounded" />
+                  <span className="w-5 h-0.5 bg-[#2563EB] rounded" />
                   <span>Predicted Temperature</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-4 h-3 rounded bg-cyan-400/20 border border-cyan-400/40" />
+                  <span className="w-4 h-3 rounded bg-[#EFF6FF] border border-[#BFDBFE]" />
                   <span>Confidence Range</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-5 border-b-2 border-dashed border-red-500" />
-                  <span className="text-red-400">Upper Limit ({selectedConfig.upperLimit}°C)</span>
+                  <span className="w-5 border-b-2 border-dashed border-[#EF4444]" />
+                  <span className="text-[#EF4444]">Upper Limit ({selectedConfig.upperLimit}°C)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-5 border-b-2 border-dashed border-blue-500" />
-                  <span className="text-blue-400">Lower Limit ({selectedConfig.lowerLimit}°C)</span>
+                  <span className="w-5 border-b-2 border-dashed border-[#2563EB]" />
+                  <span className="text-[#2563EB]">Lower Limit ({selectedConfig.lowerLimit}°C)</span>
                 </div>
               </div>
             </div>
 
             {/* AI Model Card (col-span-4, Matching Reference Image) */}
-            <div className="lg:col-span-4 rounded-xl border border-white/5 bg-slate-900/70 p-4 flex flex-col justify-between space-y-4">
+            <div className="lg:col-span-4 rounded-xl border border-[#DCE8F6] bg-[#F8FAFC] p-4 flex flex-col justify-between space-y-4">
               <div>
-                <div className="flex items-center gap-2 text-cyan-400 text-xs font-mono font-bold uppercase tracking-wider mb-1">
+                <div className="flex items-center gap-2 text-[#2563EB] text-xs font-mono font-bold uppercase tracking-wider mb-1">
                   <Cpu size={15} />
                   <span>AI Model</span>
                 </div>
-                <h4 className="text-base font-bold text-white tracking-tight">
+                <h4 className="text-base font-bold text-[#0F172A] tracking-tight">
                   {modelEvaluationPoll.data?.model_architecture ?? "Multi-Output Random Forest"}
                 </h4>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                <p className="text-xs text-[#475569] mt-1 leading-relaxed">
                   {predictionOverviewPoll.data?.ai_explanation?.narrative ??
                     "Predicts temperature, humidity and recovery time using calibrated thermodynamic decay modeling."}
                 </p>
@@ -5112,18 +5112,18 @@ export default function DigitalTwin() {
                   const isWarn = peakVal > selectedConfig.upperLimit - 1.0;
                   const peakBadge = isBreach ? "Excursion" : isWarn ? "At Risk" : "Safe";
                   const badgeColor = isBreach
-                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                    ? "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA]"
                     : isWarn
-                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
+                    ? "bg-[#FFFBEB] text-[#92400E] border-[#FDE68A]"
+                    : "bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]";
 
                   return (
-                    <div className="rounded-lg bg-slate-950/80 border border-white/5 p-2.5 flex flex-col justify-between">
-                      <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                        <Thermometer size={12} className="text-cyan-400" />
+                    <div className="rounded-lg bg-white border border-[#DCE8F6] p-2.5 flex flex-col justify-between shadow-sm">
+                      <div className="text-[10px] text-[#475569] font-mono flex items-center gap-1 font-semibold">
+                        <Thermometer size={12} className="text-[#2563EB]" />
                         <span>Predicted Peak</span>
                       </div>
-                      <div className="text-base font-bold font-mono text-white mt-1">
+                      <div className="text-base font-bold font-mono text-[#0F172A] mt-1">
                         {fmtTemp(peakVal)}
                       </div>
                       <div className="mt-1">
@@ -5155,18 +5155,18 @@ export default function DigitalTwin() {
                   const isWarning = timeToLimit != null;
                   const badgeText = isUrgent ? "Critical" : isWarning ? "Warning" : activeScenario === "sensor_anomaly" ? "Telemetry Lost" : "Safe";
                   const badgeColor = isUrgent || activeScenario === "sensor_anomaly"
-                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                    ? "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA]"
                     : isWarning
-                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
+                    ? "bg-[#FFFBEB] text-[#92400E] border-[#FDE68A]"
+                    : "bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]";
 
                   return (
-                    <div className="rounded-lg bg-slate-950/80 border border-white/5 p-2.5 flex flex-col justify-between">
-                      <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                        <Clock size={12} className="text-amber-400" />
+                    <div className="rounded-lg bg-white border border-[#DCE8F6] p-2.5 flex flex-col justify-between shadow-sm">
+                      <div className="text-[10px] text-[#475569] font-mono flex items-center gap-1 font-semibold">
+                        <Clock size={12} className="text-[#F59E0B]" />
                         <span>Time to Limit</span>
                       </div>
-                      <div className="text-base font-bold font-mono text-white mt-1">
+                      <div className="text-base font-bold font-mono text-[#0F172A] mt-1">
                         {timeToLimit != null ? `${Math.round(timeToLimit)} min` : activeScenario === "sensor_anomaly" ? "N/A" : "> 60 min"}
                       </div>
                       <div className="mt-1">
@@ -5187,16 +5187,16 @@ export default function DigitalTwin() {
                   const confBadge = f1 >= 0.85 ? "High" : f1 >= 0.7 ? "Moderate" : "Low";
                   const badgeColor =
                     f1 >= 0.85
-                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                      : "bg-amber-500/20 text-amber-300 border-amber-500/40";
+                      ? "bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]"
+                      : "bg-[#FFFBEB] text-[#92400E] border-[#FDE68A]";
 
                   return (
-                    <div className="rounded-lg bg-slate-950/80 border border-white/5 p-2.5 flex flex-col justify-between">
-                      <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                        <TrendingUp size={12} className="text-purple-400" />
+                    <div className="rounded-lg bg-white border border-[#DCE8F6] p-2.5 flex flex-col justify-between shadow-sm">
+                      <div className="text-[10px] text-[#475569] font-mono flex items-center gap-1 font-semibold">
+                        <TrendingUp size={12} className="text-[#8B5CF6]" />
                         <span>Confidence</span>
                       </div>
-                      <div className="text-base font-bold font-mono text-white mt-1">
+                      <div className="text-base font-bold font-mono text-[#0F172A] mt-1">
                         {confPct}%
                       </div>
                       <div className="mt-1">
@@ -5211,19 +5211,19 @@ export default function DigitalTwin() {
 
               {/* Dynamic Perishable Inventory Spoilage Section */}
               {predictionOverviewPoll.data?.ai_explanation?.inventory_spoilage_risk && (
-                <div className="rounded-xl bg-purple-950/20 border border-purple-500/30 p-3 mt-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-purple-500/20">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-white font-mono">
-                      <Package size={13} className="text-purple-400" />
+                <div className="rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] p-3 mt-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#BFDBFE]">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#0F172A] font-mono">
+                      <Package size={13} className="text-[#2563EB]" />
                       <span>PERISHABLE INVENTORY RISK</span>
                     </div>
                     <span
                       className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
                         predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.spoilage_status.includes("Critical")
-                          ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                          ? "bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA]"
                           : predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.spoilage_status.includes("Warning")
-                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                          : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                          ? "bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]"
+                          : "bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]"
                       }`}
                     >
                       {predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.spoilage_status}
@@ -5231,15 +5231,15 @@ export default function DigitalTwin() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 mt-2 text-[11px] font-mono">
-                    <div className="p-1.5 rounded bg-slate-950/70 border border-white/5">
-                      <span className="text-slate-400">Total Lot Value: </span>
-                      <span className="text-emerald-400 font-bold">
+                    <div className="p-1.5 rounded bg-white border border-[#DCE8F6]">
+                      <span className="text-[#475569]">Total Lot Value: </span>
+                      <span className="text-[#10B981] font-bold">
                         {predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.total_inventory_value_usd}
                       </span>
                     </div>
-                    <div className="p-1.5 rounded bg-slate-950/70 border border-white/5">
-                      <span className="text-slate-400">Time to Spoilage: </span>
-                      <span className="text-amber-400 font-bold">
+                    <div className="p-1.5 rounded bg-white border border-[#DCE8F6]">
+                      <span className="text-[#475569]">Time to Spoilage: </span>
+                      <span className="text-[#F59E0B] font-bold">
                         {predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.time_to_spoilage_minutes != null
                           ? `${predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.time_to_spoilage_minutes} min`
                           : "Nominal (Safe)"}
@@ -5247,20 +5247,20 @@ export default function DigitalTwin() {
                     </div>
                   </div>
 
-                  <div className="mt-2 text-[11px] text-slate-300 space-y-1">
-                    <div className="text-[10px] font-mono text-slate-400 uppercase font-semibold">
+                  <div className="mt-2 text-[11px] text-[#0F172A] space-y-1">
+                    <div className="text-[10px] font-mono text-[#475569] uppercase font-semibold">
                       Stored Vulnerable Products:
                     </div>
                     {predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.vulnerable_items.map((it, idx) => (
                       <div key={idx} className="flex items-start gap-1">
-                        <span className="text-purple-400 font-bold">•</span>
+                        <span className="text-[#2563EB] font-bold">•</span>
                         <span>{it}</span>
                       </div>
                     ))}
                   </div>
 
-                  <div className="mt-2 p-2 rounded bg-purple-950/30 border border-purple-500/20 text-[10px] text-purple-200 leading-relaxed font-sans">
-                    <span className="font-bold text-purple-300">Degradation Mechanism: </span>
+                  <div className="mt-2 p-2 rounded bg-white border border-[#DCE8F6] text-[10px] text-[#475569] leading-relaxed font-sans">
+                    <span className="font-bold text-[#0F172A]">Degradation Mechanism: </span>
                     {predictionOverviewPoll.data.ai_explanation.inventory_spoilage_risk.spoilage_mechanism}
                   </div>
                 </div>
@@ -5272,13 +5272,13 @@ export default function DigitalTwin() {
         {/* Tab 2: What-If Counterfactual Simulator */}
         {activeAnalyticsTab === "what-if" && (
           <div className="space-y-4 pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-xl border border-white/5">
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-[#F8FAFC] p-3 rounded-xl border border-[#DCE8F6]">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-slate-300 font-semibold">Scenario:</span>
+                <span className="text-xs font-mono text-[#0F172A] font-semibold">Scenario:</span>
                 <select
                   value={whatIfScenario}
                   onChange={(e) => setWhatIfScenario(e.target.value as any)}
-                  className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-mono text-cyan-300 cursor-pointer"
+                  className="bg-white border border-[#DCE8F6] rounded-lg px-2.5 py-1 text-xs font-mono text-[#0F172A] cursor-pointer"
                 >
                   <option value="door_open">Door Left Open (Air Ingress)</option>
                   <option value="compressor_failure">Compressor Failure (0 kW)</option>
@@ -5289,15 +5289,15 @@ export default function DigitalTwin() {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-slate-300 font-semibold">Duration:</span>
+                <span className="text-xs font-mono text-[#0F172A] font-semibold">Duration:</span>
                 {[5, 10, 15, 30].map((mins) => (
                   <button
                     key={mins}
                     onClick={() => setWhatIfDuration(mins)}
                     className={`px-2.5 py-1 rounded-lg text-xs font-mono transition cursor-pointer ${
                       whatIfDuration === mins
-                        ? "bg-cyan-600 text-white font-bold"
-                        : "bg-slate-950 text-slate-400 border border-slate-800 hover:text-white"
+                        ? "bg-[#2563EB] text-white font-bold"
+                        : "bg-white text-[#475569] border border-[#DCE8F6] hover:bg-[#EFF6FF]"
                     }`}
                   >
                     {mins}m
@@ -5308,7 +5308,7 @@ export default function DigitalTwin() {
               <button
                 onClick={handleRunWhatIf}
                 disabled={whatIfLoading}
-                className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+                className="px-4 py-1.5 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-mono text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
               >
                 <Play size={13} />
                 <span>{whatIfLoading ? "Simulating..." : "Run Simulator"}</span>
@@ -5320,14 +5320,14 @@ export default function DigitalTwin() {
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={counterfactualChartData} margin={{ top: 10, right: 10, bottom: 5, left: -10 }}>
-                    <CartesianGrid stroke="#1E293B" strokeDasharray="3 3" vertical={false} />
+                    <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="minute" stroke="#64748B" fontSize={11} tickLine={false} />
                     <YAxis stroke="#64748B" fontSize={11} tickLine={false} />
                     <Tooltip />
                     <ReferenceLine y={whatIfResult.limits.upper} stroke="#EF4444" strokeDasharray="4 4" />
-                    <ReferenceLine y={whatIfResult.limits.lower} stroke="#3B82F6" strokeDasharray="4 4" />
-                    <Line type="monotone" dataKey="baseline" stroke="#22D3EE" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="scenario" stroke="#F43F5E" strokeWidth={2.5} strokeDasharray="4 4" dot={false} />
+                    <ReferenceLine y={whatIfResult.limits.lower} stroke="#2563EB" strokeDasharray="4 4" />
+                    <Line type="monotone" dataKey="baseline" stroke="#2563EB" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="scenario" stroke="#EF4444" strokeWidth={2.5} strokeDasharray="4 4" dot={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -5348,19 +5348,19 @@ export default function DigitalTwin() {
                   key={`matrix-${cfg.id}`}
                   onClick={() => handleZoneSelect(cfg.id)}
                   className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                    isSelected ? "bg-slate-900 border-cyan-400 shadow-lg" : "bg-slate-950/70 border-white/5 hover:border-slate-700"
+                    isSelected ? "bg-[#EFF6FF] border-[#2563EB] shadow-md" : "bg-white border-[#DCE8F6] hover:border-[#BFDBFE] shadow-sm"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-bold text-white text-sm">{cfg.name}</span>
-                    <span className="text-[10px] font-mono text-cyan-400">{cfg.product}</span>
+                    <span className="font-bold text-[#0F172A] text-sm">{cfg.name}</span>
+                    <span className="text-[10px] font-mono text-[#2563EB] font-bold">{cfg.product}</span>
                   </div>
-                  <div className="text-2xl font-bold font-mono text-white mb-2">{fmtTemp(temp)}</div>
-                  <div className="text-xs text-slate-400 font-mono space-y-1">
+                  <div className="text-2xl font-bold font-mono text-[#0F172A] mb-2">{fmtTemp(temp)}</div>
+                  <div className="text-xs text-[#475569] font-mono space-y-1">
                     <div>Safe Range: {cfg.tempRange}</div>
                     <div>Humidity: {zoneData?.humidity != null ? `${Math.round(zoneData.humidity)}%` : "—"}</div>
                     <div>Power: {zoneData?.power_consumption_kw != null ? `${zoneData.power_consumption_kw.toFixed(1)} kW` : "— kW"}</div>
-                    <div>Compressor: <span className={isCompressorRunning ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>{zoneData?.compressor_status ? zoneData.compressor_status.toUpperCase() : "RUNNING"}</span></div>
+                    <div>Compressor: <span className={isCompressorRunning ? "text-[#10B981] font-bold" : "text-[#EF4444] font-bold"}>{zoneData?.compressor_status ? zoneData.compressor_status.toUpperCase() : "RUNNING"}</span></div>
                   </div>
                 </div>
               );
@@ -5394,7 +5394,7 @@ export default function DigitalTwin() {
 
               if (combinedEvents.length === 0) {
                 return (
-                  <div className="py-8 text-center text-slate-400 font-mono text-xs">
+                  <div className="py-8 text-center text-[#475569] font-mono text-xs">
                     No active or historical alarm events recorded. Facility running nominal.
                   </div>
                 );
@@ -5403,7 +5403,7 @@ export default function DigitalTwin() {
               return (
                 <table className="w-full text-left text-xs font-mono border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 uppercase text-[11px]">
+                    <tr className="border-b border-[#DCE8F6] text-[#475569] uppercase text-[11px]">
                       <th className="pb-2">Time</th>
                       <th className="pb-2">Zone</th>
                       <th className="pb-2">Event Description</th>
@@ -5411,26 +5411,26 @@ export default function DigitalTwin() {
                       <th className="pb-2">Action / Recommendation</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-[#DCE8F6]">
                     {combinedEvents.map((ev, i) => (
-                      <tr key={i} className="hover:bg-slate-900/40">
-                        <td className="py-2.5 text-slate-400">{ev.time}</td>
-                        <td className="py-2.5 text-white font-bold">{ev.zone}</td>
-                        <td className="py-2.5 text-slate-200">{ev.event}</td>
+                      <tr key={i} className="hover:bg-[#F8FAFC]">
+                        <td className="py-2.5 text-[#475569]">{ev.time}</td>
+                        <td className="py-2.5 text-[#0F172A] font-bold">{ev.zone}</td>
+                        <td className="py-2.5 text-[#0F172A]">{ev.event}</td>
                         <td className="py-2.5">
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                               ev.severity === "critical"
-                                ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                                ? "bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA]"
                                 : ev.severity === "warning"
-                                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                                : "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                                ? "bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]"
+                                : "bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]"
                             }`}
                           >
                             {ev.severity.toUpperCase()}
                           </span>
                         </td>
-                        <td className="py-2.5 text-slate-400 text-[11px] truncate max-w-xs">
+                        <td className="py-2.5 text-[#475569] text-[11px] truncate max-w-xs">
                           {ev.action ?? "—"}
                         </td>
                       </tr>
@@ -5457,12 +5457,12 @@ export default function DigitalTwin() {
               const isHealthy = offlineProbes === 0;
 
               return (
-                <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5">
-                  <span className="text-slate-400">Total Probes</span>
-                  <div className="text-lg font-bold text-white mt-1">
+                <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] shadow-sm">
+                  <span className="text-[#475569]">Total Probes</span>
+                  <div className="text-lg font-bold text-[#0F172A] mt-1">
                     {onlineProbes} / {totalProbes} Online
                   </div>
-                  <div className={`text-[10px] mt-0.5 font-bold ${isHealthy ? "text-emerald-400" : "text-amber-400"}`}>
+                  <div className={`text-[10px] mt-0.5 font-bold ${isHealthy ? "text-[#10B981]" : "text-[#F59E0B]"}`}>
                     {pctOnline}% Operational {offlineProbes > 0 ? `(${offlineProbes} Fault)` : ""}
                   </div>
                 </div>
@@ -5470,12 +5470,12 @@ export default function DigitalTwin() {
             })()}
 
             {/* Telemetry Stream */}
-            <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5">
-              <span className="text-slate-400">Telemetry Stream</span>
-              <div className="text-lg font-bold text-cyan-300 mt-1">
+            <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] shadow-sm">
+              <span className="text-[#475569]">Telemetry Stream</span>
+              <div className="text-lg font-bold text-[#2563EB] mt-1">
                 {health?.status === "ok" ? "FastSync Active" : "Stream Degraded"}
               </div>
-              <div className="text-slate-400 text-[10px] mt-0.5">
+              <div className="text-[#475569] text-[10px] mt-0.5">
                 {health?.tick_seconds ? `${health.tick_seconds}s cycle` : "1.0s cycle"} • {health?.readings_stored?.toLocaleString() ?? 0} records
               </div>
             </div>
@@ -5490,12 +5490,12 @@ export default function DigitalTwin() {
                   : firstIssue?.detail ?? firstIssue?.type ?? selectedZone?.sensor_health?.replace("_", " ");
 
               return (
-                <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5">
-                  <span className="text-slate-400">Isolation Forest</span>
-                  <div className={`text-lg font-bold mt-1 ${isAnomaly ? "text-rose-400" : "text-emerald-400"}`}>
+                <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] shadow-sm">
+                  <span className="text-[#475569]">Isolation Forest</span>
+                  <div className={`text-lg font-bold mt-1 ${isAnomaly ? "text-[#EF4444]" : "text-[#10B981]"}`}>
                     {isAnomaly ? "Anomaly Detected" : "Nominal"}
                   </div>
-                  <div className="text-slate-400 text-[10px] mt-0.5 truncate">
+                  <div className="text-[#475569] text-[10px] mt-0.5 truncate">
                     {isAnomaly ? issueLabel : "Outlier score: normal"}
                   </div>
                 </div>
@@ -5503,12 +5503,12 @@ export default function DigitalTwin() {
             })()}
 
             {/* Model Pipeline */}
-            <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5">
-              <span className="text-slate-400">Model Pipeline</span>
-              <div className="text-lg font-bold text-purple-300 mt-1 truncate">
+            <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] shadow-sm">
+              <span className="text-[#475569]">Model Pipeline</span>
+              <div className="text-lg font-bold text-[#8B5CF6] mt-1 truncate">
                 {modelEvaluationPoll.data?.model_architecture ? "Random Forest" : "RF Regressor"}
               </div>
-              <div className="text-slate-400 text-[10px] mt-0.5">
+              <div className="text-[#475569] text-[10px] mt-0.5">
                 {modelEvaluationPoll.data?.n_train_samples
                   ? `${modelEvaluationPoll.data.n_train_samples.toLocaleString()} samples`
                   : "Trained physics model"}
@@ -5518,43 +5518,41 @@ export default function DigitalTwin() {
         )}
       </div>
 
-      
-
       {/* ═══════════════════════════════════════════════════════════════════
           CONSEQUENTIAL ACTION SAFETY CONFIRMATION MODAL
           ═══════════════════════════════════════════════════════════════════ */}
       {confirmModal && confirmModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-rose-500/40 bg-slate-950 p-5 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-[#FECACA] bg-white p-5 shadow-2xl space-y-4">
             <div className="flex items-center gap-3">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/40">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#FEF2F2] text-[#EF4444] border border-[#FECACA]">
                 <AlertTriangle size={20} />
               </span>
               <div>
-                <h3 className="text-sm font-bold text-white">{confirmModal.title}</h3>
-                <div className="text-xs text-rose-300 font-mono">Consequential Simulation Event</div>
+                <h3 className="text-sm font-bold text-[#0F172A]">{confirmModal.title}</h3>
+                <div className="text-xs text-[#991B1B] font-mono font-semibold">Consequential Simulation Event</div>
               </div>
             </div>
 
-            <p className="text-xs text-fg leading-relaxed">
+            <p className="text-xs text-[#475569] leading-relaxed">
               {confirmModal.description}
             </p>
 
-            <div className="rounded-lg bg-rose-950/30 border border-rose-500/20 p-3 text-[11px] font-mono text-rose-200">
-              <div className="font-bold text-rose-400 mb-1">Operational Impact:</div>
+            <div className="rounded-lg bg-[#FEF2F2] border border-[#FECACA] p-3 text-[11px] font-mono text-[#991B1B]">
+              <div className="font-bold text-[#DC2626] mb-1">Operational Impact:</div>
               {confirmModal.impact}
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#DCE8F6]">
               <button
                 onClick={() => setConfirmModal(null)}
-                className="px-3.5 py-1.5 rounded-lg border border-white/10 text-xs font-mono text-fg-muted hover:text-white hover:bg-slate-900 transition cursor-pointer"
+                className="px-3.5 py-1.5 rounded-lg border border-[#DCE8F6] text-xs font-mono text-[#475569] hover:text-[#0F172A] hover:bg-[#F1F7FF] transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmModal.onConfirm}
-                className="px-4 py-1.5 rounded-lg border border-rose-500 bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold transition shadow-lg cursor-pointer"
+                className="px-4 py-1.5 rounded-lg border border-[#EF4444] bg-[#EF4444] hover:bg-[#DC2626] text-white text-xs font-mono font-bold transition shadow-sm cursor-pointer"
               >
                 {confirmModal.actionLabel}
               </button>

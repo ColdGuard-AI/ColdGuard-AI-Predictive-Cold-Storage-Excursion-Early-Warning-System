@@ -123,11 +123,16 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     name = Column(String(255), nullable=False)
+    phone = Column(String(32), nullable=True)
     actual_role = Column(String(64), nullable=False) # cold_storage_manager, facility_operator, government_auditor, buyer_retailer
     role_display = Column(String(128), nullable=False)
     title = Column(String(255), default="")
     security_clearance = Column(String(128), default="LEVEL_1_STANDARD")
-    approval_status = Column(String(32), default="APPROVED") # APPROVED, PENDING_APPROVAL, SUSPENDED
+    approval_status = Column(String(32), default="APPROVED") # APPROVED, PENDING_APPROVAL, REJECTED, SUSPENDED
+    must_change_password = Column(Boolean, default=False)
+    approved_by = Column(String(255), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    rejected_reason = Column(String(512), nullable=True)
     company_id = Column(String(64), ForeignKey("companies.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -166,6 +171,7 @@ class AccessRequest(Base):
     ticket_id = Column(String(64), unique=True, index=True, nullable=False)
     full_name = Column(String(255), nullable=False)
     email = Column(String(255), nullable=False)
+    phone = Column(String(32), nullable=True)
     password_hash = Column(String(255), nullable=False)
     requested_role = Column(String(64), nullable=False)
     company_id = Column(String(64), nullable=False)
@@ -173,6 +179,8 @@ class AccessRequest(Base):
     invitation_code = Column(String(128), nullable=True)
     justification = Column(Text, nullable=True)
     status = Column(String(32), default="PENDING_ADMIN_SIGN_OFF")
+    reviewed_by = Column(String(255), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 # ============================================================================

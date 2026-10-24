@@ -71,24 +71,24 @@ export function toneForSeverity(severity: Severity): Tone {
 }
 
 export const TONE_TEXT: Record<Tone, string> = {
-  ok: "text-neon",
-  warn: "text-warn",
-  crit: "text-crit",
-  neutral: "text-fg-muted",
+  ok: "text-emerald-700",
+  warn: "text-amber-700",
+  crit: "text-red-700",
+  neutral: "text-slate-600",
 };
 
 export const TONE_BADGE: Record<Tone, string> = {
-  ok: "bg-neon/10 text-neon border-neon/30",
-  warn: "bg-warn/10 text-warn border-warn/35",
-  crit: "bg-crit/10 text-crit border-crit/40",
-  neutral: "bg-white/5 text-fg-muted border-white/10",
+  ok: "bg-emerald-50 text-emerald-800 border-emerald-200",
+  warn: "bg-amber-50 text-amber-800 border-amber-200",
+  crit: "bg-red-50 text-red-800 border-red-200",
+  neutral: "bg-slate-100 text-slate-700 border-slate-200",
 };
 
 export const TONE_DOT: Record<Tone, string> = {
-  ok: "bg-neon",
-  warn: "bg-warn",
-  crit: "bg-crit",
-  neutral: "bg-fg-faint",
+  ok: "bg-emerald-500",
+  warn: "bg-amber-500",
+  crit: "bg-red-500",
+  neutral: "bg-slate-400",
 };
 
 export function capitalize(s: string): string {
@@ -96,23 +96,23 @@ export function capitalize(s: string): string {
 }
 
 export const RISK_COLOR: Record<RiskCategory, string> = {
-  low: "#10B981", // Emerald safe
-  medium: "#F59E0B", // Amber warning
-  high: "#F97316", // Orange elevated
-  critical: "#F43F5E", // Rose critical
+  low: "#10B981",      // Emerald safe
+  medium: "#F59E0B",   // Amber warning
+  high: "#F97316",     // Orange elevated
+  critical: "#EF4444", // Red critical
   unknown: "#64748B",
 };
 
-// Chart palette (aligned with cold-chain cryo cyan and deep navy aesthetic)
+// Chart palette (aligned with Premium Arctic Blue design system)
 export const CHART = {
-  observed: "#22D3EE",
-  forecast: "#38BDF8",
-  band: "#38BDF8",
-  limit: "#F43F5E",
-  setpoint: "#94A3B8",
-  humidity: "#A78BFA",
-  scenario: "#F97316",
-  baseline: "#22D3EE",
-  grid: "rgba(34, 211, 238, 0.08)",
-  axis: "#64748B",
+  observed: "#2563EB",   // Primary blue
+  forecast: "#38BDF8",   // Sky blue
+  band: "#93C5FD",       // Ice spread
+  limit: "#EF4444",      // Red excursion threshold
+  setpoint: "#475569",   // Secondary slate
+  humidity: "#6366F1",   // Indigo
+  scenario: "#F59E0B",   // Amber
+  baseline: "#2563EB",   // Primary blue
+  grid: "#E2E8F0",       // Light grid
+  axis: "#475569",       // Secondary text
 };

@@ -24,12 +24,9 @@ import type {
 let authToken: string | null = null;
 let onUnauthorized: (() => void) | null = null;
 
-/** Integration point for the team login module: set a bearer token to send with every request. */
 export function setAuthToken(token: string | null) {
   authToken = token;
 }
-
-/** Called when the backend rejects the session (expired / revoked) so the UI can sign out. */
 export function setUnauthorizedHandler(handler: (() => void) | null) {
   onUnauthorized = handler;
 }
@@ -44,7 +41,6 @@ export class ApiError extends Error {
   }
 }
 
-/** Turns FastAPI error payloads ({detail: string | [{msg, loc}]}) into readable text. */
 export function describeErrorBody(body: unknown, status: number): string {
   if (body && typeof body === "object" && "detail" in body) {
     const detail = (body as { detail: unknown }).detail;
@@ -59,9 +55,7 @@ export function describeErrorBody(body: unknown, status: number): string {
         .join("; ");
     }
   }
-  if (status === 500) {
-    return "Backend service unavailable or internal error (500). Please ensure the backend is running on port 8000.";
-  }
+  if (status === 500) return "Backend service unavailable (500). Please ensure the backend is running on port 8000.";
   return `Request failed with status ${status}`;
 }
 
@@ -91,17 +85,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let body: unknown = null;
   const text = await res.text();
   if (text) {
-    try {
-      body = JSON.parse(text);
-    } catch {
-      body = null;
-    }
+    try { body = JSON.parse(text); } catch { body = null; }
   }
   if (res.status === 401 && authToken) onUnauthorized?.();
   if (!res.ok) throw new ApiError(describeErrorBody(body, res.status), res.status);
   return body as T;
 }
 
+const get = <T>(path: string) => request<T>(path);
 const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) });
 
@@ -111,6 +102,32 @@ function qs(params: Record<string, string | number | boolean | undefined | null>
   return "?" + new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
 }
 
+// ─── Auth API ─────────────────────────────────────────────────────────────────
+export interface LoginPayload { email: string; password: string; }
+export interface RegisterPayload {
+  full_name: string; email: string; password: string;
+  phone?: string; requested_role: string; organization?: string;
+}
+export interface ChangePasswordPayload {
+  email: string; current_password: string; new_password: string;
+}
+export interface ReviewUserPayload {
+  user_id: number; action: "approve" | "reject" | "suspend" | "activate"; reason?: string;
+}
+
+export const auth = {
+  login: (payload: LoginPayload) => post<any>("/api/auth/login", payload),
+  register: (payload: RegisterPayload) => post<any>("/api/auth/register", payload),
+  changePassword: (payload: ChangePasswordPayload) => post<any>("/api/auth/change-password", payload),
+  getRoles: () => get<any[]>("/api/roles"),
+  getFacilities: () => get<any>("/api/facilities"),
+  // Manager admin
+  getPendingUsers: (status?: string) => get<any[]>(`/api/admin/pending-users${status ? `?status=${status}` : ""}`),
+  getAllUsers: () => get<any[]>("/api/admin/all-users"),
+  reviewUser: (payload: ReviewUserPayload) => post<any>("/api/admin/review-user", payload),
+};
+
+// ─── Sensor / Core API ────────────────────────────────────────────────────────
 export const api = {
   health: () => request<Health>("/api/health"),
   zones: () => request<ZoneSummary[]>("/api/zones"),
@@ -167,5 +184,9 @@ export const api = {
       reading_id: readingId,
       original_temperature: originalTemperature,
     }),
+  restoreTamper: (readingId: number, originalTemperature: number) =>
+    post<{ status: string; message: string }>("/api/integrity/restore", {
+      reading_id: readingId,
+      original_temperature: originalTemperature,
+    }),
 };
-

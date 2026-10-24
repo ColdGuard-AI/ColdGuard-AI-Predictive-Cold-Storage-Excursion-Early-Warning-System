@@ -26,3 +26,8 @@ frontend/.env
 Thumbs.db
 .vscode/
 .idea/
+
+# Environment secrets — NEVER commit
+.env
+Backend/.env
+*.env

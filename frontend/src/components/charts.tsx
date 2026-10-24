@@ -23,9 +23,9 @@ interface Row {
 
 const axisProps = {
   stroke: CHART.axis,
-  tick: { fill: CHART.axis, fontSize: 11 },
+  tick: { fill: CHART.axis, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" },
   tickLine: false,
-  axisLine: { stroke: "rgba(255,255,255,0.08)" },
+  axisLine: { stroke: "#DCE8F6" },
 };
 
 function timeTick(v: number) {
@@ -50,32 +50,34 @@ function TooltipBox({ active, payload, label, unit = "°C" }: { active?: boolean
   if (row.humidity != null) lines.push({ name: "Humidity", value: `${row.humidity.toFixed(1)}%`, color: CHART.humidity });
   if (!lines.length) return null;
   return (
-    <div className="rounded-lg border border-neon/20 bg-ink-900/95 px-3 py-2 text-xs shadow-xl">
-      <div className="mb-1 font-mono text-fg-muted">{fmtTime(new Date(label).toISOString())}</div>
-      {lines.map((l) => (
-        <div key={l.name} className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full" style={{ background: l.color }} />
-          <span className="text-fg-muted">{l.name}</span>
-          <span className="ml-auto font-mono text-fg">{l.value}</span>
-        </div>
-      ))}
+    <div className="rounded-xl border border-[#DCE8F6] bg-white p-3 text-xs shadow-xl font-sans">
+      <div className="mb-1.5 font-mono font-bold text-[#0F172A]">{fmtTime(new Date(label).toISOString())}</div>
+      <div className="space-y-1">
+        {lines.map((l) => (
+          <div key={l.name} className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: l.color }} />
+            <span className="text-[#475569] font-medium">{l.name}</span>
+            <span className="ml-auto font-mono font-bold text-[#0F172A]">{l.value}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
 export function ChartLegend({ items }: { items: { label: string; color: string; dashed?: boolean; area?: boolean }[] }) {
   return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-fg-muted" aria-label="Chart legend">
+    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-[#475569]" aria-label="Chart legend">
       {items.map((i) => (
-        <li key={i.label} className="flex items-center gap-1.5">
+        <li key={i.label} className="flex items-center gap-2">
           {i.area ? (
-            <span className="h-2.5 w-4 rounded-sm" style={{ background: i.color, opacity: 0.25 }} />
+            <span className="h-2.5 w-4 rounded-sm border border-[#DCE8F6]" style={{ background: i.color, opacity: 0.35 }} />
           ) : (
             <svg width="18" height="6" aria-hidden>
-              <line x1="0" y1="3" x2="18" y2="3" stroke={i.color} strokeWidth="2" strokeDasharray={i.dashed ? "4 3" : undefined} />
+              <line x1="0" y1="3" x2="18" y2="3" stroke={i.color} strokeWidth="2.5" strokeDasharray={i.dashed ? "4 3" : undefined} />
             </svg>
           )}
-          {i.label}
+          <span className="text-[#0F172A]">{i.label}</span>
         </li>
       ))}
     </ul>
@@ -127,17 +129,17 @@ export function ForecastChart({
           <CartesianGrid stroke={CHART.grid} vertical={false} />
           <XAxis dataKey="t" type="number" domain={["dataMin", "dataMax"]} scale="time" tickFormatter={timeTick} minTickGap={40} {...axisProps} />
           <YAxis domain={domain} tickFormatter={(v: number) => `${v}°`} width={48} {...axisProps} />
-          <Tooltip content={<TooltipBox />} cursor={{ stroke: "rgba(255,255,255,0.15)" }} />
+          <Tooltip content={<TooltipBox />} cursor={{ stroke: "rgba(37,99,235,0.2)" }} />
           {nowT && (
-            <ReferenceArea x1={nowT} x2={rows[rows.length - 1]?.t} fill={CHART.forecast} fillOpacity={0.035} ifOverflow="hidden" />
+            <ReferenceArea x1={nowT} x2={rows[rows.length - 1]?.t} fill={CHART.forecast} fillOpacity={0.05} ifOverflow="hidden" />
           )}
           <ReferenceLine y={upper} stroke={CHART.limit} strokeDasharray="6 4" label={{ value: `Upper ${upper}°C`, fill: CHART.limit, fontSize: 11, position: "insideTopLeft" }} />
-          <ReferenceLine y={lower} stroke={CHART.limit} strokeOpacity={0.6} strokeDasharray="6 4" label={{ value: `Lower ${lower}°C`, fill: CHART.limit, fontSize: 11, position: "insideBottomLeft" }} />
-          {setpoint !== undefined && <ReferenceLine y={setpoint} stroke={CHART.setpoint} strokeOpacity={0.35} strokeDasharray="2 4" />}
-          {nowT && <ReferenceLine x={nowT} stroke="rgba(255,255,255,0.35)" label={{ value: "Now", fill: "#9aa6a0", fontSize: 11, position: "insideTopRight" }} />}
-          <Area dataKey="band" stroke="none" fill={CHART.band} fillOpacity={0.16} isAnimationActive={false} connectNulls />
-          <Line dataKey="observed" stroke={CHART.observed} strokeWidth={2} dot={false} isAnimationActive={false} connectNulls={false} />
-          <Line dataKey="forecast" stroke={CHART.forecast} strokeWidth={2} strokeDasharray="6 4" dot={{ r: 2.5, fill: CHART.forecast, strokeWidth: 0 }} isAnimationActive={false} connectNulls />
+          <ReferenceLine y={lower} stroke={CHART.limit} strokeOpacity={0.7} strokeDasharray="6 4" label={{ value: `Lower ${lower}°C`, fill: CHART.limit, fontSize: 11, position: "insideBottomLeft" }} />
+          {setpoint !== undefined && <ReferenceLine y={setpoint} stroke={CHART.setpoint} strokeOpacity={0.5} strokeDasharray="2 4" />}
+          {nowT && <ReferenceLine x={nowT} stroke="#94A3B8" label={{ value: "Now", fill: "#475569", fontSize: 11, position: "insideTopRight" }} />}
+          <Area dataKey="band" stroke="none" fill={CHART.band} fillOpacity={0.25} isAnimationActive={false} connectNulls />
+          <Line dataKey="observed" stroke={CHART.observed} strokeWidth={2.5} dot={false} isAnimationActive={false} connectNulls={false} />
+          <Line dataKey="forecast" stroke={CHART.forecast} strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 3, fill: CHART.forecast, strokeWidth: 0 }} isAnimationActive={false} connectNulls />
         </ComposedChart>
       </ResponsiveContainer>
     </div>
@@ -195,18 +197,18 @@ function EventStrip({ readings, forecast, doorSpans, compSpans }: { readings: Re
   const pct = (t: number) => `${((t - t0) / Math.max(1, t1 - t0)) * 100}%`;
   const row = (spans: [number, number][], color: string, label: string) => (
     <div className="flex items-center gap-2">
-      <span className="w-24 shrink-0 text-[11px] text-fg-faint">{label}</span>
-      <div className="relative h-2 flex-1 rounded bg-white/[0.04]">
+      <span className="w-24 shrink-0 text-xs font-semibold text-[#475569]">{label}</span>
+      <div className="relative h-2.5 flex-1 rounded-full bg-slate-100 border border-[#DCE8F6]">
         {spans.map(([a, b]) => (
-          <span key={a} className="absolute inset-y-0 rounded" style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})`, background: color }} />
+          <span key={a} className="absolute inset-y-0 rounded-full" style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})`, background: color }} />
         ))}
       </div>
     </div>
   );
   return (
-    <div className="mt-2 space-y-1.5 pl-[36px] pr-3" aria-label="Equipment events timeline">
-      {row(doorSpans, "#fbbf24", "Door open")}
-      {row(compSpans, "#ff5c70", "Compressor off")}
+    <div className="mt-3 space-y-2 pl-[36px] pr-3" aria-label="Equipment events timeline">
+      {row(doorSpans, "#F59E0B", "Door open")}
+      {row(compSpans, "#EF4444", "Compressor off")}
     </div>
   );
 }
@@ -220,8 +222,8 @@ export function HumidityChart({ readings, height = 200 }: { readings: Reading[];
           <CartesianGrid stroke={CHART.grid} vertical={false} />
           <XAxis dataKey="t" type="number" domain={["dataMin", "dataMax"]} scale="time" tickFormatter={timeTick} minTickGap={40} {...axisProps} />
           <YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} width={48} {...axisProps} />
-          <Tooltip content={<TooltipBox unit="%" />} cursor={{ stroke: "rgba(255,255,255,0.15)" }} />
-          <Line dataKey="humidity" stroke={CHART.humidity} strokeWidth={2} dot={false} isAnimationActive={false} />
+          <Tooltip content={<TooltipBox unit="%" />} cursor={{ stroke: "rgba(37,99,235,0.2)" }} />
+          <Line dataKey="humidity" stroke={CHART.humidity} strokeWidth={2.5} dot={false} isAnimationActive={false} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>

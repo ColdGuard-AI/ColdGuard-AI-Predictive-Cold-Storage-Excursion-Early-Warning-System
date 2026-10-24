@@ -1,190 +1,175 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   ColdGuard AI — Root Application
+   Role-based routing with AuthGateway and RoleLayout.
+   Existing pages are preserved and routed to appropriate roles.
+───────────────────────────────────────────────────────────────────────────── */
 import { useState } from "react";
-import { Link, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { Layout } from "./components/Layout";
-import { EmptyState } from "./components/ui";
 import { AppProvider } from "./hooks/AppContext";
 import { setAuthToken } from "./services/api";
+import type { AuthSession } from "./pages/AuthGateway";
 
-// Dashboard Pages from feature/dashboard
-import Alerts from "./pages/Alerts";
-import Dashboard from "./pages/Dashboard";
-import DigitalTwin from "./pages/DigitalTwin";
+// Auth gateway
+import AuthGateway from "./pages/AuthGateway";
+
+// Role-aware layout
+import { RoleLayout } from "./components/RoleLayout";
+
+// ── Existing pages (preserved, mapped to operator routes) ─────────────────────
+import Dashboard from "./pages/Dashboard";          // operator: Live Monitor
+import DigitalTwin from "./pages/DigitalTwin";      // operator: Digital Twin
+import Alerts from "./pages/Alerts";               // shared
+import AIExplanation from "./pages/AIExplanation";  // operator: AI/SOP
 import ExcursionMonitor from "./pages/ExcursionMonitor";
-import History from "./pages/History";
-import Manager from "./pages/Manager";
-import Model from "./pages/Model";
+import BlockchainAudit from "./pages/BlockchainAudit"; // auditor: Blockchain
+import Reports from "./pages/Reports";              // auditor: Reports
 import WhatIf from "./pages/WhatIf";
-import Zones from "./pages/Zones";
-import Predictions from "./pages/Predictions";
-import AIExplanation from "./pages/AIExplanation";
-import Reports from "./pages/Reports";
-import Settings from "./pages/Settings";
-import BlockchainAudit from "./pages/BlockchainAudit";
 
-// Auth Gateway Components from feature/auth-gateway
-import SimulatedDataBanner from "./components/SimulatedDataBanner";
-import HeroLanding from "./components/HeroLanding";
-import VerticalRoleSelector from "./components/VerticalRoleSelector";
-import RoleAuthGateway from "./components/RoleAuthGateway";
-import RegisterCompanyModal from "./components/RegisterCompanyModal";
-import ForgotPasswordModal from "./components/ForgotPasswordModal";
+// ── Manager pages ─────────────────────────────────────────────────────────────
+import ManagerOverview from "./pages/manager/ManagerOverview";
+import UserApproval from "./pages/manager/UserApproval";
+import InventoryRisk from "./pages/manager/InventoryRisk";
 
+// ── Operator pages ────────────────────────────────────────────────────────────
+import EquipmentHealth from "./pages/operator/EquipmentHealth";
+
+// ── Auditor pages ─────────────────────────────────────────────────────────────
+import AuditorCompliance from "./pages/auditor/AuditorCompliance";
+
+// ── Buyer pages ───────────────────────────────────────────────────────────────
+import BuyerOrders from "./pages/buyer/BuyerOrders";
+
+// ── 404 ───────────────────────────────────────────────────────────────────────
+function NotFound() {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 text-slate-500 gap-3">
+      <div className="text-5xl font-bold text-slate-200">404</div>
+      <p className="text-sm">Page not found.</p>
+    </div>
+  );
+}
+
+// ── Role route trees ──────────────────────────────────────────────────────────
+function ManagerRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<ManagerOverview />} />
+      <Route path="/alerts" element={<Alerts />} />
+      <Route path="/inventory" element={<InventoryRisk />} />
+      <Route path="/audit" element={<BlockchainAudit />} />
+      <Route path="/users" element={<UserApproval />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
+
+function OperatorRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/twin" element={<DigitalTwin />} />
+      <Route path="/equipment" element={<EquipmentHealth />} />
+      <Route path="/alerts" element={<Alerts />} />
+      <Route path="/ai" element={<AIExplanation />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
+
+function AuditorRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<AuditorCompliance />} />
+      <Route path="/blockchain" element={<BlockchainAudit />} />
+      <Route path="/reports" element={<Reports />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
+
+function BuyerRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<BuyerOrders />} />
+      <Route path="/inventory" element={<BuyerOrders />} />
+      <Route path="/quality" element={<Alerts />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
+
+// ── Authenticated dashboard shell ─────────────────────────────────────────────
+function AuthenticatedApp({ session, onSignOut }: { session: AuthSession; onSignOut: () => void }) {
+  const role = session.user.actual_role;
+  return (
+    <AppProvider>
+      <RoleLayout session={session} onSignOut={onSignOut}>
+        <ErrorBoundary>
+          <Routes>
+            {/* Manager routes */}
+            <Route path="/manager/*" element={<ManagerRoutes />} />
+            {/* Operator routes */}
+            <Route path="/operator/*" element={<OperatorRoutes />} />
+            {/* Auditor routes */}
+            <Route path="/auditor/*" element={<AuditorRoutes />} />
+            {/* Buyer routes */}
+            <Route path="/buyer/*" element={<BuyerRoutes />} />
+
+            {/* Default redirect by role */}
+            <Route
+              path="/"
+              element={
+                role === "cold_storage_manager" ? <ManagerOverview /> :
+                role === "facility_operator" ? <Dashboard /> :
+                role === "government_auditor" ? <AuditorCompliance /> :
+                role === "buyer_retailer" ? <BuyerOrders /> :
+                <Dashboard />
+              }
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </ErrorBoundary>
+      </RoleLayout>
+    </AppProvider>
+  );
+}
+
+// ── Root App ──────────────────────────────────────────────────────────────────
 export default function App() {
-  const [currentView, setCurrentView] = useState<"landing" | "auth" | "dashboard">(() => {
-    const saved = localStorage.getItem("coldguard_session");
-    return saved ? "dashboard" : "landing";
-  });
-  const [selectedRoleId, setSelectedRoleId] = useState("cold_storage_manager");
-  const [authSession, setAuthSession] = useState<any>(() => {
+  const [session, setSession] = useState<AuthSession | null>(() => {
     try {
       const saved = localStorage.getItem("coldguard_session");
       if (saved) {
-        const parsed = JSON.parse(saved);
+        const parsed = JSON.parse(saved) as AuthSession;
         if (parsed?.token) setAuthToken(parsed.token);
+        // Reject sessions with must_change_password still flagged
+        if (parsed?.must_change_password) return null;
         return parsed;
       }
-    } catch {
-      // fallback
-    }
+    } catch { /* ignore */ }
     return null;
   });
 
-  const [isRegisterCompanyOpen, setIsRegisterCompanyOpen] = useState(false);
-  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
-
-  const handleHeroSelectRoleClick = () => {
-    const rolesEl = document.getElementById("roles-section");
-    if (rolesEl) {
-      rolesEl.scrollIntoView({ behavior: "smooth" });
+  function handleLoginSuccess(sessionData: AuthSession) {
+    setAuthToken(sessionData.token);
+    if (!sessionData.must_change_password) {
+      try { localStorage.setItem("coldguard_session", JSON.stringify(sessionData)); } catch { /* ignore */ }
     }
-  };
-
-  const handleBackToHero = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleRoleCardClick = (roleId: string) => {
-    setSelectedRoleId(roleId);
-    setCurrentView("auth");
+    setSession(sessionData);
     window.scrollTo({ top: 0, behavior: "instant" });
-  };
-
-  const handleLoginSuccess = (sessionData: any) => {
-    setAuthSession(sessionData);
-    if (sessionData?.token) {
-      setAuthToken(sessionData.token);
-    }
-    try {
-      localStorage.setItem("coldguard_session", JSON.stringify(sessionData));
-    } catch {
-      // ignore
-    }
-    setCurrentView("dashboard");
-    window.scrollTo({ top: 0, behavior: "instant" });
-  };
-
-  const handleLogout = () => {
-    setAuthToken(null);
-    setAuthSession(null);
-    try {
-      localStorage.removeItem("coldguard_session");
-    } catch {
-      // ignore
-    }
-    setCurrentView("landing");
-    window.scrollTo({ top: 0, behavior: "instant" });
-  };
-
-  // If user is authenticated, render the full ColdGuard AI Dashboard
-  if (currentView === "dashboard" && authSession) {
-    return (
-      <AppProvider>
-        <Layout user={authSession.user} onSignOut={handleLogout}>
-          <ErrorBoundary>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/blockchain" element={<BlockchainAudit />} />
-              <Route path="/twin" element={<DigitalTwin />} />
-              <Route path="/excursion" element={<ExcursionMonitor />} />
-              <Route path="/predictions" element={<Predictions />} />
-              <Route path="/ai-explanation" element={<AIExplanation />} />
-              <Route path="/alerts" element={<Alerts />} />
-              <Route path="/what-if" element={<WhatIf />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/manager" element={<Manager />} />
-              <Route path="/zones" element={<Zones />} />
-              <Route path="/history" element={<History />} />
-              <Route path="/model" element={<Model />} />
-              <Route
-                path="*"
-                element={
-                  <div>
-                    <EmptyState title="Page not found" />
-                    <p className="text-center">
-                      <Link to="/" className="text-neon hover:underline">
-                        Back to Live Monitoring
-                      </Link>
-                    </p>
-                  </div>
-                }
-              />
-            </Routes>
-          </ErrorBoundary>
-        </Layout>
-      </AppProvider>
-    );
   }
 
-  // Otherwise, render Home / Role Selection / Login Gateway
-  return (
-    <div className="min-h-screen bg-[#0B1220] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
-      <SimulatedDataBanner />
+  function handleLogout() {
+    setAuthToken(null);
+    setSession(null);
+    try { localStorage.removeItem("coldguard_session"); } catch { /* ignore */ }
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
 
-      {currentView === "landing" && (
-        <div className="flex flex-col">
-          <HeroLanding
-            onSelectRoleClick={handleHeroSelectRoleClick}
-            onOpenRegisterCompany={() => setIsRegisterCompanyOpen(true)}
-          />
-          <VerticalRoleSelector
-            onSelectRole={handleRoleCardClick}
-            onBack={handleBackToHero}
-          />
-        </div>
-      )}
+  if (session && !session.must_change_password) {
+    return <AuthenticatedApp session={session} onSignOut={handleLogout} />;
+  }
 
-      {currentView === "auth" && (
-        <RoleAuthGateway
-          selectedRoleId={selectedRoleId}
-          onBackToRoles={() => {
-            setCurrentView("landing");
-            setTimeout(() => {
-              const rolesEl = document.getElementById("roles-section");
-              if (rolesEl) rolesEl.scrollIntoView({ behavior: "instant" });
-            }, 50);
-          }}
-          onLoginSuccess={handleLoginSuccess}
-          onOpenForgotPassword={() => setIsForgotPasswordOpen(true)}
-        />
-      )}
-
-      <RegisterCompanyModal
-        isOpen={isRegisterCompanyOpen}
-        onClose={() => setIsRegisterCompanyOpen(false)}
-        onSuccess={() => {
-          setIsRegisterCompanyOpen(false);
-          const rolesEl = document.getElementById("roles-section");
-          if (rolesEl) rolesEl.scrollIntoView({ behavior: "smooth" });
-        }}
-      />
-
-      <ForgotPasswordModal
-        isOpen={isForgotPasswordOpen}
-        onClose={() => setIsForgotPasswordOpen(false)}
-        initialEmail=""
-      />
-    </div>
-  );
+  return <AuthGateway onLoginSuccess={handleLoginSuccess} />;
 }

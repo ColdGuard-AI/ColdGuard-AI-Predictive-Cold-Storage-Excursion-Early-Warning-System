@@ -26,22 +26,24 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-6 pb-12 font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="space-y-6 pb-12 font-sans selection:bg-[#38BDF8]/30 selection:text-[#0F172A]">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
-            <SettingsIcon className="text-cyan-400" />
+          <h1 className="text-2xl font-bold text-[#0F172A] tracking-tight flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center">
+              <SettingsIcon size={20} />
+            </div>
             System Governance & Facility Parameters
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-[#475569] mt-1 font-medium">
             Configure early-warning horizon triggers, sensor drift thresholds, and physical simulation constants.
           </p>
         </div>
 
         <button
           onClick={handleSave}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-600/30 transition cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] active:bg-[#1E40AF] text-white text-xs font-bold shadow-arctic-card transition cursor-pointer"
         >
           <Save size={14} />
           <span>Save Configuration</span>
@@ -49,8 +51,8 @@ export default function Settings() {
       </div>
 
       {saved && (
-        <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/50 text-emerald-300 text-xs flex items-center gap-2">
-          <CheckCircle2 size={16} />
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center gap-2 shadow-sm">
+          <CheckCircle2 size={16} className="text-emerald-600" />
           <span>Settings saved and applied to live telemetry inference engines.</span>
         </div>
       )}
@@ -58,39 +60,39 @@ export default function Settings() {
       {/* Settings Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Early Warning Engine */}
-        <div className="rounded-2xl bg-[#0F192C]/90 border border-slate-800 p-5 shadow-2xl backdrop-blur-xl space-y-4">
-          <div className="flex items-center gap-2 text-white font-bold text-sm border-b border-slate-800 pb-3">
-            <Clock size={16} className="text-cyan-400" />
+        <div className="rounded-2xl bg-white border border-[#DCE8F6] p-6 shadow-arctic-card space-y-4">
+          <div className="flex items-center gap-2 text-[#0F172A] font-bold text-sm border-b border-[#DCE8F6] pb-3">
+            <Clock size={16} className="text-[#2563EB]" />
             <span>Early Warning & Forecasting Parameters</span>
           </div>
 
-          <div className="space-y-3 text-xs">
+          <div className="space-y-4 text-xs">
             <div>
-              <label className="block text-slate-300 font-medium mb-1">
+              <label className="block text-[#0F172A] font-semibold mb-1">
                 Advance Alert Lead Horizon (minutes)
               </label>
               <input
                 type="number"
                 value={alertThreshold}
                 onChange={(e) => setAlertThreshold(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-cyan-400"
+                className="w-full bg-[#F8FAFC] border border-[#DCE8F6] rounded-xl px-3.5 py-2.5 text-[#0F172A] font-mono focus:outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#BAE6FD]"
               />
-              <span className="text-[11px] text-slate-500 mt-0.5 block">
+              <span className="text-[11px] text-[#475569] mt-1 block">
                 Alarms trigger when projected trajectory breaches safe limit within this window.
               </span>
             </div>
 
             <div>
-              <label className="block text-slate-300 font-medium mb-1">
+              <label className="block text-[#0F172A] font-semibold mb-1">
                 Conservative Tree Quantile Threshold (%)
               </label>
               <input
                 type="number"
                 value={conservativePercentile}
                 onChange={(e) => setConservativePercentile(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-cyan-400"
+                className="w-full bg-[#F8FAFC] border border-[#DCE8F6] rounded-xl px-3.5 py-2.5 text-[#0F172A] font-mono focus:outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#BAE6FD]"
               />
-              <span className="text-[11px] text-slate-500 mt-0.5 block">
+              <span className="text-[11px] text-[#475569] mt-1 block">
                 75th percentile of tree ensemble used for risk prioritization over pure mean.
               </span>
             </div>
@@ -98,33 +100,33 @@ export default function Settings() {
         </div>
 
         {/* Ambient & Facility Physics */}
-        <div className="rounded-2xl bg-[#0F192C]/90 border border-slate-800 p-5 shadow-2xl backdrop-blur-xl space-y-4">
-          <div className="flex items-center gap-2 text-white font-bold text-sm border-b border-slate-800 pb-3">
-            <Thermometer size={16} className="text-amber-400" />
+        <div className="rounded-2xl bg-white border border-[#DCE8F6] p-6 shadow-arctic-card space-y-4">
+          <div className="flex items-center gap-2 text-[#0F172A] font-bold text-sm border-b border-[#DCE8F6] pb-3">
+            <Thermometer size={16} className="text-[#2563EB]" />
             <span>Ambient Environment & Thermal Dynamics</span>
           </div>
 
-          <div className="space-y-3 text-xs">
+          <div className="space-y-4 text-xs">
             <div>
-              <label className="block text-slate-300 font-medium mb-1">
+              <label className="block text-[#0F172A] font-semibold mb-1">
                 Facility Ambient Temperature Baseline (°C)
               </label>
               <input
                 type="number"
                 value={ambientBaseline}
                 onChange={(e) => setAmbientBaseline(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-cyan-400"
+                className="w-full bg-[#F8FAFC] border border-[#DCE8F6] rounded-xl px-3.5 py-2.5 text-[#0F172A] font-mono focus:outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#BAE6FD]"
               />
-              <span className="text-[11px] text-slate-500 mt-0.5 block">
+              <span className="text-[11px] text-[#475569] mt-1 block">
                 Surrounding loading dock and exterior corridor thermal baseline.
               </span>
             </div>
 
             <div>
-              <label className="block text-slate-300 font-medium mb-1">
+              <label className="block text-[#0F172A] font-semibold mb-1">
                 Telemetry Sampling Frequency
               </label>
-              <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 font-mono">
+              <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] text-[#475569] font-mono font-medium">
                 1 sample / 60 seconds (1 minute live telemetry tick)
               </div>
             </div>

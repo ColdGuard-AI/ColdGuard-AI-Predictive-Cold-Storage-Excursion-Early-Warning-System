@@ -7,12 +7,14 @@ and initializes TimescaleDB time-stamped sensor telemetry hypertable.
 import sys
 import os
 import datetime
+import logging
 
 # Ensure project root is in sys.path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+import bcrypt
 from database.connection import engine, Base, SessionLocal, ACTIVE_DB_TYPE
 from database.models import (
     Company, 
@@ -26,6 +28,86 @@ from database.models import (
     role_permission_association
 )
 from sqlalchemy import text
+
+logger = logging.getLogger("coldguard.init_db")
+
+
+def hash_password(plain: str) -> str:
+    """Hash a plaintext password using bcrypt."""
+    return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    """Verify a plaintext password against a bcrypt hash."""
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        # Fallback for legacy plaintext passwords
+        return plain == hashed
+
+
+def bootstrap_manager(db, facility=None):
+    """
+    Bootstrap the initial Cold Storage Manager account from environment variables.
+    Uses COLDGUARD_MANAGER_EMAIL, COLDGUARD_MANAGER_PASSWORD, COLDGUARD_MANAGER_NAME, COLDGUARD_MANAGER_PHONE.
+    The password MUST be set via environment variable; if unset a random one is generated and printed.
+    """
+    email = os.getenv("COLDGUARD_MANAGER_EMAIL", "ruchita4@company.org.in").lower().strip()
+    name = os.getenv("COLDGUARD_MANAGER_NAME", "Ruchita").strip()
+    phone = os.getenv("COLDGUARD_MANAGER_PHONE", "+918262036045").strip()
+    password = os.getenv("COLDGUARD_MANAGER_PASSWORD", "").strip()
+    
+    must_change = False
+    if not password:
+        # Generate a temporary password and require change on first login
+        import secrets
+        password = f"CG-{secrets.token_urlsafe(12)}"
+        must_change = True
+        print(f"[SECURITY] Manager bootstrap password (change on first login): {password}")
+        logger.warning("Manager bootstrap: No COLDGUARD_MANAGER_PASSWORD set. Generated temporary password.")
+    
+    # Check for existing manager
+    from sqlalchemy import func
+    existing = db.query(User).filter(func.lower(User.email) == email).first()
+    if existing:
+        logger.info(f"Manager account '{email}' already exists. Skipping bootstrap.")
+        return existing
+    
+    # Find or create default company
+    company = db.query(Company).filter(Company.id == "COMP-NORDIC-01").first()
+    if not company:
+        company = Company(
+            id="COMP-NORDIC-01",
+            name="Nordic Frost Logistics Corp",
+            business_type="Commercial Deep-Freeze Logistics",
+            headquarters="Reykjavik / Boston Hub",
+            verified=True
+        )
+        db.add(company)
+        db.flush()
+    
+    manager = User(
+        email=email,
+        password_hash=hash_password(password),
+        name=name,
+        phone=phone,
+        actual_role="cold_storage_manager",
+        role_display="Cold Storage Manager",
+        company_id=company.id,
+        approval_status="APPROVED",
+        must_change_password=must_change,
+        title="Director of Cold Storage Operations",
+        security_clearance="LEVEL_3_FULL_FACILITY_OVERVIEW"
+    )
+    if facility:
+        manager.assigned_facilities = [facility] if not isinstance(facility, list) else facility
+    
+    db.add(manager)
+    db.flush()
+    logger.info(f"Bootstrapped manager account: {email}")
+    print(f"[INIT] Bootstrapped manager: {name} <{email}>")
+    return manager
+
 
 def init_and_seed_db(drop_existing: bool = False):
     print(f"Initializing ColdGuard database schema on [{ACTIVE_DB_TYPE}] (drop_existing={drop_existing})...")
@@ -52,6 +134,9 @@ def init_and_seed_db(drop_existing: bool = False):
         # Check if already seeded to prevent wiping or duplicate primary key insertion
         if not drop_existing and db.query(User).count() > 0:
             print(f"Database already contains {db.query(User).count()} registered users. Preserving records.")
+            # Still ensure manager exists
+            bootstrap_manager(db)
+            db.commit()
             return
 
         # 1. SEED RELATIONAL PERMISSIONS
@@ -275,23 +360,13 @@ def init_and_seed_db(drop_existing: bool = False):
         db.add_all(alerts)
         db.flush()
 
-        # 6. SEED RELATIONAL USERS
-        u1 = User(
-            email="manager@coldguard.ai",
-            password_hash="Manager123!",
-            name="Elena Rostova",
-            actual_role="cold_storage_manager",
-            role_display="Cold Storage Manager",
-            company_id="COMP-NORDIC-01",
-            approval_status="APPROVED",
-            title="Director of Cold Storage Operations",
-            security_clearance="LEVEL_3_FULL_FACILITY_OVERVIEW"
-        )
-        u1.assigned_facilities = [f1, f2]
+        # 6. BOOTSTRAP MANAGER ACCOUNT (from env vars, bcrypt-hashed)
+        manager = bootstrap_manager(db, facility=[f1, f2])
 
+        # 7. SEED ADDITIONAL DEMO USERS (bcrypt-hashed passwords)
         u2 = User(
             email="operator@coldguard.ai",
-            password_hash="Operator123!",
+            password_hash=hash_password("Operator123!"),
             name="Marcus Vance",
             actual_role="facility_operator",
             role_display="Facility Operator",
@@ -304,7 +379,7 @@ def init_and_seed_db(drop_existing: bool = False):
 
         u3 = User(
             email="auditor@fda-quality.gov",
-            password_hash="Auditor123!",
+            password_hash=hash_password("Auditor123!"),
             name="Dr. Aris Thorne",
             actual_role="government_auditor",
             role_display="Government / Quality Auditor",
@@ -317,7 +392,7 @@ def init_and_seed_db(drop_existing: bool = False):
 
         u4 = User(
             email="buyer@freshmart-global.com",
-            password_hash="Buyer123!",
+            password_hash=hash_password("Buyer123!"),
             name="Sarah Lin",
             actual_role="buyer_retailer",
             role_display="Buyer / Retailer",
@@ -331,7 +406,7 @@ def init_and_seed_db(drop_existing: bool = False):
         # Edge Cases
         u5 = User(
             email="pending.user@coldguard.ai",
-            password_hash="Pending123!",
+            password_hash=hash_password("Pending123!"),
             name="Devon Cross",
             actual_role="facility_operator",
             role_display="Facility Operator",
@@ -344,7 +419,7 @@ def init_and_seed_db(drop_existing: bool = False):
 
         u6 = User(
             email="pacific.operator@coldguard.ai",
-            password_hash="Pacific123!",
+            password_hash=hash_password("Pacific123!"),
             name="Kenji Sato",
             actual_role="facility_operator",
             role_display="Facility Operator",
@@ -355,10 +430,10 @@ def init_and_seed_db(drop_existing: bool = False):
         )
         u6.assigned_facilities = [f4]
 
-        db.add_all([u1, u2, u3, u4, u5, u6])
+        db.add_all([u2, u3, u4, u5, u6])
         db.flush()
 
-        # 7. SEED TIMESCALEDB TIME-STAMPED SENSOR TELEMETRY HYPERTABLE
+        # 8. SEED TIMESCALEDB TIME-STAMPED SENSOR TELEMETRY HYPERTABLE
         now = datetime.datetime.utcnow()
         telemetry_samples = []
         for i in range(10):
