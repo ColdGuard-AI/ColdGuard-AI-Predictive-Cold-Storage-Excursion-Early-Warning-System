@@ -57,7 +57,6 @@ function ManagerRoutes() {
       <Route path="/" element={<ManagerOverview />} />
       <Route path="/alerts" element={<Alerts />} />
       <Route path="/inventory" element={<InventoryRisk />} />
-      <Route path="/audit" element={<BlockchainAudit />} />
       <Route path="/users" element={<UserApproval />} />
       <Route path="*" element={<NotFound />} />
     </Routes>

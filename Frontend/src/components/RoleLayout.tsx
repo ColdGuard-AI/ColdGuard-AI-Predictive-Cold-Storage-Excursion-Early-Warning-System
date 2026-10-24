@@ -38,7 +38,6 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string; icon: any }[]> = 
     { to: "/manager", label: "Overview Dashboard", icon: LayoutDashboard },
     { to: "/manager/alerts", label: "Alerts & Incidents", icon: BellRing },
     { to: "/manager/inventory", label: "Inventory & Financial Risk", icon: Package },
-    { to: "/manager/audit", label: "Data Integrity & Audit", icon: Lock },
     { to: "/manager/users", label: "User Approval Requests", icon: Users },
   ],
   facility_operator: [
