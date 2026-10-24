@@ -189,4 +189,25 @@ export const api = {
       reading_id: readingId,
       original_temperature: originalTemperature,
     }),
+  assistantStatus: () =>
+    request<{
+      ollama: { connected: boolean; url: string; models: string[]; default_model: string; notice?: string };
+      supported_languages: Record<string, { name: string; locale: string; greeting: string }>;
+      rag_sources: string[];
+    }>("/api/assistant/status"),
+  assistantChat: (payload: {
+    message: string;
+    language?: string;
+    model?: string;
+    history?: { role: string; content: string }[];
+  }) =>
+    post<{
+      reply: string;
+      language: string;
+      model: string;
+      engine: string;
+      telemetry_context_used: boolean;
+      telemetry_snapshot: any;
+      suggested_actions: string[];
+    }>("/api/assistant/chat", payload),
 };

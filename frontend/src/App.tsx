@@ -30,6 +30,7 @@ import WhatIf from "./pages/WhatIf";
 import ManagerOverview from "./pages/manager/ManagerOverview";
 import UserApproval from "./pages/manager/UserApproval";
 import InventoryRisk from "./pages/manager/InventoryRisk";
+import ManagerAssistant from "./pages/manager/ManagerAssistant";
 
 // ── Operator pages ────────────────────────────────────────────────────────────
 import EquipmentHealth from "./pages/operator/EquipmentHealth";
@@ -59,6 +60,7 @@ function ManagerRoutes() {
       <Route path="/alerts" element={<Alerts />} />
       <Route path="/inventory" element={<InventoryRisk />} />
       <Route path="/users" element={<UserApproval />} />
+      <Route path="/assistant" element={<ManagerAssistant />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

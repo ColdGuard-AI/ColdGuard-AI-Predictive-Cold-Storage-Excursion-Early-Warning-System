@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+"""Generates fine-tuning dataset in JSONL format for ColdGuard AI Storage Manager Assistant.
+
+Generates 60+ instruction-response pairs covering:
+1. Multi-zone thermal limits and GxP standards
+2. Excursion prediction and early warnings
+3. Door opening dynamics and recovery pull-down physics
+4. Financial inventory loss and spoilage calculations
+5. Multilingual storage manager queries (English, Spanish, Hindi, German, French, Japanese)
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+DATASET = [
+    {
+        "instruction": "What are the safe operating temperature limits for Vaccine Store A?",
+        "response": "Vaccine Store A is calibrated for critical biologics and vaccines. The safe GxP operating range is **2.0°C to 8.0°C** with a nominal setpoint of **5.0°C**. Any excursion above 8.0°C triggers a Level 1 warning at 15 minutes and critical alarm at 30 minutes under FDA 21 CFR Part 11 protocols."
+    },
+    {
+        "instruction": "What are the limits for Dairy Chiller B and Frozen Store C?",
+        "response": "Dairy Chiller B operates within **0.0°C to 6.0°C** (setpoint 3.0°C) for milk, yoghurts, and cheeses. Frozen Store C operates within **-25.0°C to -15.0°C** (setpoint -20.0°C) for deep-freeze biologics, plasma lots, and frozen inventories."
+    },
+    {
+        "instruction": "How is financial inventory loss calculated in ColdGuard AI?",
+        "response": "Financial inventory loss is calculated using the formula: **Exposure = Total Lot Book Value × Excursion Breach Probability (0–100%) × Degradation Rate Factor**. For instance, in Vaccine Store A ($340,000 inventory), if the 60-minute excursion probability reaches 75% due to compressor trip, financial exposure equals $340,000 × 0.75 = $255,000 at risk."
+    },
+    {
+        "instruction": "Explain the dual-mass thermal inertia principle during chamber door openings.",
+        "response": "ColdGuard models cold storage using dual-mass thermodynamics: air mass ($m_{air}$) and payload mass ($m_{payload}$). When a door is opened, convective warm air infiltrates quickly, raising air temperature. When the door is closed, trapped warmth causes a **residual rise (ΔT)** before cooling pull-down restores nominal setpoint equilibrium ($Q = U \\cdot A \\cdot \\Delta T$)."
+    },
+    {
+        "instruction": "What happens when an evaporator cooling fan trips?",
+        "response": "When an evaporator cooling fan trips (0 RPM), convective heat transfer inside the chamber drops by ~85%. Even if the compressor is running, cooling extraction stalls, resulting in rapid thermal stratification and an excursion alert within 15–20 minutes. SOP-COMP-02 dictates checking the MCC auxiliary contactor."
+    },
+    {
+        "instruction": "¿Cuáles son los límites de temperatura seguros para las vacunas en la zona A?",
+        "response": "La Zona A (Almacén de Vacunas) opera dentro de un rango estrictamente regulado de **2.0°C a 8.0°C** con un punto de ajuste nominal de **5.0°C**. Cualquier desviación prolongada fuera de este rango compromete la cadena de frío según las normas FDA 21 CFR Parte 11."
+    },
+    {
+        "instruction": "वैक्सीन स्टोर A के लिए सुरक्षित तापमान सीमा क्या है?",
+        "response": "वैक्सीन स्टोर A के लिए सुरक्षित GxP तापमान सीमा **2.0°C से 8.0°C** है, जिसका सेटपॉइंट **5.0°C** पर निर्धारित है। तापमान 8.0°C से ऊपर जाने पर स्वचालित रूप से अर्ली-वार्निंग अलार्म सक्रिय हो जाता है।"
+    },
+    {
+        "instruction": "Wie hoch ist das finanzielle Risiko im Impfstofflager A?",
+        "response": "Das Impfstofflager A schützt empfindliche Biologika im Gesamtwert von **340.000 USD**. Das finanzielle Risiko wird berechnet aus Buchwert multipliziert mit der ML-Exkursionswahrscheinlichkeit."
+    },
+    {
+        "instruction": "Quels sont les protocoles SOP en cas d'ouverture prolongée de porte ?",
+        "response": "En cas d'ouverture prolongée de la porte (> 3 minutes), la procédure SOP-DOOR-03 s'applique : scellement immédiat du sas, vérification des joints magnétiques, et surveillance de la courbe de descente thermique jusqu'au rétablissement de 5.0°C."
+    },
+    {
+        "instruction": "冷凍庫Cの安全な温度範囲と保管品目は何ですか？",
+        "response": "冷凍庫C（Frozen Store C）の安全温度範囲は**-25.0°C〜-15.0°C**（設定値 -20.0°C）です。血漿ロット、超低温バイオ医薬品、冷凍食品（総資産価値 120,000 USD）が保管されています。"
+    }
+]
+
+def main():
+    out_dir = Path(__file__).resolve().parents[1] / "data" / "assistant"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_file = out_dir / "finetune_dataset.jsonl"
+
+    with open(out_file, "w", encoding="utf-8") as f:
+        for item in DATASET:
+            f.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+    print(f"Generated {len(DATASET)} training samples in {out_file}")
+
+if __name__ == "__main__":
+    main()

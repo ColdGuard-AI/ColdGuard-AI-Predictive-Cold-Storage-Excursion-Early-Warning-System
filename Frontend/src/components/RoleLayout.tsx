@@ -6,6 +6,7 @@
 import {
   Activity,
   BellRing,
+  Bot,
   BrainCircuit,
   CheckCircle2,
   ClipboardCheck,
@@ -32,6 +33,7 @@ import { useApp } from "../hooks/AppContext";
 import { fmtTime } from "../lib/format";
 import type { AuthSession } from "../pages/AuthGateway";
 import { auth } from "../services/api";
+import ManagerVoiceDrawer from "./ManagerVoiceDrawer";
 
 // ── Role-based nav configs ────────────────────────────────────────────────────
 const NAV_BY_ROLE: Record<string, { to: string; label: string; icon: any }[]> = {
@@ -40,6 +42,7 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string; icon: any }[]> = 
     { to: "/manager/alerts", label: "Alerts & Incidents", icon: BellRing },
     { to: "/manager/inventory", label: "Inventory & Financial Risk", icon: Package },
     { to: "/manager/users", label: "User Approval Requests", icon: Users },
+    { to: "/manager/assistant", label: "AI Voice & Chatbot", icon: Bot },
   ],
   facility_operator: [
     { to: "/operator", label: "Live Monitor", icon: LayoutDashboard },
@@ -326,6 +329,7 @@ export function RoleLayout({
         </main>
       </div>
 
+      {role === "cold_storage_manager" && <ManagerVoiceDrawer />}
       <Toaster />
     </div>
   );
