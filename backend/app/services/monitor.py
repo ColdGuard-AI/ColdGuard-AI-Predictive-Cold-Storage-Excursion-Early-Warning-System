@@ -23,6 +23,7 @@ from app.simulator.zones import ZONES, ZoneConfig
 
 from .alerts import CATEGORY_LABELS, AlertManager, ZoneSignals, evaluate_conditions
 from .forecasting import forecast_from_history
+from .notifier import PhoneNotifier
 from .risk import compute_risk, temperature_status
 from .whatif import run_what_if
 
@@ -58,6 +59,8 @@ class MonitoringService:
         self.models = models
         self.db = db
         self.alerts = AlertManager(db, cooldown_minutes=settings.alert_cooldown_minutes)
+        self.notifier = PhoneNotifier(fallback_phone=settings.manager_phone)
+        self.alerts.on_notify = self.notifier.notify  # instant phone pop-up for new/returning alerts
         self.sims: dict[str, ZoneSimulator] = {}
         self.assessments: dict[str, ZoneAssessment] = {}
         self.running = False
@@ -642,6 +645,7 @@ class MonitoringService:
 
     # ------------------------------------------------------------------ stateful door controls
     def set_door(self, zone_id: str, action: str, duration_minutes: int | None = None) -> dict[str, Any]:
+        self.notifier.forget(zone_id)  # user action: next alert for this room always reaches the phone
         """Stateful independent door control for a zone."""
         with self._lock:
             sim = self.sims[zone_id]
@@ -1367,6 +1371,7 @@ class MonitoringService:
     # ------------------------------------------------------------------ control
     def set_scenario(self, zone_id: str, scenario: str, ambient_delta: float | None = None) -> None:
         with self._lock:
+            self.notifier.forget(zone_id)  # user action: next alert for this room always reaches the phone
             kwargs = {"ambient_delta": ambient_delta} if ambient_delta is not None else {}
             self.sims[zone_id].set_scenario(Scenario(kind=scenario, **kwargs))
             self._assess(zone_id, raise_alerts=True)
@@ -1374,10 +1379,12 @@ class MonitoringService:
     def reset(self, mode: str, zone_id: str | None = None) -> None:
         with self._lock:
             if mode == "full":
+                self.notifier.forget()
                 self.initialize()
                 return
             for zid, sim in self.sims.items():
                 if zone_id is None or zid == zone_id:
+                    self.notifier.forget(zid)
                     sim.set_scenario("normal")
                     self._assess(zid, raise_alerts=False)
 

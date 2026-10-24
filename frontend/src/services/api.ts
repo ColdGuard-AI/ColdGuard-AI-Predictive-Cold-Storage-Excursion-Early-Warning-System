@@ -21,6 +21,12 @@ import type {
   ModelEvaluationResponse,
 } from "../types/api";
 
+export interface PhoneAlertRecipient { name: string; phone: string; topic: string; delivered?: boolean }
+export interface PhoneAlertStatus {
+  enabled: boolean; provider: string; server: string; severities: string[];
+  recipients: PhoneAlertRecipient[]; sent_count: number; last_error: string | null;
+}
+
 let authToken: string | null = null;
 let onUnauthorized: (() => void) | null = null;
 
@@ -139,6 +145,8 @@ export const api = {
   alerts: (filters: { severity?: Severity | ""; zone_id?: string; acknowledged?: boolean; active?: boolean; limit?: number } = {}) =>
     request<Alert[]>(`/api/alerts${qs(filters)}`),
   acknowledge: (alertId: string) => post<Alert>(`/api/alerts/${alertId}/acknowledge`),
+  phoneAlertStatus: () => request<PhoneAlertStatus>("/api/notifications/phone"),
+  phoneAlertTest: () => post<{ recipients: PhoneAlertRecipient[]; error: string | null }>("/api/notifications/phone/test"),
   simulatorStatus: () => request<SimulatorStatus>("/api/simulator/status"),
   setScenario: (zoneId: string, scenario: ScenarioId, ambientDelta?: number) =>
     post<MessageResponse>("/api/simulator/scenario", { zone_id: zoneId, scenario, ambient_delta: ambientDelta ?? null }),

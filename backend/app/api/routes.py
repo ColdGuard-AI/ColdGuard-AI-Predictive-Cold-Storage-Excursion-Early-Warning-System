@@ -218,6 +218,17 @@ def acknowledge_alert(
     return _alert_out(alert)
 
 
+# ---------------------------------------------------------------------- phone alerts
+@router.get("/notifications/phone", tags=["alerts"])
+def phone_alert_status(monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
+    return monitor.notifier.status()
+
+
+@router.post("/notifications/phone/test", tags=["alerts"])
+def phone_alert_test(monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:
+    return monitor.notifier.send_test()
+
+
 # ---------------------------------------------------------------------- simulator
 @router.get("/simulator/status", tags=["simulator"])
 def simulator_status(monitor: MonitoringService = Depends(get_monitor)) -> dict[str, Any]:

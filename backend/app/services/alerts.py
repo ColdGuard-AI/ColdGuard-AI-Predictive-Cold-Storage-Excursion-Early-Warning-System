@@ -14,7 +14,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Callable
 
 from app.database.db import Database
 from app.simulator.zones import ZoneConfig
@@ -158,10 +158,14 @@ class AlertManager:
     def __init__(self, db: Database, cooldown_minutes: int = 20) -> None:
         self.db = db
         self.cooldown = timedelta(minutes=cooldown_minutes)
+        # Optional callback for phone notifications. Receives every alert that is new,
+        # re-activated after clearing, or escalated in severity (not just brand-new ones).
+        self.on_notify: Callable[[list[dict[str, Any]]], None] | None = None
 
     def process(self, zone_id: str, conditions: list[Condition], now: datetime) -> list[dict[str, Any]]:
         """Apply conditions for a zone; returns alerts that were newly created."""
         created = []
+        to_notify: list[dict[str, Any]] = []
         present = {c.category: c for c in conditions}
         for category in CATEGORY_LABELS:
             latest = self.db.latest_alert_for(zone_id, category)
@@ -176,12 +180,15 @@ class AlertManager:
                     severity = cond.severity
                 self.db.update_alert(latest["id"], last_seen_at=now, severity=severity, title=cond.title,
                                      explanation=cond.explanation, context=cond.context)
+                if severity != latest["severity"]:  # escalated, e.g. warning -> critical
+                    to_notify.append(self.db.get_alert(latest["id"]))
                 continue
             if latest and now - datetime.fromisoformat(latest["last_seen_at"]) < self.cooldown:
                 # Same condition returned shortly after clearing: re-activate instead of duplicating.
                 self.db.update_alert(latest["id"], active=True, last_seen_at=now, severity=cond.severity,
                                      title=cond.title, explanation=cond.explanation, context=cond.context)
                 self.db.increment_occurrence(latest["id"])
+                to_notify.append(self.db.get_alert(latest["id"]))
                 continue
             context = dict(cond.context)
             if category in ("high_temperature", "low_temperature"):
@@ -205,6 +212,9 @@ class AlertManager:
             }
             self.db.insert_alert(alert)
             created.append(alert)
+            to_notify.append(alert)
+        if self.on_notify and to_notify:
+            self.on_notify([a for a in to_notify if a])
         return created
 
     def acknowledge(self, alert_id: str, user: str, now: datetime) -> dict[str, Any] | None:

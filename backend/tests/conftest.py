@@ -1,6 +1,7 @@
 """Shared fixtures: a small model trained once per test session on simulated data."""
 from __future__ import annotations
 
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -8,6 +9,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+os.environ.setdefault("COLDGUARD_PHONE_ALERTS", "0")  # never push real phone alerts from tests
 
 from app.config import Settings  # noqa: E402
 from app.database.db import Database  # noqa: E402

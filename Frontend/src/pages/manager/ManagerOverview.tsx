@@ -45,6 +45,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { api } from "../../services/api";
+import PhoneAlertsCard from "../../components/PhoneAlertsCard";
 import { useApp } from "../../hooks/AppContext";
 import type { ZonePredictionOverview } from "../../types/api";
 
@@ -207,6 +208,8 @@ export default function ManagerOverview() {
           </button>
         </div>
       </div>
+
+      <PhoneAlertsCard />
 
       {/* ─────────────────────────────────────────────────────────────
           2. Dribbble-Style Top Metric Cards (4 Cards with Trend Chips)
