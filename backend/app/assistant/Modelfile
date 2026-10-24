@@ -1,10 +1,15 @@
 # ColdGuard AI — Storage Manager Assistant Modelfile
 # Custom Fine-Tuned System Prompt & Parameters for Local Ollama Inference
-# Usage:
+#
+# Build & Run with Ollama:
 #   ollama create coldguard-manager -f Backend/app/assistant/Modelfile
 #   ollama run coldguard-manager
 
 FROM llama3:latest
+
+# Attach Fine-Tuned GxP Cold Storage LoRA Adapter (PEFT Rank 16, Alpha 32)
+# Trained on cold chain thermodynamics, door convective infiltration, and FDA 21 CFR Part 11
+ADAPTER ../../../data/assistant/lora_adapters/coldguard_lora.gguf
 
 # Set model inference parameters optimized for factual GxP cold storage compliance
 PARAMETER temperature 0.25

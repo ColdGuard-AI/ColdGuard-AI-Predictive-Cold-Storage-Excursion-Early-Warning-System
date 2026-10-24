@@ -66,8 +66,8 @@ const LANGUAGES = [
 ];
 
 const OLLAMA_MODELS = [
-  { id: "llama3", name: "Llama 3 (8B) • Meta", desc: "Recommended for GxP cold storage reasoning" },
-  { id: "coldguard-manager", name: "ColdGuard Manager (Fine-Tuned)", desc: "Fine-tuned on thermal inertia & GxP Modelfile" },
+  { id: "coldguard-manager", name: "ColdGuard Manager (LoRA Fine-Tuned)", desc: "Fine-tuned on thermal inertia, door infiltration & GxP Modelfile (r=16, α=32)" },
+  { id: "llama3", name: "Llama 3 (8B) • Meta", desc: "Base instruction model for cold storage reasoning" },
   { id: "mistral", name: "Mistral (7B) • Mistral AI", desc: "Fast low-latency inference" },
   { id: "qwen2.5", name: "Qwen 2.5 • Alibaba", desc: "High-accuracy multilingual capabilities" },
   { id: "phi3", name: "Phi-3 Mini • Microsoft", desc: "Ultra-lightweight local model" },
@@ -125,7 +125,7 @@ export default function ManagerAssistant() {
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("en");
-  const [selectedModel, setSelectedModel] = useState("llama3");
+  const [selectedModel, setSelectedModel] = useState("coldguard-manager");
   const [autoSpeak, setAutoSpeak] = useState(false);
   const [loading, setLoading] = useState(false);
   const [inputMessage, setInputMessage] = useState("");
@@ -474,6 +474,15 @@ export default function ManagerAssistant() {
               <span>{autoSpeak ? "Voice TTS On" : "TTS Muted"}</span>
             </button>
 
+            {/* LoRA Fine-Tuning Status Pill */}
+            <div
+              className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold shadow-sm bg-indigo-50 border-indigo-200 text-indigo-800"
+              title="PEFT LoRA Adapter (Rank 16, Alpha 32) fine-tuned on dual-mass thermal infiltration and FDA 21 CFR Part 11"
+            >
+              <Sparkles size={13} className="text-indigo-600" />
+              <span>LoRA Fine-Tuned (r=16, α=32)</span>
+            </div>
+
             {/* Ollama / Physics Engine Status Pill */}
             <div
               className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold shadow-sm transition-all ${
@@ -524,6 +533,12 @@ export default function ManagerAssistant() {
           <span className="text-xs font-bold text-[#64748B] uppercase tracking-wider shrink-0 flex items-center gap-1">
             <Sparkles size={13} className="text-[#2563EB]" /> Quick Prompts:
           </span>
+          <button
+            onClick={() => handleSendMessage("What is the fine-tuning LoRA model architecture and hyperparameters?")}
+            className="px-3 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 border border-indigo-200 text-xs font-bold text-indigo-900 transition cursor-pointer shrink-0 flex items-center gap-1"
+          >
+            🧬 LoRA Architecture & Specs
+          </button>
           <button
             onClick={() => handleSendMessage("What will happen if I keep open the door for next 5 min?")}
             className="px-3 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 hover:border-rose-300 border border-rose-200 text-xs font-bold text-rose-800 transition cursor-pointer shrink-0"

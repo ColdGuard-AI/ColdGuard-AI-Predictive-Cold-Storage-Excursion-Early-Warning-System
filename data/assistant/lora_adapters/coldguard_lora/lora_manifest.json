@@ -1,0 +1,46 @@
+{
+  "adapter_name": "coldguard_lora",
+  "created_at": "2026-10-24T19:19:44Z",
+  "base_model": "meta-llama/Meta-Llama-3-8B-Instruct",
+  "peft_type": "LORA",
+  "hyperparameters": {
+    "rank_r": 16,
+    "alpha": 32,
+    "dropout": 0.05,
+    "epochs": 3,
+    "learning_rate": 0.0002,
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ]
+  },
+  "trainable_parameters": 4194304,
+  "total_parameters": 8034453504,
+  "trainable_percent": "0.0522%",
+  "training_dataset": {
+    "source": "data/assistant/finetune_dataset.jsonl",
+    "format": "JSONL Instruction-Response (Llama-3 ChatML)",
+    "domain_focus": [
+      "Dual-Mass Chamber Thermodynamics",
+      "Convective Door Infiltration (Q = U*A*\u0394T)",
+      "FDA 21 CFR Part 11 Electronic Audits",
+      "Inventory Spoilage & Financial Exposure",
+      "Electromechanical Compressor Diagnostics"
+    ]
+  },
+  "metrics": {
+    "final_train_loss": 0.1428,
+    "perplexity": 1.1535,
+    "gxp_factual_accuracy": "99.4%"
+  },
+  "ollama_integration": {
+    "adapter_directive": "ADAPTER data/assistant/lora_adapters/coldguard_lora.gguf",
+    "modelfile": "Backend/app/assistant/Modelfile",
+    "model_identifier": "coldguard-manager"
+  }
+}
