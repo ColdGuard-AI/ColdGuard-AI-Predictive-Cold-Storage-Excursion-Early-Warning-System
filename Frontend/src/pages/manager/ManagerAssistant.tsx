@@ -474,6 +474,29 @@ export default function ManagerAssistant() {
               <span>{autoSpeak ? "Voice TTS On" : "TTS Muted"}</span>
             </button>
 
+            {/* Ollama / Physics Engine Status Pill */}
+            <div
+              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold shadow-sm transition-all ${
+                ollamaStatus.connected
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                  : "bg-[#EFF6FF] border-[#BAE6FD] text-[#2563EB]"
+              }`}
+              title={
+                ollamaStatus.connected
+                  ? "Connected to local Ollama daemon on http://localhost:11434"
+                  : "Ollama daemon offline on port 11434. Running ColdGuard Physics & GxP Neural Engine. To activate Ollama LLM, run 'ollama serve' in your terminal."
+              }
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  ollamaStatus.connected ? "bg-emerald-500 animate-pulse" : "bg-[#2563EB]"
+                }`}
+              />
+              <span>
+                {ollamaStatus.connected ? `Ollama Active (${selectedModel})` : "ColdGuard Physics Engine"}
+              </span>
+            </div>
+
             {/* Clear Session */}
             <button
               onClick={clearChat}
@@ -502,6 +525,12 @@ export default function ManagerAssistant() {
             <Sparkles size={13} className="text-[#2563EB]" /> Quick Prompts:
           </span>
           <button
+            onClick={() => handleSendMessage("What will happen if I keep open the door for next 5 min?")}
+            className="px-3 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 hover:border-rose-300 border border-rose-200 text-xs font-bold text-rose-800 transition cursor-pointer shrink-0"
+          >
+            🚪 5-Min Door Breach Simulation
+          </button>
+          <button
             onClick={() => handleSendMessage("What is the current temperature of all 3 cold chambers?")}
             className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
           >
@@ -520,10 +549,10 @@ export default function ManagerAssistant() {
             💰 Inventory Financial Exposure
           </button>
           <button
-            onClick={() => handleSendMessage("Explain the cooling pull-down recovery curve and door status.")}
+            onClick={() => handleSendMessage("What perishable products have the shortest time to spoilage?")}
             className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
           >
-            🚪 Door &amp; Pull-Down
+            📦 Spoilage Sensitivity
           </button>
           <button
             onClick={() => handleSendMessage("Are all digital telemetry logs compliant with FDA 21 CFR Part 11?")}
@@ -536,6 +565,12 @@ export default function ManagerAssistant() {
             className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
           >
             ⚡ Compressor Power (kW)
+          </button>
+          <button
+            onClick={() => handleSendMessage("Explain the cooling pull-down recovery curve and door status.")}
+            className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
+          >
+            📈 Cooling Pull-Down Curve
           </button>
         </div>
 
