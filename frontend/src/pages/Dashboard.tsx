@@ -90,11 +90,11 @@ function SemiCircleGauge({
       : "rgba(16,185,129,0.3)";
 
   return (
-    <div className="flex flex-col items-center justify-between p-3.5 rounded-2xl bg-white border border-[#DCE8F6] hover:border-[#38BDF8] transition-all shadow-arctic-card">
-      <div className="text-[11px] font-mono uppercase tracking-wider text-[#475569] font-bold text-center">
+    <div className="flex flex-col items-center justify-between p-4 rounded-2xl bg-white border border-[#DCE8F6] hover:border-[#38BDF8] transition-all shadow-arctic-card">
+      <div className="text-xs sm:text-sm font-bold uppercase tracking-wider text-[#475569] text-center">
         {label}
       </div>
-      <div className="relative w-28 h-16 flex items-end justify-center mt-1">
+      <div className="relative w-32 h-18 sm:w-36 sm:h-20 flex items-end justify-center mt-2">
         <svg viewBox="0 0 100 55" className="w-full h-full overflow-visible">
           <path
             d="M 12 48 A 38 38 0 0 1 88 48"
@@ -117,25 +117,25 @@ function SemiCircleGauge({
             }}
           />
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-end pb-0.5">
-          <span className="text-xl font-bold font-mono tracking-tight text-[#0F172A] leading-none">
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-1">
+          <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0F172A] leading-none font-sans">
             {clamped}%
           </span>
         </div>
       </div>
       <div
-        className={`text-[11px] font-semibold mt-1 tracking-wide ${
+        className={`text-xs sm:text-sm font-bold mt-2 tracking-wide ${
           color === "red"
             ? "text-rose-600"
             : color === "amber"
             ? "text-amber-600"
-            : "text-emerald-600"
+            : "text-emerald-700"
         }`}
       >
         {sublabel}
       </div>
       {advisory && (
-        <div className="text-[10px] font-mono text-[#475569] mt-0.5 truncate max-w-full text-center">
+        <div className="text-xs text-[#64748B] mt-1 font-medium truncate max-w-full text-center">
           {advisory}
         </div>
       )}
@@ -439,24 +439,24 @@ export default function Dashboard() {
       {/* ═══════════════════════════════════════════════════════════════════
           SECTION 1: SYSTEM TELEMETRY RIBBON & LIVE MONITORING BAR
           ═══════════════════════════════════════════════════════════════════ */}
-      <div className="rounded-2xl bg-white border border-[#DCE8F6] p-4 shadow-arctic-card flex flex-wrap items-center justify-between gap-4">
+      <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card flex flex-wrap items-center justify-between gap-4">
         {/* Left: Live System Clock & Connectivity */}
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center shadow-sm">
-            <Clock size={20} className="animate-pulse" />
+        <div className="flex items-center gap-3.5">
+          <div className="h-11 w-11 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center shadow-sm">
+            <Clock size={22} className="animate-pulse" />
           </div>
           <div>
-            <div className="text-[10px] text-[#2563EB] font-bold uppercase tracking-wider flex items-center gap-1.5 font-mono">
+            <div className="text-xs text-[#2563EB] font-bold uppercase tracking-wider flex items-center gap-1.5 font-mono">
               <span
-                className={`h-2 w-2 rounded-full ${
+                className={`h-2.5 w-2.5 rounded-full ${
                   streamConnected ? "bg-emerald-500 shadow-[0_0_8px_#10B981] animate-pulse" : "bg-[#38BDF8] animate-ping"
                 }`}
               />
               <span>{streamConnected ? "Live Telemetry Stream Active" : "FastAPI Backend Online"}</span>
             </div>
-            <div className="text-xl font-bold font-mono text-[#0F172A] tracking-tight flex items-center gap-3">
+            <div className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] tracking-tight font-sans flex items-center gap-3 mt-0.5">
               <span>{liveClock}</span>
-              <span className="text-xs font-normal text-[#475569] font-sans border-l border-[#DCE8F6] pl-3 hidden sm:inline">
+              <span className="text-sm font-semibold text-[#475569] border-l border-[#DCE8F6] pl-3 hidden sm:inline">
                 {new Date().toLocaleDateString(undefined, { weekday: "short", year: "numeric", month: "short", day: "numeric" })}
               </span>
             </div>
@@ -464,31 +464,31 @@ export default function Dashboard() {
         </div>
 
         {/* Center: Live Facility Metrics */}
-        <div className="hidden lg:flex items-center gap-4 px-4 py-1.5 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] text-xs font-mono">
+        <div className="hidden lg:flex items-center gap-4 px-4 py-2 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] text-xs sm:text-sm font-sans">
           <div className="flex items-center gap-2">
-            <Zap size={14} className="text-[#2563EB]" />
-            <span className="text-[#475569]">Total Power:</span>
-            <span className="font-bold text-[#0F172A]">{totalPowerKw.toFixed(1)} kW</span>
+            <Zap size={16} className="text-[#2563EB]" />
+            <span className="text-[#475569] font-medium">Total Power:</span>
+            <span className="font-extrabold text-[#0F172A]">{totalPowerKw.toFixed(1)} kW</span>
           </div>
           <span className="text-[#DCE8F6]">|</span>
           <div className="flex items-center gap-2">
-            <ShieldAlert size={14} className={facilityRisk > 50 ? "text-rose-600" : "text-emerald-600"} />
-            <span className="text-[#475569]">Facility Risk:</span>
-            <span className={`font-bold ${facilityRisk > 50 ? "text-rose-600" : "text-emerald-700"}`}>
+            <ShieldAlert size={16} className={facilityRisk > 50 ? "text-rose-600" : "text-emerald-600"} />
+            <span className="text-[#475569] font-medium">Facility Risk:</span>
+            <span className={`font-extrabold ${facilityRisk > 50 ? "text-rose-600" : "text-emerald-700"}`}>
               {Math.round(facilityRisk)} / 100
             </span>
           </div>
           <span className="text-[#DCE8F6]">|</span>
           <div className="flex items-center gap-1.5 text-[#475569]">
-            <Timer size={14} className="text-[#2563EB]" />
-            <span>Cycle:</span>
-            <span className="text-[#2563EB] font-bold">{cycleSecondsRemaining}s</span>
+            <Timer size={16} className="text-[#2563EB]" />
+            <span className="font-medium">Cycle:</span>
+            <span className="text-[#2563EB] font-extrabold">{cycleSecondsRemaining}s</span>
           </div>
         </div>
 
         {/* Right: Chamber Quick-Switch Tabs & Actions */}
         <div className="flex flex-wrap items-center gap-2.5 ml-auto">
-          <div className="flex items-center gap-1 bg-[#F1F7FF] p-1 rounded-xl border border-[#DCE8F6]">
+          <div className="flex items-center gap-1.5 bg-[#F1F7FF] p-1.5 rounded-xl border border-[#DCE8F6]">
             {zones?.map((z) => {
               const isSelected = focusedZoneId === z.zone_id;
               const isExcursion = z.temperature_status === "critical" || z.door_status === "open";
@@ -496,20 +496,20 @@ export default function Dashboard() {
                 <button
                   key={z.zone_id}
                   onClick={() => handleSelectZone(z.zone_id)}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold font-mono transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
                     isSelected
                       ? "bg-[#2563EB] text-white shadow-sm"
                       : "text-[#475569] hover:text-[#0F172A] hover:bg-white"
                   }`}
                 >
                   <span
-                    className={`h-2 w-2 rounded-full ${
+                    className={`h-2.5 w-2.5 rounded-full ${
                       isExcursion ? "bg-rose-500 animate-ping" : isSelected ? "bg-white" : "bg-slate-400"
                     }`}
                   />
                   <span>{z.name.replace(" Vaccine Store", " A").replace(" Dairy Chiller", " B").replace(" Frozen Store", " C")}</span>
                   {z.temperature != null && (
-                    <span className="text-[10px] font-bold opacity-90">{z.temperature.toFixed(1)}°</span>
+                    <span className="text-xs font-extrabold opacity-95">{z.temperature.toFixed(1)}°</span>
                   )}
                 </button>
               );
@@ -518,9 +518,9 @@ export default function Dashboard() {
 
           <button
             onClick={() => setShowEvalModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] hover:bg-[#DBEAFE] text-xs font-bold transition shadow-sm cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] hover:bg-[#DBEAFE] text-xs sm:text-sm font-bold transition shadow-sm cursor-pointer"
           >
-            <Activity size={14} className="text-[#2563EB]" />
+            <Activity size={16} className="text-[#2563EB]" />
             <span>Validation</span>
           </button>
         </div>
@@ -529,11 +529,11 @@ export default function Dashboard() {
       {/* ═══════════════════════════════════════════════════════════════════
           SECTION 2: STATEFUL DOOR INGRESS & THERMAL RECOVERY COMMAND CENTER
           ═══════════════════════════════════════════════════════════════════ */}
-      <div className="rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-[#DCE8F6]">
+      <div className="rounded-2xl bg-white border border-[#DCE8F6] p-6 shadow-arctic-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pb-3 border-b border-[#DCE8F6]">
           <div className="flex items-center gap-3">
             <div
-              className={`h-9 w-9 rounded-xl flex items-center justify-center ${
+              className={`h-10 w-10 rounded-xl flex items-center justify-center ${
                 isDoorOpen
                   ? "bg-rose-50 text-rose-600 border border-rose-200 animate-pulse"
                   : isRecovering
@@ -541,15 +541,15 @@ export default function Dashboard() {
                   : "bg-emerald-50 text-emerald-600 border border-emerald-200"
               }`}
             >
-              {isDoorOpen ? <DoorOpen size={20} /> : <DoorClosed size={20} />}
+              {isDoorOpen ? <DoorOpen size={22} /> : <DoorClosed size={22} />}
             </div>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base font-bold text-[#0F172A] tracking-tight">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h3 className="text-lg sm:text-xl font-extrabold text-[#0F172A] tracking-tight">
                   Stateful Door Ingress & Cooling Recovery ({currentZone?.name || focusedZoneId})
                 </h3>
                 <span
-                  className={`text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${
+                  className={`text-xs font-bold px-3 py-1 rounded-full border ${
                     isDoorOpen
                       ? "bg-rose-50 border-rose-200 text-rose-800 animate-pulse"
                       : isRecovering
@@ -564,7 +564,7 @@ export default function Dashboard() {
                     : `DOOR CLOSED (Thermal Equilibrium)`}
                 </span>
               </div>
-              <p className="text-xs text-[#475569] mt-0.5 font-medium">
+              <p className="text-xs sm:text-sm text-[#475569] mt-1 font-medium">
                 Dual-mass thermal inertia tracking. Closing chamber door preserves residual accumulated warmth during pull-down.
               </p>
             </div>
@@ -572,22 +572,22 @@ export default function Dashboard() {
 
           <button
             onClick={() => setShowTimelineModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#DCE8F6] hover:bg-[#F1F7FF] text-xs font-bold text-[#2563EB] transition shadow-sm cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#DCE8F6] hover:bg-[#F1F7FF] text-xs sm:text-sm font-bold text-[#2563EB] transition shadow-sm cursor-pointer"
           >
-            <Layers size={14} className="text-[#2563EB]" />
+            <Layers size={16} className="text-[#2563EB]" />
             <span>Event Timeline</span>
           </button>
         </div>
 
         {/* Real-Time Door & Recovery Metrics (Purely Dynamic) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 mb-5">
           {/* Box 1: Door Status & Duration */}
-          <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
-            <div className="text-[11px] text-[#475569] uppercase font-bold">Door State</div>
-            <div className="text-lg font-bold text-[#0F172A] mt-0.5 font-mono">
+          <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
+            <div className="text-xs sm:text-sm text-[#475569] uppercase font-bold tracking-wider">Door State</div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] mt-1 font-sans">
               {isDoorOpen ? "OPEN" : "CLOSED"}
             </div>
-            <div className="text-[10px] text-[#475569] font-mono mt-0.5">
+            <div className="text-xs text-[#475569] mt-1 font-medium">
               {isDoorOpen
                 ? `${fmtDoorDuration(focusedDoorSeconds)} open`
                 : `${(recoveryData?.time_since_closure_minutes ?? 0).toFixed(0)}m since close`}
@@ -595,21 +595,21 @@ export default function Dashboard() {
           </div>
 
           {/* Box 2: Predicted Residual Rise */}
-          <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
-            <div className="text-[11px] text-[#475569] uppercase font-bold">Residual Rise (ΔT)</div>
-            <div className="text-lg font-bold text-amber-600 mt-0.5 font-mono">
+          <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
+            <div className="text-xs sm:text-sm text-[#475569] uppercase font-bold tracking-wider">Residual Rise (ΔT)</div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-amber-600 mt-1 font-sans">
               +{((recoveryData?.residual_rise_predicted ?? currentZone?.residual_rise_predicted ?? 0)).toFixed(2)}°C
             </div>
-            <div className="text-[10px] text-[#475569] font-mono mt-0.5">
+            <div className="text-xs text-[#475569] mt-1 font-medium">
               trapped warm air
             </div>
           </div>
 
           {/* Box 3: Predicted Peak Temp */}
-          <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
-            <div className="text-[11px] text-[#475569] uppercase font-bold">Predicted Peak Temp</div>
+          <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
+            <div className="text-xs sm:text-sm text-[#475569] uppercase font-bold tracking-wider">Predicted Peak Temp</div>
             <div
-              className={`text-lg font-bold font-mono mt-0.5 ${
+              className={`text-2xl sm:text-3xl font-extrabold font-sans mt-1 ${
                 (recoveryData?.peak_temp_predicted ?? currentZone?.peak_temp_predicted ?? 0) >= (currentZone?.upper_limit ?? 6)
                   ? "text-rose-600"
                   : "text-[#0F172A]"
@@ -623,44 +623,44 @@ export default function Dashboard() {
                 ? fmtTemp(currentTemp)
                 : "—"}
             </div>
-            <div className="text-[10px] text-[#2563EB] font-mono mt-0.5 font-semibold">
+            <div className="text-xs text-[#2563EB] mt-1 font-semibold">
               Safe: {currentZone?.lower_limit ?? 0}° to {currentZone?.upper_limit ?? 6}°C
             </div>
           </div>
 
           {/* Box 4: Cooling Recovery Time */}
-          <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
-            <div className="text-[11px] text-[#475569] uppercase font-bold">Est. Recovery Time</div>
-            <div className="text-lg font-bold text-[#2563EB] mt-0.5 font-mono">
+          <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
+            <div className="text-xs sm:text-sm text-[#475569] uppercase font-bold tracking-wider">Est. Recovery Time</div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-[#2563EB] mt-1 font-sans">
               {recoveryData?.recovery_time_minutes
                 ? `~${Math.round(recoveryData.recovery_time_minutes)} min`
                 : currentZone?.recovery_time_minutes
                 ? `~${Math.round(currentZone.recovery_time_minutes)} min`
                 : "Nominal"}
             </div>
-            <div className="text-[10px] text-[#475569] font-mono mt-0.5">
+            <div className="text-xs text-[#475569] mt-1 font-medium">
               to setpoint {currentZone?.setpoint != null ? fmtTemp(currentZone.setpoint) : "3.0°C"}
             </div>
           </div>
 
           {/* Box 5: Recovery Progress */}
-          <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
-            <div className="text-[11px] text-[#475569] uppercase font-bold">Recovery Progress</div>
-            <div className="text-lg font-bold text-emerald-600 mt-0.5 font-mono">
+          <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
+            <div className="text-xs sm:text-sm text-[#475569] uppercase font-bold tracking-wider">Recovery Progress</div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-emerald-600 mt-1 font-sans">
               {Math.round(recoveryData?.recovery_progress_pct ?? currentZone?.recovery_progress_pct ?? 100)}%
             </div>
-            <div className="text-[10px] text-[#475569] font-mono mt-0.5">
-              {isDoorOpen ? "Inactive (Door open)" : isRecovering ? "Pull-down active" : "Restored"}
+            <div className="text-xs text-[#475569] mt-1 font-medium">
+              {isRecovering ? "Pull-down active" : "Equilibrium restored"}
             </div>
           </div>
 
           {/* Box 6: 24h Cumulative Exposure */}
-          <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
-            <div className="text-[11px] text-[#475569] uppercase font-bold">24h Cumulative</div>
-            <div className="text-lg font-bold text-[#0F172A] mt-0.5 font-mono">
+          <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#DCE8F6]">
+            <div className="text-xs sm:text-sm text-[#475569] uppercase font-bold tracking-wider">24h Cumulative</div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] mt-1 font-sans">
               {(recoveryData?.cumulative_open_minutes_24h ?? currentZone?.cumulative_open_minutes_24h ?? 0).toFixed(1)}m
             </div>
-            <div className="text-[10px] text-[#475569] font-mono mt-0.5">
+            <div className="text-xs text-[#475569] mt-1 font-medium">
               {recoveryData?.events_count_24h ?? currentZone?.door_events_count_24h ?? 0} door events (24h)
             </div>
           </div>
@@ -728,11 +728,11 @@ export default function Dashboard() {
           ═══════════════════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left: Dynamic Chamber Sensor Readings (col-span-7) */}
-        <div className="lg:col-span-7 rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card flex flex-col justify-between">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="lg:col-span-7 rounded-2xl bg-white border border-[#DCE8F6] p-6 shadow-arctic-card flex flex-col justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-bold text-[#0F172A] tracking-tight flex items-center gap-2">
-                <Thermometer size={18} className="text-[#2563EB]" />
+              <h2 className="text-lg sm:text-xl font-extrabold text-[#0F172A] tracking-tight flex items-center gap-2">
+                <Thermometer size={20} className="text-[#2563EB]" />
                 Live Sensor Readings
               </h2>
               {/* Dynamic Zone Filter */}
@@ -740,7 +740,7 @@ export default function Dashboard() {
                 <select
                   value={zoneFilter}
                   onChange={(e) => setZoneFilter(e.target.value)}
-                  className="bg-[#F8FAFC] border border-[#DCE8F6] rounded-xl px-3 py-1.5 text-xs font-semibold text-[#0F172A] pr-7 appearance-none cursor-pointer focus:outline-none focus:border-[#2563EB]"
+                  className="bg-[#F8FAFC] border border-[#DCE8F6] rounded-xl px-3 py-1.5 text-xs sm:text-sm font-bold text-[#0F172A] pr-7 appearance-none cursor-pointer focus:outline-none focus:border-[#2563EB]"
                 >
                   <option value="all">All Zones ({zones?.length ?? 0})</option>
                   {zones?.map((z) => (
@@ -749,7 +749,7 @@ export default function Dashboard() {
                     </option>
                   ))}
                 </select>
-                <ChevronDown size={14} className="absolute right-2.5 top-2 text-[#475569] pointer-events-none" />
+                <ChevronDown size={14} className="absolute right-2.5 top-2.5 text-[#475569] pointer-events-none" />
               </div>
             </div>
 
@@ -760,7 +760,7 @@ export default function Dashboard() {
           </div>
 
           {/* Chamber Cards Grid (Dynamic, Filterable) */}
-          <div className={`grid gap-3.5 ${filteredZones.length === 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-3"}`}>
+          <div className={`grid gap-4 ${filteredZones.length === 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-3"}`}>
             {filteredZones.map((z) => {
               const isSelected = focusedZoneId === z.zone_id;
               const isDoor = isDoorOpenContext(z.zone_id) || z.door_status === "open" || z.scenario === "door_open";
@@ -777,42 +777,42 @@ export default function Dashboard() {
                 <div
                   key={z.zone_id}
                   onClick={() => handleSelectZone(z.zone_id)}
-                  className={`rounded-2xl p-4 transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden ${
+                  className={`rounded-2xl p-4 sm:p-5 transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden ${
                     isCritical
                       ? "bg-rose-50 border-2 border-rose-300 shadow-sm"
                       : isSelected
                       ? "bg-[#EFF6FF] border-2 border-[#2563EB] shadow-sm"
-                      : "bg-[#F8FAFC] border border-[#DCE8F6] hover:border-[#38BDF8]"
+                      : "bg-[#F8FAFC] border border-[#DCE8F6] hover:border-[#38BDF8] hover:bg-white"
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2 min-w-0">
                       <div
-                        className={`h-7 w-7 rounded-lg flex items-center justify-center ${
+                        className={`h-8 w-8 rounded-lg shrink-0 flex items-center justify-center ${
                           isCritical
                             ? "bg-rose-100 text-rose-700 border border-rose-200"
                             : "bg-[#EFF6FF] text-[#2563EB] border border-[#BAE6FD]"
                         }`}
                       >
-                        <Snowflake size={16} />
+                        <Snowflake size={17} />
                       </div>
-                      <div>
-                        <div className="font-bold text-sm text-[#0F172A] leading-none">
-                          {z.name.replace(" Vaccine Store", "").replace(" Dairy Chiller", "").replace(" Frozen Store", "")}
+                      <div className="min-w-0">
+                        <div className="font-extrabold text-sm sm:text-base text-[#0F172A] leading-tight truncate" title={z.name}>
+                          {z.name}
                         </div>
-                        <div className="text-[10px] text-[#2563EB] font-mono mt-0.5 font-semibold">{z.product}</div>
+                        <div className="text-xs text-[#2563EB] font-bold mt-0.5 truncate">{z.product}</div>
                       </div>
                     </div>
 
                     <span
-                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                      className={`text-xs font-bold px-2 py-0.5 rounded-full border shrink-0 ${
                         isCritical
                           ? "bg-rose-100 border-rose-300 text-rose-800 animate-pulse"
                           : "bg-emerald-50 border-emerald-200 text-emerald-800"
                       }`}
                     >
                       {isDoor
-                        ? `Door Open (${fmtDoorDuration(getDoorOpenSeconds(z.zone_id))})`
+                        ? `Door Open`
                         : z.scenario === "normal"
                         ? "Nominal"
                         : z.scenario_label}
@@ -820,24 +820,25 @@ export default function Dashboard() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 mb-4">
-                    <div>
-                      <div className="text-[11px] text-[#475569] flex items-center gap-1 mb-0.5 font-medium">
-                        <Thermometer size={12} className={isCritical ? "text-rose-600" : "text-[#2563EB]"} />
+                    <div className="min-w-0 pr-1">
+                      <div className="text-xs font-bold text-[#475569] flex items-center gap-1 mb-1 truncate">
+                        <Thermometer size={14} className={isCritical ? "text-rose-600" : "text-[#2563EB]"} />
                         <span>Temperature</span>
                       </div>
                       <div
-                        className={`text-2xl font-bold font-mono tracking-tight ${
+                        className={`text-2xl sm:text-[26px] font-extrabold font-sans tracking-tight truncate leading-tight ${
                           isCritical ? "text-rose-600" : "text-[#0F172A]"
                         }`}
+                        title={z.temperature != null ? fmtTemp(z.temperature) : "—"}
                       >
                         {z.temperature != null ? fmtTemp(z.temperature) : "—"}
                       </div>
                       <div
-                        className={`text-[11px] font-mono font-semibold flex items-center gap-0.5 mt-0.5 ${
+                        className={`text-xs font-bold flex items-center gap-0.5 mt-1 truncate ${
                           isRising ? "text-rose-600" : "text-emerald-700"
                         }`}
                       >
-                        {isRising ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                        {isRising ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
                         <span>
                           {isRising ? "+" : ""}
                           {tempTrend.toFixed(1)}°C/h
@@ -845,38 +846,36 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div>
-                      <div className="text-[11px] text-[#475569] flex items-center gap-1 mb-0.5 font-medium">
-                        <Droplets size={12} className="text-[#38BDF8]" />
+                    <div className="min-w-0 pl-2 border-l border-[#DCE8F6]">
+                      <div className="text-xs font-bold text-[#475569] flex items-center gap-1 mb-1 truncate">
+                        <Droplets size={14} className="text-[#38BDF8]" />
                         <span>Humidity</span>
                       </div>
-                      <div className="text-2xl font-bold font-mono text-[#0F172A]">
+                      <div className="text-2xl sm:text-[26px] font-extrabold font-sans text-[#0F172A] tracking-tight truncate leading-tight">
                         {z.humidity != null ? `${Math.round(z.humidity)}%` : "—%"}
                       </div>
-                      <div className="text-[10px] text-[#475569] font-mono mt-0.5">Target: 45–70%</div>
+                      <div className="text-xs text-[#64748B] font-medium mt-1 truncate">Target: 45–70%</div>
                     </div>
                   </div>
 
-                  <div className="pt-2.5 border-t border-[#DCE8F6] flex items-center justify-between text-[11px] text-[#475569]">
+                  <div className="pt-3 border-t border-[#DCE8F6] flex items-center justify-between text-xs font-bold text-[#475569]">
                     <div className="flex items-center gap-1">
                       {isDoor ? (
-                        <DoorOpen size={13} className="text-rose-600" />
+                        <DoorOpen size={14} className="text-rose-600" />
                       ) : (
-                        <DoorClosed size={13} className="text-emerald-700" />
+                        <DoorClosed size={14} className="text-emerald-700" />
                       )}
-                      <span className="font-mono font-semibold">{isDoor ? "Open" : "Closed"}</span>
+                      <span>{isDoor ? "Open" : "Closed"}</span>
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <Cpu size={13} className="text-[#2563EB]" />
-                      <span className="font-mono font-semibold text-[#0F172A]">
-                        {z.compressor_status === "stopped" ? "OFF" : `${Math.round(z.compressor_load_pct ?? 70)}%`}
-                      </span>
+                      <Cpu size={14} className="text-[#2563EB]" />
+                      <span>{Math.round(z.compressor_load_pct ?? 0)}%</span>
                     </div>
 
-                    <div className="flex items-center gap-1 font-mono text-[#0F172A] font-semibold">
-                      <Zap size={13} className="text-[#2563EB]" />
-                      <span>{z.power_consumption_kw != null ? `${z.power_consumption_kw.toFixed(1)} kW` : "— kW"}</span>
+                    <div className="flex items-center gap-1">
+                      <Zap size={14} className="text-amber-500" />
+                      <span>{(z.power_consumption_kw ?? 0).toFixed(1)} kW</span>
                     </div>
                   </div>
                 </div>
@@ -886,16 +885,16 @@ export default function Dashboard() {
         </div>
 
         {/* Right: Overall Risk Prediction Gauges (col-span-5) */}
-        <div className="lg:col-span-5 rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center">
-                <Atom size={17} />
+        <div className="lg:col-span-5 rounded-2xl bg-white border border-[#DCE8F6] p-6 shadow-arctic-card flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center">
+                <Atom size={18} />
               </div>
-              <h2 className="text-lg font-bold text-[#0F172A] tracking-tight flex items-center gap-1.5">
+              <h2 className="text-lg sm:text-xl font-extrabold text-[#0F172A] tracking-tight flex items-center gap-1.5">
                 Overall Risk Prediction
                 <span title="Continuous ML risk classification score across horizons" className="text-[#475569] hover:text-[#0F172A] cursor-pointer">
-                  <Info size={14} />
+                  <Info size={15} />
                 </span>
               </h2>
             </div>
@@ -904,7 +903,7 @@ export default function Dashboard() {
               <select
                 value={focusedZoneId}
                 onChange={(e) => handleSelectZone(e.target.value)}
-                className="bg-[#F8FAFC] border border-[#DCE8F6] rounded-xl px-3 py-1.5 text-xs font-semibold text-[#0F172A] pr-8 appearance-none cursor-pointer focus:outline-none focus:border-[#2563EB]"
+                className="bg-[#F8FAFC] border border-[#DCE8F6] rounded-xl px-3 py-1.5 text-xs sm:text-sm font-bold text-[#0F172A] pr-8 appearance-none cursor-pointer focus:outline-none focus:border-[#2563EB]"
               >
                 {zones?.map((z) => (
                   <option key={z.zone_id} value={z.zone_id}>
@@ -917,7 +916,7 @@ export default function Dashboard() {
           </div>
 
           {/* 4 Dynamic Semi-circular Gauges */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 my-auto">
             <SemiCircleGauge
               label="Next 30 min"
               score={risk30}
@@ -946,9 +945,9 @@ export default function Dashboard() {
             />
           </div>
 
-          <div className="mt-3 pt-3 border-t border-[#DCE8F6] flex items-center justify-between text-[11px] text-[#475569] font-mono">
-            <span>Model: {evaluationData?.model_architecture || "RandomForest (100 Trees)"}</span>
-            <span className="text-[#2563EB] font-bold">100% Physics & ML Driven</span>
+          <div className="mt-4 pt-3 border-t border-[#DCE8F6] flex items-center justify-between text-xs font-bold text-[#475569]">
+            <span>ML Engine: {evaluationData?.model_architecture || "RandomForest (100 Trees)"}</span>
+            <span className="text-[#2563EB]">100% Physics & ML Driven</span>
           </div>
         </div>
       </div>
@@ -958,19 +957,19 @@ export default function Dashboard() {
           ═══════════════════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left: Temperature Forecast Chart (col-span-7) */}
-        <div className="lg:col-span-7 rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card flex flex-col justify-between">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div className="lg:col-span-7 rounded-2xl bg-white border border-[#DCE8F6] p-6 shadow-arctic-card flex flex-col justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-2.5">
-              <div className="h-7 w-7 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center">
-                <LineChartIcon size={17} />
+              <div className="h-8 w-8 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center shadow-sm">
+                <LineChartIcon size={18} />
               </div>
-              <h2 className="text-lg font-bold text-[#0F172A] tracking-tight">
+              <h2 className="text-lg sm:text-xl font-extrabold text-[#0F172A] tracking-tight">
                 Temperature Forecast ({currentZone?.name || focusedZoneId})
               </h2>
             </div>
 
             {/* Horizon Selector Tabs */}
-            <div className="flex items-center gap-1 bg-[#F1F7FF] p-1 rounded-xl border border-[#DCE8F6]">
+            <div className="flex items-center gap-1.5 bg-[#F1F7FF] p-1.5 rounded-xl border border-[#DCE8F6]">
               {[
                 { label: "30 min", value: 30 },
                 { label: "1 hour", value: 60 },
@@ -980,7 +979,7 @@ export default function Dashboard() {
                 <button
                   key={tab.value}
                   onClick={() => setForecastHorizon(tab.value)}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer ${
                     forecastHorizon === tab.value
                       ? "bg-[#2563EB] text-white shadow-sm font-bold"
                       : "text-[#475569] hover:text-[#0F172A]"
@@ -993,7 +992,7 @@ export default function Dashboard() {
           </div>
 
           {/* Chart Legend */}
-          <div className="flex flex-wrap items-center gap-5 text-xs text-[#475569] font-medium mb-3">
+          <div className="flex flex-wrap items-center gap-5 text-xs sm:text-sm text-[#475569] font-medium mb-3">
             <div className="flex items-center gap-2">
               <span className="w-4 h-0.5 bg-[#2563EB] rounded" />
               <span>Actual History</span>
@@ -1022,13 +1021,13 @@ export default function Dashboard() {
                 <XAxis
                   dataKey="timeLabel"
                   stroke="#475569"
-                  fontSize={11}
+                  fontSize={12}
                   tickLine={false}
                   minTickGap={35}
                 />
                 <YAxis
                   stroke="#475569"
-                  fontSize={11}
+                  fontSize={12}
                   tickLine={false}
                   domain={[
                     (dataMin: number) => Math.floor(Math.min(dataMin, currentZone?.lower_limit ?? 0) - 1),
@@ -1041,21 +1040,21 @@ export default function Dashboard() {
                     if (!active || !payload?.length) return null;
                     const data = payload[0].payload;
                     return (
-                      <div className="rounded-xl border border-[#DCE8F6] bg-white p-3 text-xs shadow-arctic-card">
-                        <div className="font-mono text-[#475569] mb-1.5">{data.timeLabel}</div>
+                      <div className="rounded-xl border border-[#DCE8F6] bg-white p-3.5 text-xs sm:text-sm shadow-arctic-card">
+                        <div className="text-[#475569] font-bold mb-1.5">{data.timeLabel}</div>
                         {data.actual != null && (
-                          <div className="flex items-center justify-between gap-3 text-[#2563EB] font-mono">
+                          <div className="flex items-center justify-between gap-3 text-[#2563EB] font-sans font-bold">
                             <span>Actual:</span>
-                            <span className="font-bold">{data.actual.toFixed(2)}°C</span>
+                            <span>{data.actual.toFixed(2)}°C</span>
                           </div>
                         )}
                         {data.predicted != null && (
-                          <div className="flex items-center justify-between gap-3 text-rose-600 font-mono">
+                          <div className="flex items-center justify-between gap-3 text-rose-600 font-sans font-bold">
                             <span>Predicted:</span>
-                            <span className="font-bold">{data.predicted.toFixed(2)}°C</span>
+                            <span>{data.predicted.toFixed(2)}°C</span>
                           </div>
                         )}
-                        <div className="flex items-center justify-between gap-3 text-[#0F172A] font-mono mt-1 pt-1 border-t border-[#DCE8F6]">
+                        <div className="flex items-center justify-between gap-3 text-[#0F172A] font-sans font-medium mt-1.5 pt-1.5 border-t border-[#DCE8F6]">
                           <span>Safe Limit:</span>
                           <span className="font-bold">{data.safeUpper}°C</span>
                         </div>
@@ -1072,7 +1071,7 @@ export default function Dashboard() {
                   label={{
                     value: `Safe Upper (${currentZone?.upper_limit ?? 6}°C)`,
                     fill: "#2563EB",
-                    fontSize: 11,
+                    fontSize: 12,
                     position: "insideTopLeft",
                   }}
                 />
@@ -1111,20 +1110,20 @@ export default function Dashboard() {
         </div>
 
         {/* Right: AI Explanation & Root Causes (col-span-5) */}
-        <div className="lg:col-span-5 rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center">
-                <Sparkles size={17} />
+        <div className="lg:col-span-5 rounded-2xl bg-white border border-[#DCE8F6] p-6 shadow-arctic-card flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center shadow-sm">
+                <Sparkles size={18} />
               </div>
-              <h2 className="text-lg font-bold text-[#0F172A] tracking-tight">AI Explanation & Causes</h2>
+              <h2 className="text-lg sm:text-xl font-extrabold text-[#0F172A] tracking-tight">AI Explanation & Causes</h2>
             </div>
 
             <div className="relative">
               <select
                 value={focusedZoneId}
                 onChange={(e) => handleSelectZone(e.target.value)}
-                className="bg-[#F8FAFC] border border-[#DCE8F6] rounded-xl px-3 py-1.5 text-xs font-semibold text-[#0F172A] pr-8 appearance-none cursor-pointer focus:outline-none focus:border-[#2563EB]"
+                className="bg-[#F8FAFC] border border-[#DCE8F6] rounded-xl px-3 py-1.5 text-xs sm:text-sm font-bold text-[#0F172A] pr-8 appearance-none cursor-pointer focus:outline-none focus:border-[#2563EB]"
               >
                 {zones?.map((z) => (
                   <option key={z.zone_id} value={z.zone_id}>
@@ -1132,32 +1131,32 @@ export default function Dashboard() {
                   </option>
                 ))}
               </select>
-              <ChevronDown size={14} className="absolute right-2.5 top-2.5 text-[#475569] pointer-events-none" />
+              <ChevronDown size={14} className="absolute right-2.5 top-3 text-[#475569] pointer-events-none" />
             </div>
           </div>
 
           <div
-            className={`rounded-xl p-3 flex items-start gap-2.5 border mb-3 ${
+            className={`rounded-xl p-3.5 flex items-start gap-2.5 border mb-3.5 ${
               aiExplanation?.severity === "critical" || aiExplanation?.severity === "warning"
                 ? "bg-rose-50 border-rose-200 text-rose-800"
                 : "bg-emerald-50 border-emerald-200 text-emerald-800"
             }`}
           >
-            <AlertTriangle size={18} className="shrink-0 mt-0.5 text-rose-600" />
-            <div className="text-xs font-bold leading-snug">{aiHeadline}</div>
+            <AlertTriangle size={20} className="shrink-0 mt-0.5 text-rose-600" />
+            <div className="text-sm sm:text-base font-bold leading-snug">{aiHeadline}</div>
           </div>
 
-          <p className="text-xs text-[#0F172A] leading-relaxed mb-3">
+          <p className="text-sm sm:text-base text-[#0F172A] leading-relaxed mb-4">
             {aiNarrative}
           </p>
 
-          <div className="rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] p-3 mb-2">
-            <div className="text-xs font-bold text-[#0F172A] mb-2 flex items-center gap-1.5 font-mono">
-              <Cpu size={13} className="text-[#2563EB]" />
+          <div className="rounded-xl bg-[#F8FAFC] border border-[#DCE8F6] p-3.5 mb-3">
+            <div className="text-xs sm:text-sm font-bold text-[#0F172A] mb-2 flex items-center gap-1.5">
+              <Cpu size={15} className="text-[#2563EB]" />
               <span>Contributing Telemetry Factors</span>
             </div>
             {aiFactors.length > 0 ? (
-              <ul className="space-y-1.5 text-xs text-[#475569]">
+              <ul className="space-y-1.5 text-xs sm:text-sm text-[#475569]">
                 {aiFactors.map((factor, idx) => (
                   <li key={idx} className="flex items-start gap-2">
                     <span className="text-[#2563EB] mt-0.5 font-bold">•</span>
@@ -1166,8 +1165,8 @@ export default function Dashboard() {
                 ))}
               </ul>
             ) : (
-              <div className="flex items-center gap-2 text-xs text-emerald-700 font-mono font-medium">
-                <CheckCircle2 size={13} />
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-emerald-700 font-medium">
+                <CheckCircle2 size={15} />
                 <span>All telemetry factors within calibrated baseline limits.</span>
               </div>
             )}
@@ -1175,14 +1174,14 @@ export default function Dashboard() {
 
           {/* Perishable Inventory Spoilage Risk Analysis */}
           {aiExplanation?.inventory_spoilage_risk && (
-            <div className="rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] p-3.5 mb-2 shadow-sm">
+            <div className="rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] p-4 mb-2 shadow-sm">
               <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-[#BAE6FD]">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-[#0F172A] font-mono">
-                  <Package size={14} className="text-[#2563EB]" />
+                <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#0F172A]">
+                  <Package size={15} className="text-[#2563EB]" />
                   <span>PERISHABLE INVENTORY AT RISK</span>
                 </div>
                 <span
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold border ${
+                  className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
                     aiExplanation.inventory_spoilage_risk.spoilage_status.includes("Critical")
                       ? "bg-rose-50 text-rose-800 border-rose-200 animate-pulse"
                       : aiExplanation.inventory_spoilage_risk.spoilage_status.includes("Warning")
@@ -1195,14 +1194,14 @@ export default function Dashboard() {
               </div>
 
               {/* Inventory Metrics */}
-              <div className="grid grid-cols-2 gap-2 mb-2.5 text-[11px] font-mono">
-                <div className="p-2 rounded-lg bg-white border border-[#DCE8F6]">
-                  <div className="text-[10px] text-[#475569]">Total Lot Value:</div>
-                  <div className="text-emerald-700 font-bold">{aiExplanation.inventory_spoilage_risk.total_inventory_value_usd}</div>
+              <div className="grid grid-cols-2 gap-2.5 mb-3 text-xs sm:text-sm">
+                <div className="p-2.5 rounded-xl bg-white border border-[#DCE8F6]">
+                  <div className="text-xs text-[#64748B] font-medium">Total Lot Value:</div>
+                  <div className="text-emerald-700 text-base font-extrabold">{aiExplanation.inventory_spoilage_risk.total_inventory_value_usd}</div>
                 </div>
-                <div className="p-2 rounded-lg bg-white border border-[#DCE8F6]">
-                  <div className="text-[10px] text-[#475569]">Est. Time to Spoilage:</div>
-                  <div className={`font-bold ${aiExplanation.inventory_spoilage_risk.time_to_spoilage_minutes != null ? "text-amber-600" : "text-[#475569]"}`}>
+                <div className="p-2.5 rounded-xl bg-white border border-[#DCE8F6]">
+                  <div className="text-xs text-[#64748B] font-medium">Est. Time to Spoilage:</div>
+                  <div className={`text-base font-extrabold ${aiExplanation.inventory_spoilage_risk.time_to_spoilage_minutes != null ? "text-amber-600" : "text-[#475569]"}`}>
                     {aiExplanation.inventory_spoilage_risk.time_to_spoilage_minutes != null
                       ? `${aiExplanation.inventory_spoilage_risk.time_to_spoilage_minutes} min`
                       : "Nominal (Safe)"}
@@ -1211,13 +1210,13 @@ export default function Dashboard() {
               </div>
 
               {/* Vulnerable Items List */}
-              <div className="mb-2">
-                <div className="text-[10px] uppercase font-mono text-[#475569] mb-1 font-semibold">
+              <div className="mb-2.5">
+                <div className="text-xs uppercase text-[#64748B] mb-1.5 font-bold">
                   Vulnerable Products Stored in Chamber:
                 </div>
                 <div className="space-y-1">
                   {aiExplanation.inventory_spoilage_risk.vulnerable_items.map((item, idx) => (
-                    <div key={idx} className="flex items-start gap-1.5 text-[11px] text-[#0F172A]">
+                    <div key={idx} className="flex items-start gap-1.5 text-xs sm:text-sm text-[#0F172A] font-medium">
                       <span className="text-[#2563EB] font-bold">•</span>
                       <span>{item}</span>
                     </div>
@@ -1226,7 +1225,7 @@ export default function Dashboard() {
               </div>
 
               {/* Degradation Mechanism */}
-              <div className="p-2 rounded-lg bg-white border border-[#DCE8F6] text-[11px] text-[#475569] leading-relaxed">
+              <div className="p-2.5 rounded-xl bg-white border border-[#DCE8F6] text-xs sm:text-sm text-[#475569] leading-relaxed">
                 <span className="font-bold text-[#0F172A]">Spoilage Mechanism: </span>
                 {aiExplanation.inventory_spoilage_risk.spoilage_mechanism}
               </div>
@@ -1240,18 +1239,18 @@ export default function Dashboard() {
           ═══════════════════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Next Prediction Card (col-span-5) */}
-        <div className="lg:col-span-5 rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card flex flex-col justify-between">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="h-7 w-7 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center">
-              <Atom size={17} />
+        <div className="lg:col-span-5 rounded-2xl bg-white border border-[#DCE8F6] p-6 shadow-arctic-card flex flex-col justify-between">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="h-8 w-8 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center shadow-sm">
+              <Atom size={18} />
             </div>
-            <h2 className="text-lg font-bold text-[#0F172A] tracking-tight">
+            <h2 className="text-lg sm:text-xl font-extrabold text-[#0F172A] tracking-tight">
               Next Prediction ({currentZone?.name || focusedZoneId})
             </h2>
           </div>
 
           {/* 4 Stat Boxes (Dynamically mapped) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             {[
               { label: "30 min", data: h30 },
               { label: "1 hour", data: h60 },
@@ -1264,18 +1263,18 @@ export default function Dashboard() {
               return (
                 <div
                   key={label}
-                  className={`p-3 rounded-xl bg-[#F8FAFC] border flex flex-col justify-between ${
+                  className={`p-3.5 rounded-xl bg-[#F8FAFC] border flex flex-col justify-between ${
                     isBreach ? "border-rose-300 ring-2 ring-rose-100" : "border-[#DCE8F6]"
                   }`}
                 >
-                  <div className="flex items-center justify-between text-[11px] text-[#475569] font-mono">
-                    <Thermometer size={14} className={isBreach ? "text-rose-600" : "text-[#2563EB]"} />
-                    <span className="font-semibold">{label}</span>
+                  <div className="flex items-center justify-between text-xs sm:text-sm text-[#475569] font-bold">
+                    <Thermometer size={15} className={isBreach ? "text-rose-600" : "text-[#2563EB]"} />
+                    <span>{label}</span>
                   </div>
-                  <div className={`text-lg font-bold font-mono mt-1 ${isBreach ? "text-rose-600" : "text-[#0F172A]"}`}>
+                  <div className={`text-2xl font-extrabold font-sans mt-1.5 ${isBreach ? "text-rose-600" : "text-[#0F172A]"}`}>
                     {pTemp != null ? fmtTemp(pTemp) : "—"}
                   </div>
-                  <div className="text-[10px] font-mono font-medium text-[#475569]">
+                  <div className="text-xs font-semibold text-[#64748B] mt-1">
                     {delta !== 0 ? fmtDelta(delta) : "±0.0°C"}
                   </div>
                 </div>
@@ -1283,13 +1282,13 @@ export default function Dashboard() {
             })}
           </div>
 
-          <div className="rounded-xl p-3.5 bg-[#EFF6FF] border border-[#BAE6FD] flex items-start gap-3 shadow-sm">
+          <div className="rounded-xl p-4 bg-[#EFF6FF] border border-[#BAE6FD] flex items-start gap-3 shadow-sm">
             <div className="h-8 w-8 rounded-lg bg-white text-[#2563EB] flex items-center justify-center shrink-0 border border-[#BAE6FD]">
               <Sparkles size={18} />
             </div>
             <div className="space-y-1">
-              <div className="text-xs font-bold text-[#0F172A] uppercase tracking-wider font-mono">Summary & Expected Recovery</div>
-              <div className="text-xs text-[#475569] leading-relaxed font-sans">
+              <div className="text-xs sm:text-sm font-bold text-[#0F172A] uppercase tracking-wider">Summary & Expected Recovery</div>
+              <div className="text-xs sm:text-sm text-[#475569] leading-relaxed font-sans">
                 {aiSummary}
               </div>
             </div>
@@ -1297,23 +1296,23 @@ export default function Dashboard() {
         </div>
 
         {/* Recommended Actions Card (col-span-3) */}
-        <div className="lg:col-span-3 rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card flex flex-col justify-between">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="h-7 w-7 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center">
-              <Lightbulb size={17} />
+        <div className="lg:col-span-3 rounded-2xl bg-white border border-[#DCE8F6] p-6 shadow-arctic-card flex flex-col justify-between">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="h-8 w-8 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center shadow-sm">
+              <Lightbulb size={18} />
             </div>
-            <h2 className="text-lg font-bold text-[#0F172A] tracking-tight">Recommended Actions</h2>
+            <h2 className="text-lg sm:text-xl font-extrabold text-[#0F172A] tracking-tight">Recommended Actions</h2>
           </div>
 
-          <ol className="space-y-2.5 my-auto">
+          <ol className="space-y-3 my-auto">
             {recommendedActions.length > 0 ? (
               recommendedActions.map((action, idx) => {
                 const num = idx + 1;
                 const isUrgent = num === 1 && (currentZone?.door_status === "open" || (currentZone?.temperature ?? 0) > (currentZone?.upper_limit ?? 6));
                 return (
-                  <li key={idx} className="flex items-center gap-3 text-xs text-[#0F172A]">
+                  <li key={idx} className="flex items-center gap-3 text-xs sm:text-sm text-[#0F172A] font-medium">
                     <span
-                      className={`h-5 w-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 font-mono ${
+                      className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                         isUrgent
                           ? "bg-rose-500 text-white shadow-[0_0_8px_#EF4444]"
                           : "bg-[#2563EB] text-white"
@@ -1326,57 +1325,57 @@ export default function Dashboard() {
                 );
               })
             ) : (
-              <div className="text-xs text-[#475569] italic">No emergency actions required. All operations nominal.</div>
+              <div className="text-xs sm:text-sm text-[#475569] italic">No emergency actions required. All operations nominal.</div>
             )}
           </ol>
 
-          <div className="mt-3 pt-3 border-t border-[#DCE8F6] text-[11px] text-[#475569] font-mono flex items-center justify-between">
+          <div className="mt-4 pt-3 border-t border-[#DCE8F6] text-xs font-bold text-[#475569] flex items-center justify-between">
             <span>Enforcement: Active</span>
-            <span className="text-[#2563EB] font-bold">{liveClock}</span>
+            <span className="text-[#2563EB]">{liveClock}</span>
           </div>
         </div>
 
         {/* Active Alerts & Events Card (col-span-4) */}
-        <div className="lg:col-span-4 rounded-2xl bg-white border border-[#DCE8F6] p-5 shadow-arctic-card flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center">
-                <BellRing size={17} />
+        <div className="lg:col-span-4 rounded-2xl bg-white border border-[#DCE8F6] p-6 shadow-arctic-card flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-xl bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] flex items-center justify-center shadow-sm">
+                <BellRing size={18} />
               </div>
-              <h2 className="text-lg font-bold text-[#0F172A] tracking-tight">Active Alerts & Events</h2>
+              <h2 className="text-lg sm:text-xl font-extrabold text-[#0F172A] tracking-tight">Active Alerts & Events</h2>
             </div>
-            <Link to="/alerts" className="text-xs font-bold text-[#2563EB] hover:underline">
+            <Link to="/operator/alerts" className="text-xs sm:text-sm font-bold text-[#2563EB] hover:underline">
               View All
             </Link>
           </div>
 
           <div className="overflow-x-auto my-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full text-left text-xs sm:text-sm border-collapse">
               <thead>
-                <tr className="border-b border-[#DCE8F6] text-[11px] font-bold text-[#0F172A] uppercase tracking-wider font-mono">
-                  <th className="pb-2">Time</th>
-                  <th className="pb-2">Zone</th>
-                  <th className="pb-2">Event</th>
-                  <th className="pb-2">Severity</th>
-                  <th className="pb-2">Status</th>
+                <tr className="border-b border-[#DCE8F6] text-xs font-bold text-[#0F172A] uppercase tracking-wider">
+                  <th className="pb-2.5">Time</th>
+                  <th className="pb-2.5">Zone</th>
+                  <th className="pb-2.5">Event</th>
+                  <th className="pb-2.5">Severity</th>
+                  <th className="pb-2.5">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#DCE8F6]/60 font-mono">
+              <tbody className="divide-y divide-[#DCE8F6]/60">
                 {eventsList.length > 0 ? (
                   eventsList.slice(0, 5).map((ev) => (
                     <tr key={ev.id} className="hover:bg-[#F1F7FF] transition">
-                      <td className="py-2 font-mono text-[#475569] text-[11px] whitespace-nowrap">
+                      <td className="py-2.5 text-[#475569] whitespace-nowrap">
                         {ev.time}
                       </td>
-                      <td className="py-2 font-semibold text-[#0F172A] whitespace-nowrap">
+                      <td className="py-2.5 font-bold text-[#0F172A] whitespace-nowrap">
                         {ev.zone_name.replace(" Vaccine Store", " A").replace(" Dairy Chiller", " B").replace(" Frozen Store", " C")}
                       </td>
-                      <td className="py-2 text-[#0F172A] font-medium max-w-[130px] truncate" title={ev.event}>
+                      <td className="py-2.5 text-[#0F172A] font-medium max-w-[130px] truncate" title={ev.event}>
                         {ev.event}
                       </td>
-                      <td className="py-2 whitespace-nowrap">
+                      <td className="py-2.5 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center gap-1 font-bold text-[10px] ${
+                          className={`inline-flex items-center gap-1 font-bold text-xs ${
                             ev.severity === "high"
                               ? "text-rose-600"
                               : ev.severity === "medium"
@@ -1387,14 +1386,14 @@ export default function Dashboard() {
                           {ev.severity === "high" ? "🔺 High" : ev.severity === "medium" ? "🔔 Med" : "💧 Low"}
                         </span>
                       </td>
-                      <td className="py-2 whitespace-nowrap">
+                      <td className="py-2.5 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center gap-1.5 text-[10px] font-bold ${
+                          className={`inline-flex items-center gap-1.5 text-xs font-bold ${
                             ev.status === "active" ? "text-rose-600" : "text-emerald-700"
                           }`}
                         >
                           <span
-                            className={`h-1.5 w-1.5 rounded-full ${
+                            className={`h-2 w-2 rounded-full ${
                               ev.status === "active" ? "bg-rose-500 animate-ping" : "bg-emerald-500"
                             }`}
                           />
@@ -1414,10 +1413,10 @@ export default function Dashboard() {
             </table>
           </div>
 
-          <div className="mt-3 pt-3 border-t border-[#DCE8F6] text-[11px] text-[#475569] font-mono flex items-center justify-between">
+          <div className="mt-4 pt-3 border-t border-[#DCE8F6] text-xs font-bold text-[#475569] flex items-center justify-between">
             <span>Database: SQLite / TimescaleDB</span>
-            <span className="text-emerald-700 font-bold flex items-center gap-1">
-              <CheckCircle2 size={12} /> {health?.readings_stored ?? 0} Readings Indexed
+            <span className="text-emerald-700 flex items-center gap-1">
+              <CheckCircle2 size={14} /> {health?.readings_stored ?? 0} Readings Indexed
             </span>
           </div>
         </div>
