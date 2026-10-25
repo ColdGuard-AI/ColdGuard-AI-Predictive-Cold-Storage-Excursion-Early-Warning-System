@@ -13,6 +13,7 @@ import {
   Mic,
   MicOff,
   Send,
+  Trash2,
   Volume2,
   VolumeX,
   X,
@@ -24,8 +25,9 @@ import { api } from "../services/api";
 
 const LANGUAGES = [
   { code: "en", name: "English", flag: "🇺🇸", locale: "en-US" },
-  { code: "es", name: "Español", flag: "🇪🇸", locale: "es-ES" },
+  { code: "mr", name: "मराठी", flag: "🇮🇳", locale: "mr-IN" },
   { code: "hi", name: "हिन्दी", flag: "🇮🇳", locale: "hi-IN" },
+  { code: "es", name: "Español", flag: "🇪🇸", locale: "es-ES" },
   { code: "de", name: "Deutsch", flag: "🇩🇪", locale: "de-DE" },
   { code: "fr", name: "Français", flag: "🇫🇷", locale: "fr-FR" },
   { code: "ja", name: "日本語", flag: "🇯🇵", locale: "ja-JP" },
@@ -33,23 +35,67 @@ const LANGUAGES = [
   { code: "ar", name: "العربية", flag: "🇸🇦", locale: "ar-SA" },
 ];
 
+const STORAGE_DRAWER_MESSAGES_KEY = "coldguard.drawer.messages";
+const STORAGE_DRAWER_LANG_KEY = "coldguard.drawer.language";
+const STORAGE_DRAWER_AUTOSPEAK_KEY = "coldguard.drawer.autoSpeak";
+
 export default function ManagerVoiceDrawer() {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string; time: string }>>([
-    {
-      role: "assistant",
-      content: "Hello! I am your ColdGuard Manager Voice Assistant. How can I help with facility telemetry or risk?",
-      time: "Now",
-    },
-  ]);
+  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string; time: string }>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_DRAWER_MESSAGES_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [
+      {
+        role: "assistant",
+        content: "Hello! I am your ColdGuard Manager Voice Assistant. How can I help with facility telemetry or risk?",
+        time: "Now",
+      },
+    ];
+  });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_DRAWER_LANG_KEY) || "en";
+    } catch {
+      return "en";
+    }
+  });
   const [isRecording, setIsRecording] = useState(false);
-  const [autoSpeak, setAutoSpeak] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_DRAWER_AUTOSPEAK_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  // Persist messages & preferences
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_DRAWER_MESSAGES_KEY, JSON.stringify(messages));
+    } catch {}
+  }, [messages]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_DRAWER_LANG_KEY, language);
+    } catch {}
+  }, [language]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_DRAWER_AUTOSPEAK_KEY, String(autoSpeak));
+    } catch {}
+  }, [autoSpeak]);
 
   useEffect(() => {
     if (isOpen) {
@@ -97,12 +143,75 @@ export default function ManagerVoiceDrawer() {
     }
   };
 
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+    const populateVoices = () => {
+      const v = window.speechSynthesis.getVoices();
+      if (v && v.length > 0) setAvailableVoices(v);
+    };
+    populateVoices();
+    window.speechSynthesis.onvoiceschanged = populateVoices;
+    return () => {
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
+  }, []);
+
   const speak = (text: string) => {
     if (!("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
-    const clean = text.replace(/###/g, "").replace(/\*\*/g, "").replace(/\*/g, "");
+
+    let clean = text
+      .replace(/###/g, "")
+      .replace(/\*\*/g, "")
+      .replace(/\*/g, "")
+      .replace(/`/g, "")
+      .replace(/\[.*?\]\(.*?\)/g, "")
+      .replace(/—/g, "-")
+      .trim();
+
+    if (language === "hi") {
+      clean = clean
+        .replace(/\([A-Za-z\s0-9\-_%]+\)/g, " ")
+        .replace(/°C/g, " डिग्री सेल्सियस")
+        .replace(/\$([0-9,]+(?:\.[0-9]+)?)\s*USD/g, "$1 डॉलर")
+        .replace(/•/g, "")
+        .replace(/SOP-0(\d)/g, "एसओपी 0$1");
+    } else {
+      clean = clean
+        .replace(/°C/g, " degrees Celsius")
+        .replace(/•/g, "");
+    }
+
     const utter = new SpeechSynthesisUtterance(clean);
-    utter.lang = activeLocale;
+    utter.rate = 0.95;
+    utter.pitch = 1.0;
+
+    const voicesList = availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
+    const normLocale = activeLocale.toLowerCase().replace("_", "-");
+    const normLang = language.toLowerCase();
+
+    let voice = voicesList.find((v) => v.lang.toLowerCase().replace("_", "-") === normLocale);
+    if (!voice) {
+      voice = voicesList.find((v) => v.lang.toLowerCase().replace("_", "-").startsWith(normLang));
+    }
+    if (!voice && normLang === "hi") {
+      voice = voicesList.find((v) => {
+        const name = v.name.toLowerCase();
+        return name.includes("hindi") || name.includes("lekha") || name.includes("neerja") || name.includes("kalpana") || name.includes("हिन्दी");
+      });
+    }
+
+    if (voice) {
+      utter.voice = voice;
+      utter.lang = voice.lang;
+    } else {
+      utter.lang = activeLocale;
+    }
+
     window.speechSynthesis.speak(utter);
   };
 
@@ -154,6 +263,20 @@ export default function ManagerVoiceDrawer() {
     }
   };
 
+  const clearDrawer = () => {
+    window.speechSynthesis?.cancel();
+    try {
+      localStorage.removeItem(STORAGE_DRAWER_MESSAGES_KEY);
+    } catch {}
+    setMessages([
+      {
+        role: "assistant",
+        content: "Hello! I am your ColdGuard Manager Voice Assistant. How can I help with facility telemetry or risk?",
+        time: "Now",
+      },
+    ]);
+  };
+
   return (
     <>
       {/* Floating Action Button (Bottom-Right Orb) */}
@@ -192,6 +315,13 @@ export default function ManagerVoiceDrawer() {
             </div>
 
             <div className="flex items-center gap-1.5">
+              <button
+                onClick={clearDrawer}
+                className="p-1.5 text-[#475569] hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                title="Clear Conversation History"
+              >
+                <Trash2 size={16} />
+              </button>
               <Link
                 to="/manager/assistant"
                 onClick={() => setIsOpen(false)}

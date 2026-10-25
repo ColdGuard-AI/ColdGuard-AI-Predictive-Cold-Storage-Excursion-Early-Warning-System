@@ -59,9 +59,10 @@ export function describeErrorBody(body: unknown, status: number): string {
   return `Request failed with status ${status}`;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, customTimeoutMs?: number): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timeout = customTimeoutMs ?? TIMEOUT_MS;
+  const timer = setTimeout(() => controller.abort(), timeout);
   let res: Response;
   try {
     res = await fetch(`${BASE_URL}${path}`, {
@@ -92,9 +93,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-const get = <T>(path: string) => request<T>(path);
-const post = <T>(path: string, body?: unknown) =>
-  request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) });
+const get = <T>(path: string, timeoutMs?: number) => request<T>(path, undefined, timeoutMs);
+const post = <T>(path: string, body?: unknown, timeoutMs?: number) =>
+  request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }, timeoutMs);
 
 function qs(params: Record<string, string | number | boolean | undefined | null>): string {
   const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "");
@@ -209,5 +210,5 @@ export const api = {
       telemetry_context_used: boolean;
       telemetry_snapshot: any;
       suggested_actions: string[];
-    }>("/api/assistant/chat", payload),
+    }>("/api/assistant/chat", payload, 60000),
 };

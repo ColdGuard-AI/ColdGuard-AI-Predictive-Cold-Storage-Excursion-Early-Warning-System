@@ -56,8 +56,9 @@ interface ChatMessage {
 
 const LANGUAGES = [
   { code: "en", name: "English (US)", flag: "🇺🇸", locale: "en-US" },
-  { code: "es", name: "Español", flag: "🇪🇸", locale: "es-ES" },
+  { code: "mr", name: "मराठी (Marathi)", flag: "🇮🇳", locale: "mr-IN" },
   { code: "hi", name: "हिन्दी (Hindi)", flag: "🇮🇳", locale: "hi-IN" },
+  { code: "es", name: "Español", flag: "🇪🇸", locale: "es-ES" },
   { code: "de", name: "Deutsch", flag: "🇩🇪", locale: "de-DE" },
   { code: "fr", name: "Français", flag: "🇫🇷", locale: "fr-FR" },
   { code: "ja", name: "日本語 (Japanese)", flag: "🇯🇵", locale: "ja-JP" },
@@ -84,51 +85,92 @@ function createDynamicGreeting(
   const zoneLines = zList
     .map(
       (z) =>
-        `* **${z.name || z.zone_id}**: ${
+        `• ${z.name || z.zone_id}: ${
           z.temperature != null ? `${z.temperature.toFixed(2)}°C` : "—"
-        } (Safe: ${z.lower_limit}°C to ${z.upper_limit}°C) — Door: \`${
+        } (Safe: ${z.lower_limit}°C to ${z.upper_limit}°C) — Door: ${
           z.door_status || "closed"
-        }\` | Compressor: ${
+        } | Compressor: ${
           z.compressor_load_pct != null ? `${z.compressor_load_pct.toFixed(0)}% load` : "Normal"
         }`
     )
     .join("\n");
 
+  if (lang === "mr") {
+    return `👋 नमस्कार, कोल्ड स्टोरेज व्यवस्थापक\n\nमी तुमचा कोल्डगार्ड AI सहाय्यक आहे, जो थेट प्रत्यक्ष टेलीमेट्री आणि स्थानिक Ollama GxP मॉडेलशी जोडलेला आहे.\n\nसध्याची प्रत्यक्ष चेंबर स्थिती:\n${
+      zoneLines || "• थेट सेन्सर टेलीमेट्री डेटा लोड होत आहे..."
+    }\n\n• सुविधा जोखीम पातळी: ${risk}%\n• एकूण वीज वापर: ${power.toFixed(1)} kW\n• विनियामक स्थिती: 100% FDA 21 CFR Part 11 ऑडिट अनुपालन\n\nतुम्ही मला चेंबरचे तापमान, दरवाजा उघडा राहिल्यास होणारे आर्थिक नुकसान, किंवा एसओपी कृतींबद्दल मराठीत विचारू शकता. आपण मायक्रोफोनवर क्लिक करून बोलू शकता.`;
+  }
   if (lang === "hi") {
-    return `### 👋 नमस्ते, कोल्ड स्टोरेज मैनेजर\n\nमैं आपका **कोल्डगार्ड AI कोपायलट** हूँ, जो लाइव फैसिलिटी टेलीमेट्री और स्थानीय Ollama GxP मॉडल से सीधे जुड़ा हुआ है।\n\n**वर्तमान लाइव सिस्टम स्थिति:**\n${
-      zoneLines || "* लाइव टेलीमेट्री डेटा लोड हो रहा है..."
-    }\n\n* **सुविधा जोखिम स्तर:** ${risk}%\n* **कुल कंप्रेसर लोड:** ${power.toFixed(1)} kW\n* **GxP विनियामक स्थिति:** 100% FDA 21 CFR Part 11 ऑडिट अनुपालन\n\nआप मुझसे कक्ष तापमान, इन्वेंट्री वित्तीय जोखिम, कंप्रेसर लोड या दरवाजों की स्थिति के बारे में पूछ सकते हैं। आप माइक्रोफ़ोन पर क्लिक करके बोल भी सकते हैं।`;
+    return `👋 नमस्ते, कोल्ड स्टोरेज मैनेजर\n\nमैं आपका कोल्डगार्ड AI कोपायलट हूँ, जो लाइव फैसिलिटी टेलीमेट्री और स्थानीय Ollama GxP मॉडल से सीधे जुड़ा हुआ है।\n\nवर्तमान लाइव सिस्टम स्थिति:\n${
+      zoneLines || "• लाइव टेलीमेट्री डेटा लोड हो रहा है..."
+    }\n\n• सुविधा जोखिम स्तर: ${risk}%\n• कुल कंप्रेसर लोड: ${power.toFixed(1)} kW\n• GxP विनियामक स्थिति: 100% FDA 21 CFR Part 11 ऑडिट अनुपालन\n\nआप मुझसे कक्ष तापमान, इन्वेंट्री वित्तीय जोखिम, कंप्रेसर लोड या दरवाजों की स्थिति के बारे में पूछ सकते हैं। आप माइक्रोफ़ोन पर क्लिक करके बोल भी सकते हैं।`;
   }
   if (lang === "es") {
-    return `### 👋 Bienvenido, Gerente de Almacenamiento en Frío\n\nSoy su **Copiloto ColdGuard AI**, conectado en tiempo real a la telemetría de la instalación y modelos locales Ollama.\n\n**Estado Actual de Telemetría en Vivo:**\n${
-      zoneLines || "* Sincronizando datos de sensores..."
-    }\n\n* **Riesgo Global:** ${risk}%\n* **Carga Eléctrica:** ${power.toFixed(1)} kW\n* **Cumplimiento GxP:** FDA 21 CFR Parte 11 Verificado\n\n¿En qué puedo asistirle hoy respecto a telemetría, pronóstico de excursiones o exposición financiera? Puede escribir o pulsar el micrófono para hablar en español.`;
+    return `👋 Bienvenido, Gerente de Almacenamiento en Frío\n\nSoy su Copiloto ColdGuard AI, conectado en tiempo real a la telemetría de la instalación y modelos locales Ollama.\n\nEstado Actual de Telemetría en Vivo:\n${
+      zoneLines || "• Sincronizando datos de sensores..."
+    }\n\n• Riesgo Global: ${risk}%\n• Carga Eléctrica: ${power.toFixed(1)} kW\n• Cumplimiento GxP: FDA 21 CFR Parte 11 Verificado\n\n¿En qué puedo asistirle hoy respecto a telemetría, pronóstico de excursiones o exposición financiera? Puede escribir o pulsar el micrófono para hablar en español.`;
   }
   if (lang === "de") {
-    return `### 👋 Willkommen, Kaltlager-Manager\n\nIch bin Ihr **ColdGuard AI Copilot**, direkt angebunden an Echtzeit-Telemetrie und lokale Ollama GxP-Modelle.\n\n**Aktuelle Live-Telemetrie:**\n${
-      zoneLines || "* Telemetriedaten werden synchronisiert..."
-    }\n\n* **Gesamtanlagenrisiko:** ${risk}%\n* **Kompressor-Gesamtlast:** ${power.toFixed(1)} kW\n* **FDA 21 CFR Part 11:** Vollständig auditiert\n\nFragen Sie nach Kammertemperaturen, Exkursionsrisiken oder elektrischen Lasten.`;
+    return `👋 Willkommen, Kaltlager-Manager\n\nIch bin Ihr ColdGuard AI Copilot, direkt angebunden an Echtzeit-Telemetrie und lokale Ollama GxP-Modelle.\n\nAktuelle Live-Telemetrie:\n${
+      zoneLines || "• Telemetriedaten werden synchronisiert..."
+    }\n\n• Gesamtanlagenrisiko: ${risk}%\n• Kompressor-Gesamtlast: ${power.toFixed(1)} kW\n• FDA 21 CFR Part 11: Vollständig auditiert\n\nFragen Sie nach Kammertemperaturen, Exkursionsrisiken oder elektrischen Lasten.`;
   }
   if (lang === "fr") {
-    return `### 👋 Bienvenue, Gestionnaire d'Entrepôt Frigorifique\n\nJe suis votre **Copilote ColdGuard AI**, connecté en temps réel à la télémétrie locale et aux modèles GxP Ollama.\n\n**État Actuel en Direct:**\n${
-      zoneLines || "* Synchronisation des données télémétriques..."
-    }\n\n* **Risque Global:** ${risk}%\n* **Charge Électrique:** ${power.toFixed(1)} kW\n* **Conformité GxP:** FDA 21 CFR Part 11 vérifiée\n\nPosez vos questions ou cliquez sur le micro pour parler.`;
+    return `👋 Bienvenue, Gestionnaire d'Entrepôt Frigorifique\n\nJe suis votre Copilote ColdGuard AI, connecté en temps réel à la télémétrie locale et aux modèles GxP Ollama.\n\nÉtat Actuel en Direct:\n${
+      zoneLines || "• Synchronisation des données télémétriques..."
+    }\n\n• Risque Global: ${risk}%\n• Charge Électrique: ${power.toFixed(1)} kW\n• Conformité GxP: FDA 21 CFR Part 11 vérifiée\n\nPosez vos questions ou cliquez sur le micro pour parler.`;
   }
   // Default English
-  return `### 👋 Welcome, Cold Storage Manager\n\nI am your **ColdGuard AI Copilot**, connected in real time to live facility telemetry and local Ollama GxP models.\n\n**Live Telemetry Status:**\n${
-    zoneLines || "* Synchronizing telemetry stream from active chambers..."
-  }\n\n* **Overall Facility Risk:** ${risk}%\n* **Total Electrical Load:** ${power.toFixed(1)} kW\n* **GxP Compliance:** 100% FDA 21 CFR Part 11 Tamper-Proof Audit Trail\n\nAsk me about chamber temperatures, excursion forecasts, financial exposure, or electromechanical compressor loads. You can also click the microphone to speak aloud in your preferred language.`;
+  return `👋 Welcome, Cold Storage Manager\n\nI am your ColdGuard AI Copilot, connected in real time to live facility telemetry and local Ollama GxP models.\n\nLive Telemetry Status:\n${
+    zoneLines || "• Synchronizing telemetry stream from active chambers..."
+  }\n\n• Overall Facility Risk: ${risk}%\n• Total Electrical Load: ${power.toFixed(1)} kW\n• GxP Compliance: 100% FDA 21 CFR Part 11 Tamper-Proof Audit Trail\n\nAsk me about chamber temperatures, excursion forecasts, financial exposure, or electromechanical compressor loads. You can also click the microphone to speak aloud in your preferred language.`;
 }
+
+const STORAGE_MESSAGES_KEY = "coldguard.assistant.messages";
+const STORAGE_LANG_KEY = "coldguard.assistant.language";
+const STORAGE_MODEL_KEY = "coldguard.assistant.model";
+const STORAGE_AUTOSPEAK_KEY = "coldguard.assistant.autoSpeak";
+const STORAGE_DRAFT_KEY = "coldguard.assistant.draft";
 
 export default function ManagerAssistant() {
   const { zones, totalPowerKw, facilityRisk } = useApp();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState("en");
-  const [selectedModel, setSelectedModel] = useState("coldguard-manager");
-  const [autoSpeak, setAutoSpeak] = useState(false);
+
+  const [selectedLanguage, setSelectedLanguage] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_LANG_KEY) || "en";
+    } catch {
+      return "en";
+    }
+  });
+
+  const [selectedModel, setSelectedModel] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_MODEL_KEY) || "coldguard-manager";
+    } catch {
+      return "coldguard-manager";
+    }
+  });
+
+  const [autoSpeak, setAutoSpeak] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_AUTOSPEAK_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+
   const [loading, setLoading] = useState(false);
-  const [inputMessage, setInputMessage] = useState("");
+
+  const [inputMessage, setInputMessage] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_DRAFT_KEY) || "";
+    } catch {
+      return "";
+    }
+  });
+
   const [isRecording, setIsRecording] = useState(false);
   const [currentlySpeakingId, setCurrentlySpeakingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -139,37 +181,92 @@ export default function ManagerAssistant() {
     models: [],
   });
 
-  const [messages, setMessages] = useState<ChatMessage[]>(() => [
-    {
-      id: "welcome-init",
-      role: "assistant",
-      content: createDynamicGreeting("en", [], 0, 0),
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      engine: "ColdGuard Intelligence Engine",
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_MESSAGES_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn("Could not load saved chat history:", e);
+    }
+    return [
+      {
+        id: "welcome-init",
+        role: "assistant",
+        content: createDynamicGreeting("en", [], 0, 0),
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        engine: "ColdGuard Intelligence Engine",
+      },
+    ];
+  });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  // Persist messages across tab navigation
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_MESSAGES_KEY, JSON.stringify(messages));
+    } catch (e) {
+      console.warn("Could not save chat history:", e);
+    }
+  }, [messages]);
+
+  // Persist settings across tab navigation
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_LANG_KEY, selectedLanguage);
+    } catch {}
+  }, [selectedLanguage]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_MODEL_KEY, selectedModel);
+    } catch {}
+  }, [selectedModel]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_AUTOSPEAK_KEY, String(autoSpeak));
+    } catch {}
+  }, [autoSpeak]);
+
+  useEffect(() => {
+    try {
+      if (inputMessage) {
+        localStorage.setItem(STORAGE_DRAFT_KEY, inputMessage);
+      } else {
+        localStorage.removeItem(STORAGE_DRAFT_KEY);
+      }
+    } catch {}
+  }, [inputMessage]);
 
   // Auto-scroll chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // Sync dynamic greeting with live telemetry when initial state loads
+  // Sync dynamic greeting with live telemetry ONLY if no user messages exist yet
   useEffect(() => {
-    if (messages.length <= 1) {
-      setMessages([
+    setMessages((prev) => {
+      const hasUserMessage = prev.some((m) => m.role === "user");
+      if (hasUserMessage) {
+        return prev; // Preserve conversation history untouched!
+      }
+      return [
         {
           id: "welcome-live",
           role: "assistant",
           content: createDynamicGreeting(selectedLanguage, zones, facilityRisk, totalPowerKw),
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: prev[0]?.timestamp || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           engine: ollamaStatus.connected ? `Ollama (${selectedModel})` : "ColdGuard Intelligence Engine",
         },
-      ]);
-    }
+      ];
+    });
   }, [zones, facilityRisk, totalPowerKw, selectedLanguage, ollamaStatus.connected, selectedModel]);
 
   // Check Ollama daemon status
@@ -246,6 +343,26 @@ export default function ManagerAssistant() {
     }
   };
 
+  // Load and cache voices when SpeechSynthesis is ready
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+    const populateVoices = () => {
+      const v = window.speechSynthesis.getVoices();
+      if (v && v.length > 0) {
+        setAvailableVoices(v);
+      }
+    };
+    populateVoices();
+    window.speechSynthesis.onvoiceschanged = populateVoices;
+    return () => {
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
+  }, []);
+
   // ── Text-to-Speech (TTS) Integration ──────────────────────────────────────
   const speakText = (text: string, messageId?: string) => {
     if (!("speechSynthesis" in window)) {
@@ -260,7 +377,7 @@ export default function ManagerAssistant() {
       return;
     }
 
-    const cleanText = text
+    let speechText = text
       .replace(/###/g, "")
       .replace(/\*\*/g, "")
       .replace(/\*/g, "")
@@ -269,15 +386,64 @@ export default function ManagerAssistant() {
       .replace(/—/g, "-")
       .trim();
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = activeLocale;
-    utterance.rate = 1.0;
+    if (selectedLanguage === "mr") {
+      // In Marathi mode, strip parenthetical English labels so Marathi TTS reads smooth, natural Marathi
+      speechText = speechText
+        .replace(/\([A-Za-z\s0-9\-_%]+\)/g, " ")
+        .replace(/°C/g, " अंश सेल्सिअस")
+        .replace(/\$([0-9,]+(?:\.[0-9]+)?)\s*USD/g, "$1 डॉलर्स")
+        .replace(/•/g, "")
+        .replace(/SOP-0(\d)/g, "एसओपी 0$1");
+    } else if (selectedLanguage === "hi") {
+      // In Hindi mode, strip parenthetical English labels so Hindi TTS reads smooth, pure Hindi
+      speechText = speechText
+        .replace(/\([A-Za-z\s0-9\-_%]+\)/g, " ")
+        .replace(/°C/g, " डिग्री सेल्सियस")
+        .replace(/\$([0-9,]+(?:\.[0-9]+)?)\s*USD/g, "$1 डॉलर")
+        .replace(/•/g, "")
+        .replace(/SOP-0(\d)/g, "एसओपी 0$1");
+    } else {
+      speechText = speechText
+        .replace(/°C/g, " degrees Celsius")
+        .replace(/•/g, "");
+    }
+
+    const utterance = new SpeechSynthesisUtterance(speechText);
+    utterance.rate = 0.95;
     utterance.pitch = 1.0;
 
-    const voices = window.speechSynthesis.getVoices();
-    const voice = voices.find((v) => v.lang.startsWith(selectedLanguage));
+    const voicesList = availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
+    const normLocale = activeLocale.toLowerCase().replace("_", "-");
+    const normLang = selectedLanguage.toLowerCase();
+
+    // 1. Exact locale match (e.g. "mr-IN", "hi-IN")
+    let voice = voicesList.find((v) => v.lang.toLowerCase().replace("_", "-") === normLocale);
+
+    // 2. Starts with language code (e.g. "mr", "hi")
+    if (!voice) {
+      voice = voicesList.find((v) => v.lang.toLowerCase().replace("_", "-").startsWith(normLang));
+    }
+
+    // 3. Match known voice names by language
+    if (!voice && normLang === "mr") {
+      voice = voicesList.find((v) => {
+        const name = v.name.toLowerCase();
+        return name.includes("marathi") || name.includes("मराठी");
+      });
+    } else if (!voice && normLang === "hi") {
+      voice = voicesList.find((v) => {
+        const name = v.name.toLowerCase();
+        return name.includes("hindi") || name.includes("lekha") || name.includes("neerja") || name.includes("kalpana") || name.includes("हिन्दी");
+      });
+    } else if (!voice && normLang === "es") {
+      voice = voicesList.find((v) => v.name.toLowerCase().includes("spanish") || v.name.toLowerCase().includes("español"));
+    }
+
     if (voice) {
       utterance.voice = voice;
+      utterance.lang = voice.lang;
+    } else {
+      utterance.lang = activeLocale;
     }
 
     utterance.onstart = () => {
@@ -371,6 +537,11 @@ export default function ManagerAssistant() {
   const clearChat = () => {
     window.speechSynthesis?.cancel();
     setCurrentlySpeakingId(null);
+    try {
+      localStorage.removeItem(STORAGE_MESSAGES_KEY);
+      localStorage.removeItem(STORAGE_DRAFT_KEY);
+    } catch {}
+    setInputMessage("");
     setMessages([
       {
         id: `welcome-${Date.now()}`,
@@ -426,11 +597,11 @@ export default function ManagerAssistant() {
             </div>
           </div>
 
-          {/* Integrated Control Toolbar (Language, Model, TTS, Clear, Fullscreen) */}
-          <div className="flex items-center gap-2 flex-wrap ml-auto">
+          {/* Integrated Control Toolbar: Language and Model Selector */}
+          <div className="flex items-center gap-2.5 flex-wrap ml-auto">
             {/* Language Selector */}
-            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-[#DCE8F6] shadow-sm">
-              <Globe2 size={14} className="text-[#2563EB]" />
+            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-[#DCE8F6] shadow-sm">
+              <Globe2 size={15} className="text-[#2563EB]" />
               <select
                 value={selectedLanguage}
                 onChange={(e) => setSelectedLanguage(e.target.value)}
@@ -445,8 +616,8 @@ export default function ManagerAssistant() {
             </div>
 
             {/* Model Selector */}
-            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-[#DCE8F6] shadow-sm">
-              <Server size={14} className="text-[#2563EB]" />
+            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-[#DCE8F6] shadow-sm">
+              <Server size={15} className="text-[#2563EB]" />
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
@@ -460,133 +631,16 @@ export default function ManagerAssistant() {
               </select>
             </div>
 
-            {/* Auto-Speak TTS Toggle */}
-            <button
-              onClick={() => setAutoSpeak(!autoSpeak)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs sm:text-sm font-bold transition shadow-sm cursor-pointer ${
-                autoSpeak
-                  ? "bg-[#EFF6FF] border-[#BAE6FD] text-[#2563EB]"
-                  : "bg-white border-[#DCE8F6] text-[#64748B] hover:text-[#0F172A]"
-              }`}
-              title={autoSpeak ? "Disable automated voice readout" : "Enable automated voice readout"}
-            >
-              {autoSpeak ? <Volume2 size={15} className="text-[#2563EB]" /> : <VolumeX size={15} />}
-              <span>{autoSpeak ? "Voice TTS On" : "TTS Muted"}</span>
-            </button>
-
-            {/* LoRA Fine-Tuning Status Pill */}
-            <div
-              className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold shadow-sm bg-indigo-50 border-indigo-200 text-indigo-800"
-              title="PEFT LoRA Adapter (Rank 16, Alpha 32) fine-tuned on dual-mass thermal infiltration and FDA 21 CFR Part 11"
-            >
-              <Sparkles size={13} className="text-indigo-600" />
-              <span>LoRA Fine-Tuned (r=16, α=32)</span>
-            </div>
-
-            {/* Ollama / Physics Engine Status Pill */}
-            <div
-              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold shadow-sm transition-all ${
-                ollamaStatus.connected
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                  : "bg-[#EFF6FF] border-[#BAE6FD] text-[#2563EB]"
-              }`}
-              title={
-                ollamaStatus.connected
-                  ? "Connected to local Ollama daemon on http://localhost:11434"
-                  : "Ollama daemon offline on port 11434. Running ColdGuard Physics & GxP Neural Engine. To activate Ollama LLM, run 'ollama serve' in your terminal."
-              }
-            >
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  ollamaStatus.connected ? "bg-emerald-500 animate-pulse" : "bg-[#2563EB]"
-                }`}
-              />
-              <span>
-                {ollamaStatus.connected ? `Ollama Active (${selectedModel})` : "ColdGuard Physics Engine"}
-              </span>
-            </div>
-
             {/* Clear Session */}
             <button
               onClick={clearChat}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white border border-[#DCE8F6] hover:bg-[#F1F7FF] text-[#475569] hover:text-[#0F172A] text-xs font-bold transition shadow-sm cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#DCE8F6] hover:bg-[#F1F7FF] text-[#475569] hover:text-[#0F172A] text-xs sm:text-sm font-bold transition shadow-sm cursor-pointer"
               title="Reset Chat Session"
             >
-              <Trash2 size={13} />
+              <Trash2 size={14} />
               <span>Clear</span>
             </button>
-
-            {/* Fullscreen Toggle */}
-            <button
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#EFF6FF] border border-[#BAE6FD] text-[#2563EB] hover:text-[#1D4ED8] text-xs sm:text-sm font-bold transition shadow-sm cursor-pointer"
-              title={isFullscreen ? "Exit Fullscreen Mode" : "Expand to Fullscreen"}
-            >
-              {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-              <span>{isFullscreen ? "Exit Fullscreen" : "Fullscreen"}</span>
-            </button>
           </div>
-        </div>
-
-        {/* Quick Query Templates Strip */}
-        <div className="px-4 sm:px-6 py-2.5 bg-white border-b border-[#DCE8F6] flex items-center gap-2 overflow-x-auto text-xs shrink-0">
-          <span className="text-xs font-bold text-[#64748B] uppercase tracking-wider shrink-0 flex items-center gap-1">
-            <Sparkles size={13} className="text-[#2563EB]" /> Quick Prompts:
-          </span>
-          <button
-            onClick={() => handleSendMessage("What is the fine-tuning LoRA model architecture and hyperparameters?")}
-            className="px-3 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 border border-indigo-200 text-xs font-bold text-indigo-900 transition cursor-pointer shrink-0 flex items-center gap-1"
-          >
-            🧬 LoRA Architecture & Specs
-          </button>
-          <button
-            onClick={() => handleSendMessage("What will happen if I keep open the door for next 5 min?")}
-            className="px-3 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 hover:border-rose-300 border border-rose-200 text-xs font-bold text-rose-800 transition cursor-pointer shrink-0"
-          >
-            🚪 5-Min Door Breach Simulation
-          </button>
-          <button
-            onClick={() => handleSendMessage("What is the current temperature of all 3 cold chambers?")}
-            className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
-          >
-            🌡️ All Temperatures
-          </button>
-          <button
-            onClick={() => handleSendMessage("Are there any predicted excursion breaches in the next 1 hour?")}
-            className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
-          >
-            🚨 1h Excursion Forecast
-          </button>
-          <button
-            onClick={() => handleSendMessage("How much total financial inventory is at risk across the facility?")}
-            className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
-          >
-            💰 Inventory Financial Exposure
-          </button>
-          <button
-            onClick={() => handleSendMessage("What perishable products have the shortest time to spoilage?")}
-            className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
-          >
-            📦 Spoilage Sensitivity
-          </button>
-          <button
-            onClick={() => handleSendMessage("Are all digital telemetry logs compliant with FDA 21 CFR Part 11?")}
-            className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
-          >
-            📋 FDA GxP Regulations
-          </button>
-          <button
-            onClick={() => handleSendMessage("Are all compressor racks operating within normal electrical load?")}
-            className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
-          >
-            ⚡ Compressor Power (kW)
-          </button>
-          <button
-            onClick={() => handleSendMessage("Explain the cooling pull-down recovery curve and door status.")}
-            className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] hover:border-[#BAE6FD] border border-[#DCE8F6] text-xs font-bold text-[#0F172A] transition cursor-pointer shrink-0"
-          >
-            📈 Cooling Pull-Down Curve
-          </button>
         </div>
 
         {/* Chat Message Scrollable Area */}
@@ -651,23 +705,68 @@ export default function ManagerAssistant() {
                     </div>
                   </div>
 
-                  {/* Message Body with simple markdown rendering */}
+                  {/* Message Body with clean styling and no raw markdown symbols */}
                   <div className="space-y-2 whitespace-pre-wrap font-sans">
-                    {m.content.split("\n\n").map((paragraph, pIdx) => {
-                      if (paragraph.startsWith("### ")) {
+                    {m.content
+                      .replace(/^#+\s*/gm, "")
+                      .replace(/\*{1,5}/g, "")
+                      .split("\n\n")
+                      .map((paragraph, pIdx) => {
+                        const trimmed = paragraph.trim();
+                        if (!trimmed) return null;
+
+                        const isTitle =
+                          pIdx === 0 &&
+                          (trimmed.startsWith("🚨") ||
+                            trimmed.startsWith("🧬") ||
+                            trimmed.startsWith("👋") ||
+                            trimmed.startsWith("🤖") ||
+                            trimmed.includes("Simulation") ||
+                            trimmed.includes("Architecture"));
+
+                        const isSectionNumbered = /^\d+\.\s+/.test(trimmed);
+
+                        if (isTitle) {
+                          return (
+                            <h3
+                              key={pIdx}
+                              className={`text-base font-extrabold mt-0.5 mb-1 tracking-tight ${
+                                isUser ? "text-white" : "text-[#0F172A]"
+                              }`}
+                            >
+                              {trimmed}
+                            </h3>
+                          );
+                        }
+
+                        if (isSectionNumbered) {
+                          const lines = trimmed.split("\n");
+                          const header = lines[0];
+                          const body = lines.slice(1).join("\n");
+                          return (
+                            <div key={pIdx} className="mt-1.5 mb-1.5">
+                              <h4
+                                className={`text-sm font-bold mb-1 ${
+                                  isUser ? "text-white" : "text-[#0F172A]"
+                                }`}
+                              >
+                                {header}
+                              </h4>
+                              {body && (
+                                <p className="leading-relaxed text-xs sm:text-sm">
+                                  {body}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        }
+
                         return (
-                          <h4
-                            key={pIdx}
-                            className={`text-base font-extrabold mt-1 mb-1 tracking-tight ${
-                              isUser ? "text-white" : "text-[#0F172A]"
-                            }`}
-                          >
-                            {paragraph.replace("### ", "")}
-                          </h4>
+                          <p key={pIdx} className="leading-relaxed text-xs sm:text-sm">
+                            {trimmed}
+                          </p>
                         );
-                      }
-                      return <p key={pIdx}>{paragraph}</p>;
-                    })}
+                      })}
                   </div>
 
                   {/* Footer Engine Badge */}
